@@ -1,0 +1,61 @@
+# ==========================
+# Node / VSCode Extension
+# ==========================
+
+# Dépendances Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Builds VS Code
+out/
+dist/
+.vscode-test/
+
+# Extensions VSIX générées
+*.vsix
+
+# Logs divers
+*.log
+logs/
+*.pid
+*.seed
+*.tgz
+
+# Cache
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Système
+.DS_Store
+Thumbs.db
+
+# VSCode workspace local
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# Tests snapshots
+test-results/
+coverage-final.json
+.nyc_output/
+
+# Env secrets
+.env
+.env.local
+.env.*.local
+
+# IDE / JetBrains
+.idea/
+*.iml
+
+# Misc
+tmp/
+temp/
