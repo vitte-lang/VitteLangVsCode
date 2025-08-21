@@ -1,0 +1,441 @@
+{
+  "scopeName": "source.vitte",
+  "name": "Vitte",
+  "fileTypes": ["vitte"],
+  "uuid": "9b9a8a48-8a2b-4c66-9f7f-0c9a6f2b2b77",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#attributes" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords" },
+    { "include": "#types-builtins" },
+    { "include": "#use-import" },
+    { "include": "#module-decl" },
+    { "include": "#trait-decl" },
+    { "include": "#impl-block" },
+    { "include": "#struct-decl" },
+    { "include": "#enum-decl" },
+    { "include": "#fn-decl" },
+    { "include": "#fn-call" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.vitte",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.vitte",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            {
+              "name": "comment.block.documentation.vitte",
+              "match": "@\\w+"
+            },
+            {
+              "name": "keyword.other.todo.vitte",
+              "match": "\\b(TODO|FIXME|HACK|BUG|NOTE|OPTIMIZE|XXX)\\b"
+            }
+          ]
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "meta.annotation.vitte",
+          "match": "@[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.vitte",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.vitte",
+              "match": "\\\\(x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|[0-7]{1,3}|[\\\\\"'nrvtbf0])"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.vitte",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.vitte",
+              "match": "\\\\(x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|[0-7]{1,3}|[\\\\\"'nrvtbf0])"
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.binary.vitte",
+          "match": "\\b0b[01](?:[01_]*[01])?(?:[iu](?:8|16|32|64))?\\b"
+        },
+        {
+          "name": "constant.numeric.octal.vitte",
+          "match": "\\b0o[0-7](?:[0-7_]*[0-7])?(?:[iu](?:8|16|32|64))?\\b"
+        },
+        {
+          "name": "constant.numeric.hex.vitte",
+          "match": "\\b0x[0-9A-Fa-f](?:[0-9A-Fa-f_]*[0-9A-Fa-f])?(?:[iu](?:8|16|32|64))?\\b"
+        },
+        {
+          "name": "constant.numeric.float.vitte",
+          "match": "\\b\\d[\\d_]*\\.(?:\\d[\\d_]*)?(?:[eE][+-]?\\d+)?(?:f(?:32|64))?\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.vitte",
+          "match": "\\b\\d[\\d_]*(?:[eE][+-]?\\d+)?(?:[iu](?:8|16|32|64))?\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.vitte",
+          "match": "\\b(if|else|while|for|match|return|break|continue|yield|defer)\\b"
+        },
+        {
+          "name": "storage.type.vitte",
+          "match": "\\b(fn|let|const|mut|struct|enum|trait|impl|module|use|pub|extern|type|where)\\b"
+        },
+        {
+          "name": "constant.language.vitte",
+          "match": "\\b(true|false|null)\\b"
+        }
+      ]
+    },
+    "types-builtins": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.vitte",
+          "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|isize|usize|f32|f64|bool|char|str|void)\\b"
+        },
+        {
+          "name": "support.type.std.vitte",
+          "match": "\\b(Vec|Map|Set|Option|Result|String|Box|Rc|Arc)\\b"
+        },
+        {
+          "name": "entity.name.type.vitte",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        }
+      ]
+    },
+    "use-import": {
+      "patterns": [
+        {
+          "name": "meta.import.vitte",
+          "begin": "\\buse\\b",
+          "beginCaptures": {
+            "0": { "name": "keyword.other.import.vitte" }
+          },
+          "end": "(?=;|$)",
+          "patterns": [
+            {
+              "name": "entity.name.namespace.vitte",
+              "match": "[A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*"
+            },
+            {
+              "name": "keyword.operator.as.vitte",
+              "match": "\\bas\\b"
+            },
+            {
+              "name": "variable.other.alias.vitte",
+              "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+            },
+            {
+              "name": "punctuation.separator.comma.vitte",
+              "match": ","
+            },
+            {
+              "name": "punctuation.section.braces.vitte",
+              "match": "[{}]"
+            },
+            {
+              "name": "keyword.operator.wildcard.vitte",
+              "match": "\\*"
+            }
+          ]
+        }
+      ]
+    },
+    "module-decl": {
+      "patterns": [
+        {
+          "name": "meta.module.vitte",
+          "begin": "\\bmodule\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "0": { "name": "storage.type.module.vitte" },
+            "1": { "name": "entity.name.namespace.module.vitte" }
+          },
+          "end": "(?=;|$)",
+          "patterns": []
+        }
+      ]
+    },
+    "trait-decl": {
+      "patterns": [
+        {
+          "name": "meta.trait.vitte",
+          "begin": "\\btrait\\s+([A-Z][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "0": { "name": "storage.type.trait.vitte" },
+            "1": { "name": "entity.name.type.trait.vitte" }
+          },
+          "end": "(?=\\{|;|$)",
+          "patterns": [
+            { "include": "#generics" },
+            { "include": "#where-clause" }
+          ]
+        }
+      ]
+    },
+    "impl-block": {
+      "patterns": [
+        {
+          "name": "meta.impl.vitte",
+          "begin": "\\bimpl\\b",
+          "beginCaptures": { "0": { "name": "storage.type.impl.vitte" } },
+          "end": "(?=\\{)",
+          "patterns": [
+            { "include": "#type-ref" },
+            { "include": "#generics" },
+            { "include": "#where-clause" }
+          ]
+        }
+      ]
+    },
+    "struct-decl": {
+      "patterns": [
+        {
+          "name": "meta.struct.vitte",
+          "begin": "\\b(struct)\\s+([A-Z][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "storage.type.struct.vitte" },
+            "2": { "name": "entity.name.type.struct.vitte" }
+          },
+          "end": "(?=\\{|;|$)",
+          "patterns": [
+            { "include": "#generics" },
+            { "include": "#where-clause" }
+          ]
+        }
+      ]
+    },
+    "enum-decl": {
+      "patterns": [
+        {
+          "name": "meta.enum.vitte",
+          "begin": "\\b(enum)\\s+([A-Z][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "storage.type.enum.vitte" },
+            "2": { "name": "entity.name.type.enum.vitte" }
+          },
+          "end": "(?=\\{|;|$)",
+          "patterns": [
+            { "include": "#generics" },
+            { "include": "#where-clause" }
+          ]
+        }
+      ]
+    },
+    "fn-decl": {
+      "patterns": [
+        {
+          "name": "meta.function.vitte",
+          "begin": "\\b(pub\\s+)?(extern\\s+\"[A-Za-z0-9_]+\"\\s+)?(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "beginCaptures": {
+            "1": { "name": "storage.modifier.vitte" },
+            "2": { "name": "storage.modifier.extern.vitte" },
+            "3": { "name": "storage.type.function.vitte" },
+            "4": { "name": "entity.name.function.vitte" }
+          },
+          "end": "(?=\\{|;)",
+          "patterns": [
+            { "include": "#generics" },
+            {
+              "name": "meta.parameters.vitte",
+              "begin": "\\(",
+              "beginCaptures": { "0": { "name": "punctuation.section.parens.begin.vitte" } },
+              "end": "\\)",
+              "endCaptures": { "0": { "name": "punctuation.section.parens.end.vitte" } },
+              "patterns": [
+                { "include": "#type-ref" },
+                { "include": "#strings" },
+                { "include": "#numbers" },
+                { "include": "#attributes" },
+                {
+                  "name": "variable.parameter.vitte",
+                  "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
+                },
+                {
+                  "name": "punctuation.separator.parameter.vitte",
+                  "match": ","
+                },
+                {
+                  "name": "keyword.operator.assignment.vitte",
+                  "match": ":"
+                }
+              ]
+            },
+            {
+              "name": "meta.return-type.vitte",
+              "begin": "\\s*->\\s*",
+              "beginCaptures": { "0": { "name": "keyword.operator.arrow.vitte" } },
+              "end": "(?=\\{|;)",
+              "patterns": [{ "include": "#type-ref" }]
+            },
+            { "include": "#where-clause" }
+          ]
+        }
+      ]
+    },
+    "fn-call": {
+      "patterns": [
+        {
+          "name": "meta.function-call.vitte",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": { "name": "entity.name.function.vitte" }
+          }
+        }
+      ]
+    },
+    "generics": {
+      "patterns": [
+        {
+          "name": "meta.generics.vitte",
+          "begin": "<",
+          "beginCaptures": { "0": { "name": "punctuation.definition.typeparameters.begin.vitte" } },
+          "end": ">",
+          "endCaptures": { "0": { "name": "punctuation.definition.typeparameters.end.vitte" } },
+          "patterns": [
+            { "include": "#type-ref" },
+            { "include": "#lifetimes" },
+            { "include": "#punctuation" }
+          ]
+        }
+      ]
+    },
+    "where-clause": {
+      "patterns": [
+        {
+          "name": "meta.where.vitte",
+          "begin": "\\bwhere\\b",
+          "beginCaptures": { "0": { "name": "keyword.other.where.vitte" } },
+          "end": "(?=\\{|;|$)",
+          "patterns": [
+            { "include": "#type-ref" },
+            { "include": "#lifetimes" },
+            { "include": "#operators" },
+            { "include": "#punctuation" }
+          ]
+        }
+      ]
+    },
+    "type-ref": {
+      "patterns": [
+        {
+          "name": "storage.type.reference.vitte",
+          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
+        },
+        {
+          "name": "support.type.primitive.vitte",
+          "match": "\\b(i8|i16|i32|i64|u8|u16|u32|u64|isize|usize|f32|f64|bool|char|str|void)\\b"
+        },
+        {
+          "name": "keyword.operator.namespace.vitte",
+          "match": "::"
+        },
+        { "include": "#generics" },
+        { "include": "#lifetimes" }
+      ]
+    },
+    "lifetimes": {
+      "patterns": [
+        {
+          "name": "storage.modifier.lifetime.vitte",
+          "match": "'[A-Za-z_][A-Za-z0-9_]*"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.arithmetic.vitte",
+          "match": "\\+|\\-|\\*|\\/|%|\\*\\*"
+        },
+        {
+          "name": "keyword.operator.bitwise.vitte",
+          "match": "&|\\||\\^|~|<<|>>"
+        },
+        {
+          "name": "keyword.operator.logical.vitte",
+          "match": "&&|\\|\\||!"
+        },
+        {
+          "name": "keyword.operator.comparison.vitte",
+          "match": "==|!=|<=|>=|<|>"
+        },
+        {
+          "name": "keyword.operator.assignment.vitte",
+          "match": "=|\\+=|\\-=|\\*=|\\/=|%=|&=|\\|=|\\^=|<<=|>>="
+        },
+        {
+          "name": "keyword.operator.range.vitte",
+          "match": "\\.\\.|\\.\\.\\."
+        },
+        {
+          "name": "keyword.operator.arrow.vitte",
+          "match": "->|=>"
+        }
+        ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.section.block.vitte",
+          "match": "[{}]"
+        },
+        {
+          "name": "punctuation.section.parens.vitte",
+          "match": "[()]"
+        },
+        {
+          "name": "punctuation.section.brackets.vitte",
+          "match": "[\\[\\]]"
+        },
+        {
+          "name": "punctuation.separator.comma.vitte",
+          "match": ","
+        },
+        {
+          "name": "punctuation.terminator.statement.vitte",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.colon.vitte",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.accessor.vitte",
+          "match": "\\.|::"
+        }
+      ]
+    }
+  }
+}
