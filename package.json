@@ -1,0 +1,99 @@
+{
+  "name": "vitte-lang",
+  "displayName": "Vitte Language Support",
+  "description": "Extension Visual Studio Code pour le langage Vitte : coloration syntaxique, snippets, configuration de langage et base pour LSP.",
+  "version": "0.1.0",
+  "publisher": "vitte-lang",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters",
+    "Formatters"
+  ],
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vitte-lang/vscode-vitte"
+  },
+  "bugs": {
+    "url": "https://github.com/vitte-lang/vscode-vitte/issues"
+  },
+  "homepage": "https://vitte-lang.github.io/vitte/",
+  "license": "MIT",
+  "keywords": [
+    "vitte",
+    "language",
+    "syntax highlighting",
+    "snippets",
+    "vscode",
+    "lsp",
+    "compiler",
+    "bytecode",
+    "programming language"
+  ],
+  "activationEvents": [
+    "onLanguage:vitte"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "vitte",
+        "aliases": ["Vitte", "vitte"],
+        "extensions": [".vitte"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "vitte",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "vitte",
+        "path": "./snippets/vitte.json"
+      }
+    ],
+    "configuration": {
+      "title": "Vitte",
+      "properties": {
+        "vitte.enableLSP": {
+          "type": "boolean",
+          "default": false,
+          "description": "Activer le serveur de langage Vitte (si disponible)"
+        },
+        "vitte.trace.server": {
+          "type": "string",
+          "enum": ["off", "messages", "verbose"],
+          "default": "off",
+          "description": "Niveau de log pour le LSP"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint . --ext .ts",
+    "test": "npm run compile && node ./out/test/runTest.js",
+    "build": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.70.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0",
+    "vsce": "^2.15.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.0"
+  }
+}

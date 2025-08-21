@@ -1,0 +1,154 @@
+{
+  "Print": {
+    "prefix": "print",
+    "body": ["print(\"$1\");"],
+    "description": "Afficher une valeur"
+  },
+  "Function": {
+    "prefix": "fn",
+    "body": [
+      "pub fn ${1:name}(${2:params}) -> ${3:Type} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Définir une fonction publique"
+  },
+  "Private Function": {
+    "prefix": "fnp",
+    "body": [
+      "fn ${1:name}(${2:params}) -> ${3:Type} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Définir une fonction privée"
+  },
+  "Module": {
+    "prefix": "module",
+    "body": [
+      "module ${1:name}",
+      "",
+      "use ${2:dep} as ${3:alias}",
+      ""
+    ],
+    "description": "Déclarer un module avec un import"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": [
+      "struct ${1:Name} {",
+      "    ${2:field}: ${3:Type},",
+      "}"
+    ],
+    "description": "Définir une structure"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:Name} {",
+      "    ${2:Variant1},",
+      "    ${3:Variant2},",
+      "}"
+    ],
+    "description": "Définir une énumération"
+  },
+  "Impl": {
+    "prefix": "impl",
+    "body": [
+      "impl ${1:Type} {",
+      "    pub fn ${2:new}(${3:params}) -> ${1:Type} {",
+      "        $0",
+      "    }",
+      "}"
+    ],
+    "description": "Implémenter des méthodes pour un type"
+  },
+  "Trait": {
+    "prefix": "trait",
+    "body": [
+      "trait ${1:TraitName} {",
+      "    fn ${2:method}(${3:self}) -> ${4:Type};",
+      "}"
+    ],
+    "description": "Définir un trait (interface)"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": [
+      "for ${1:var} in ${2:iterable} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Boucle for"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while ${1:condition} {",
+      "    $0",
+      "}"
+    ],
+    "description": "Boucle while"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": [
+      "match ${1:expr} {",
+      "    ${2:Pattern1} => { $3 },",
+      "    ${4:Pattern2} => { $5 },",
+      "    _ => { $0 }",
+      "}"
+    ],
+    "description": "Expression match"
+  },
+  "Test": {
+    "prefix": "test",
+    "body": [
+      "@test",
+      "fn ${1:it_should_do_x}() {",
+      "    // Arrange",
+      "    // Act",
+      "    // Assert",
+      "    $0",
+      "}"
+    ],
+    "description": "Définir un test"
+  },
+  "FFI C": {
+    "prefix": "ffi-c",
+    "body": [
+      "extern \"C\" {",
+      "    fn ${1:c_function}(${2:params}) -> ${3:Return};",
+      "}"
+    ],
+    "description": "Déclaration FFI vers C"
+  },
+  "FFI Rust": {
+    "prefix": "ffi-rust",
+    "body": [
+      "extern \"Rust\" {",
+      "    fn ${1:rust_function}(${2:params}) -> ${3:Return};",
+      "}"
+    ],
+    "description": "Déclaration FFI vers Rust"
+  },
+  "Vec": {
+    "prefix": "vec",
+    "body": ["let mut ${1:items}: Vec<${2:Type}> = Vec::new();"],
+    "description": "Créer un vecteur"
+  },
+  "Map": {
+    "prefix": "map",
+    "body": ["let mut ${1:map}: Map<${2:Key}, ${3:Value}> = Map::new();"],
+    "description": "Créer une map"
+  },
+  "Option": {
+    "prefix": "option",
+    "body": ["let ${1:maybe}: Option<${2:Type}> = None;"],
+    "description": "Créer une option"
+  },
+  "Result": {
+    "prefix": "result",
+    "body": ["let ${1:res}: Result<${2:Type}, ${3:Error}> = Ok(${4:value});"],
+    "description": "Créer un Result"
+  }
+}
