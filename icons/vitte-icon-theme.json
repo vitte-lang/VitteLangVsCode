@@ -1,0 +1,14 @@
+{
+  "iconDefinitions": {
+    "_vitte": { "iconPath": "./vitte.png" }
+  },
+  "fileExtensions": {
+    "vitte": "_vitte"
+  },
+  "fileNames": {
+    "main.vitte": "_vitte"
+  },
+  "languageIds": {
+    "vitte": "_vitte"
+  }
+}

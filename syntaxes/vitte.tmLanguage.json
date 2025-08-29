@@ -21,6 +21,7 @@
     { "include": "#types-primitive" },
     { "include": "#booleans" },
     { "include": "#macros" },
+    { "include": "#asm" },
     { "include": "#operators" },
     { "include": "#punctuation" }
   ],
@@ -28,9 +29,7 @@
     "shebang": {
       "name": "comment.line.shebang.vitte",
       "match": "^(#!).*$",
-      "captures": {
-        "1": { "name": "punctuation.definition.comment.vitte" }
-      }
+      "captures": { "1": { "name": "punctuation.definition.comment.vitte" } }
     },
 
     "comments-doc": {
@@ -43,10 +42,7 @@
           "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitte" } },
           "patterns": [{ "include": "#todo" }]
         },
-        {
-          "name": "comment.line.documentation.vitte",
-          "match": "///.*$"
-        }
+        { "name": "comment.line.documentation.vitte", "match": "///.*$" }
       ]
     },
 
@@ -96,14 +92,8 @@
       "patterns": [
         { "include": "#comments" },
         { "include": "#ident-path" },
-        {
-          "name": "keyword.control.as.vitte",
-          "match": "\\b(as)\\b"
-        },
-        {
-          "name": "punctuation.section.braces.vitte",
-          "match": "[{}*,]"
-        }
+        { "name": "keyword.control.as.vitte", "match": "\\b(as)\\b" },
+        { "name": "punctuation.section.braces.vitte", "match": "[{}*,]" }
       ]
     },
 
@@ -112,9 +102,7 @@
       "begin": "\\b(module)\\s+",
       "beginCaptures": { "1": { "name": "keyword.other.module.vitte" } },
       "end": "(?=[;{])",
-      "patterns": [
-        { "include": "#ident-path" }
-      ]
+      "patterns": [{ "include": "#ident-path" }]
     },
 
     "ident-path": {
@@ -161,10 +149,7 @@
       "end": "(?={|;)",
       "patterns": [
         { "include": "#ident-path" },
-        {
-          "name": "keyword.control.for.vitte",
-          "match": "\\bfor\\b"
-        }
+        { "name": "keyword.control.for.vitte", "match": "\\bfor\\b" }
       ]
     },
 
@@ -177,9 +162,7 @@
         "3": { "name": "punctuation.section.parameters.begin.vitte" }
       },
       "end": "(\\))",
-      "endCaptures": {
-        "1": { "name": "punctuation.section.parameters.end.vitte" }
-      },
+      "endCaptures": { "1": { "name": "punctuation.section.parameters.end.vitte" } },
       "patterns": [
         { "include": "#comments" },
         { "include": "#strings" },
@@ -188,27 +171,16 @@
         { "include": "#types-primitive" },
         { "include": "#booleans" },
         { "include": "#ident-path" },
-        {
-          "name": "variable.parameter.vitte",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
-        },
-        {
-          "name": "punctuation.separator.parameter.vitte",
-          "match": ","
-        },
-        {
-          "name": "punctuation.separator.type.vitte",
-          "match": ":"
-        }
+        { "name": "variable.parameter.vitte", "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
+        { "name": "punctuation.separator.parameter.vitte", "match": "," },
+        { "name": "punctuation.separator.type.vitte", "match": ":" }
       ]
     },
 
     "fn-call": {
       "name": "meta.function-call.vitte",
       "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
-      "captures": {
-        "1": { "name": "entity.name.function.vitte" }
-      }
+      "captures": { "1": { "name": "entity.name.function.vitte" } }
     },
 
     "strings": {
@@ -222,7 +194,7 @@
           "patterns": [
             {
               "name": "constant.character.escape.vitte",
-              "match": "\\\\(?:[nrt\"'\\\\]|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f_]{1,6}\\})"
+              "match": "\\\\(?:[btnr\"'\\\\]|x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f_]{1,6}\\})"
             }
           ]
         },
@@ -243,26 +215,14 @@
 
     "numbers": {
       "patterns": [
-        {
-          "name": "constant.numeric.hex.vitte",
-          "match": "\\b0x[0-9A-Fa-f](?:[0-9A-Fa-f_]*[0-9A-Fa-f])?\\b"
-        },
-        {
-          "name": "constant.numeric.bin.vitte",
-          "match": "\\b0b[01](?:[01_]*[01])?\\b"
-        },
-        {
-          "name": "constant.numeric.oct.vitte",
-          "match": "\\b0o[0-7](?:[0-7_]*[0-7])?\\b"
-        },
+        { "name": "constant.numeric.hex.vitte", "match": "\\b0x[0-9A-Fa-f](?:[0-9A-Fa-f_]*[0-9A-Fa-f])?\\b" },
+        { "name": "constant.numeric.bin.vitte", "match": "\\b0b[01](?:[01_]*[01])?\\b" },
+        { "name": "constant.numeric.oct.vitte", "match": "\\b0o[0-7](?:[0-7_]*[0-7])?\\b" },
         {
           "name": "constant.numeric.float.vitte",
           "match": "\\b\\d(?:[\\d_]*\\d)?(?:\\.\\d(?:[\\d_]*\\d)?)?(?:[eE][+-]?\\d(?:[\\d_]*\\d)?)\\b"
         },
-        {
-          "name": "constant.numeric.dec.vitte",
-          "match": "\\b\\d(?:[\\d_]*\\d)?\\b"
-        }
+        { "name": "constant.numeric.dec.vitte", "match": "\\b\\d(?:[\\d_]*\\d)?\\b" }
       ]
     },
 
@@ -270,36 +230,53 @@
       "patterns": [
         {
           "name": "keyword.control.vitte",
-          "match": "\\b(if|else|match|for|while|loop|break|continue|return)\\b"
+          "match": "\\b(?:if|else|match|for|while|loop|break|continue|return|switch|case|default|do|goto|try|catch|finally|throw|throws|await|async|with|yield|elif)\\b"
         },
         {
           "name": "storage.modifier.vitte",
-          "match": "\\b(pub)\\b"
+          "match": "\\b(?:pub|mut|static|extern|inline|volatile|restrict)\\b"
         },
         {
           "name": "storage.type.binding.vitte",
-          "match": "\\b(let|const)\\b"
+          "match": "\\b(?:let|const|var|type|typedef)\\b"
+        },
+        {
+          "name": "keyword.other.import.vitte",
+          "match": "\\b(?:import|from|use|package|namespace|using)\\b"
         },
         {
           "name": "keyword.operator.word.vitte",
-          "match": "\\b(as|in|where)\\b"
+          "match": "\\b(?:as|in|is|and|or|not|where|sizeof|new|delete)\\b"
+        },
+        {
+          "name": "keyword.declaration.other.vitte",
+          "match": "\\b(?:def|class|struct|enum|trait|impl|fn|interface|template|constexpr|friend|override|virtual|abstract|extends|implements|operator|global|nonlocal|assert|del|raise|map|chan|go|defer|select|fallthrough|range)\\b"
         }
       ]
     },
 
     "types-primitive": {
       "name": "storage.type.primitive.vitte",
-      "match": "\\b(i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64|bool|char|str|void)\\b"
+      "match": "\\b(?:void|bool|char|short|int|long|unsigned|signed|float|double|i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize|f32|f64|str|string|byte)\\b"
     },
 
     "booleans": {
       "name": "constant.language.boolean.vitte",
-      "match": "\\b(true|false)\\b"
+      "match": "\\b(true|false|null|nil|none)\\b"
     },
 
     "macros": {
       "name": "support.function.macro.vitte",
       "match": "\\b([A-Za-z_][A-Za-z0-9_]*)!"
+    },
+
+    "asm": {
+      "patterns": [
+        {
+          "name": "keyword.other.asm.vitte",
+          "match": "\\b(?:mov|add|sub|mul|div|inc|dec|cmp|jmp|je|jne|jg|jl|jge|jle|push|pop|call|ret|lea|and|or|xor|not|shl|shr|nop)\\b"
+        }
+      ]
     },
 
     "operators": {

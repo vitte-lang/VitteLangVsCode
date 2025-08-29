@@ -139,8 +139,30 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
 
 const KEYWORDS = [
-  "module","use","pub","fn","struct","enum","trait","impl","let","const",
-  "match","if","else","while","for","loop","return"
+  
+  "module","use","pub","fn","struct","enum","trait","impl","let","const","mut",
+  "match","if","else","while","for","loop","return",
+
+  
+  "def","class","import","from","as","in","is","and","or","not","elif","try","except","finally",
+  "with","yield","lambda","pass","global","nonlocal","assert","del","raise","await","async",
+
+  
+  "package","interface","map","chan","go","defer","select","type","var","const","break","continue",
+  "fallthrough","range","default","switch","case",
+
+  
+  "int","float","double","char","short","long","signed","unsigned","void","bool","sizeof","typedef",
+  "union","static","extern","inline","volatile","restrict","goto","register","do",
+
+  
+  "mov","add","sub","mul","div","inc","dec","cmp","jmp","je","jne","jg","jl","jge","jle",
+  "push","pop","call","ret","lea","xor","shl","shr","nop",
+
+  
+  "true","false","null","nil","none","self","this","super","new","delete","catch","throw","throws",
+  "export","namespace","using","override","virtual","abstract","extends","implements","operator",
+  "template","constexpr","friend","static_cast","dynamic_cast","reinterpret_cast"
 ];
 
 connection.onCompletion((_params): CompletionItem[] => {
@@ -170,6 +192,42 @@ connection.onCompletion((_params): CompletionItem[] => {
 });
 
 const HOVER_DOC: Record<string,string> = {
+  // Vitte / Rust-like
+  mut: "Marque la mutabilité (autorise la modification).",
+
+  def: "Définit une fonction (style Python).",
+  class: "Définit une classe (style Python).",
+  import: "Importe un module ou symbole.",
+  from: "Importe depuis un module (Python).",
+  lambda: "Fonction anonyme (Python).",
+  await: "Attente asynchrone.",
+  async: "Déclare un contexte asynchrone.",
+
+
+  package: "Déclare le paquet courant (Go).",
+  interface: "Déclare une interface (Go).",
+  defer: "Diffère l’exécution jusqu’au retour (Go).",
+  select: "Multiplexage de canaux (Go).",
+
+ 
+  typedef: "Alias de type (C/C++).",
+  sizeof: "Taille en octets d’un type/objet.",
+  switch: "Sélection multi-branches.",
+  case: "Branche d’un switch.",
+  break: "Sort d’une boucle/switch.",
+  continue: "Passe à l’itération suivante.",
+  inline: "Suggestion d’inlining.",
+
+  
+  mov: "Copie registre/mémoire (ASM).",
+  add: "Addition (ASM).",
+  jmp: "Saut inconditionnel (ASM).",
+  push: "Empile une valeur (ASM).",
+  pop: "Dépile une valeur (ASM).",
+  call: "Appel de sous-routine (ASM).",
+  ret: "Retour de sous-routine (ASM).",
+
+
   module: "Déclare un module (espace de noms).",
   use: "Importe un symbole/module.",
   pub: "Rend public.",
@@ -186,8 +244,9 @@ const HOVER_DOC: Record<string,string> = {
   while: "Boucle conditionnelle.",
   for: "Boucle sur itérable.",
   loop: "Boucle infinie.",
-  return: "Retour de fonction.",
+  return: "Retour de fonction."
 };
+
 
 connection.onHover((params) => {
   const doc = documents.get(params.textDocument.uri);
