@@ -2,8 +2,7 @@
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/VitteStudio.vitte-lang?label=VS%20Code%20Marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=VitteStudio.vitte-lang)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/VitteStudio.vitte-lang?label=Installs&color=brightgreen)](https://marketplace.visualstudio.com/items?itemName=VitteStudio.vitte-lang)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/VitteStudio.vitte-lang?label=Rating)](https://marketplace.visualstudio.com/items?itemName=VitteStudio.vitte-lang)
-[![GitHub Stars](https://img.shields.io/github/stars/vitte-lang/vscode-vitte?style=social)](https://github.com/vitte-lang/vscode-vitte/stargazers)  
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/VitteStudio.vitte-lang?label=Rating)](https://marketplace.visualstudio.com/items?itemName=VitteStudio.vitte-lang) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Build](https://img.shields.io/github/actions/workflow/status/vitte-lang/vscode-vitte/ci.yml?label=build&logo=github)](https://github.com/vitte-lang/vscode-vitte/actions)
 
