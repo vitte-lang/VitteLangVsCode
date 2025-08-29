@@ -4,12 +4,16 @@
   "version": "0.1.0",
   "type": "commonjs",
   "main": "out/server.js",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc -b",
     "watch": "tsc -b -w",
     "clean": "tsc -b --clean",
-    "start": "node --enable-source-maps out/server.js"
+    "start": "node --enable-source-maps out/server.js",
+    "prepare": "npm run build",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "vscode-languageserver": "^9.0.1",
