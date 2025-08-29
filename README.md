@@ -4,7 +4,7 @@
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/VitteStudio.vitte-lang?label=Installs&color=brightgreen)](https://marketplace.visualstudio.com/items?itemName=VitteStudio.vitte-lang)
 [![Rating](https://img.shields.io/visual-studio-marketplace/r/VitteStudio.vitte-lang?label=Rating)](https://marketplace.visualstudio.com/items?itemName=VitteStudio.vitte-lang) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Build](https://img.shields.io/github/actions/workflow/status/vitte-lang/vscode-vitte/ci.yml?label=build&logo=github)](https://github.com/vitte-lang/vscode-vitte/actions)
+
 
 Extension **Visual Studio Code** pour le langage **Vitte** :  
 coloration syntaxique, snippets, Language Server Protocol (LSP), et icônes personnalisées pour vos fichiers `.vitte`.
