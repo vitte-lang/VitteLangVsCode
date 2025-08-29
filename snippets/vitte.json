@@ -1,154 +1,303 @@
 {
-  "Print": {
-    "prefix": "print",
-    "body": ["print(\"$1\");"],
-    "description": "Afficher une valeur"
-  },
-  "Function": {
-    "prefix": "fn",
-    "body": [
-      "pub fn ${1:name}(${2:params}) -> ${3:Type} {",
-      "    $0",
-      "}"
-    ],
-    "description": "Définir une fonction publique"
-  },
-  "Private Function": {
-    "prefix": "fnp",
-    "body": [
-      "fn ${1:name}(${2:params}) -> ${3:Type} {",
-      "    $0",
-      "}"
-    ],
-    "description": "Définir une fonction privée"
-  },
   "Module": {
-    "prefix": "module",
-    "body": [
-      "module ${1:name}",
-      "",
-      "use ${2:dep} as ${3:alias}",
-      ""
-    ],
-    "description": "Déclarer un module avec un import"
+    "prefix": ["mod", "module"],
+    "body": ["module ${1:my.module}"],
+    "description": "Déclaration de module"
   },
+  "Use import": {
+    "prefix": ["use", "import"],
+    "body": ["use ${1:path::to::item}${2: as ${3:alias}}"],
+    "description": "Import (use ... as ...)"
+  },
+  "Public use": {
+    "prefix": ["pubuse"],
+    "body": ["pub use ${1:path::to::item}${2: as ${3:alias}}"],
+    "description": "Import public (ré-export)"
+  },
+
+  "Function": {
+    "prefix": ["fn"],
+    "body": [
+      "fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Définition de fonction"
+  },
+  "Public function": {
+    "prefix": ["pfn", "pubfn"],
+    "body": [
+      "pub fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Définition de fonction publique"
+  },
+  "Main": {
+    "prefix": ["main"],
+    "body": [
+      "fn main() {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Point d’entrée"
+  },
+  "Return": {
+    "prefix": ["ret", "return"],
+    "body": ["return ${1:value};"],
+    "description": "Instruction return"
+  },
+
   "Struct": {
-    "prefix": "struct",
+    "prefix": ["struct", "st"],
     "body": [
       "struct ${1:Name} {",
-      "    ${2:field}: ${3:Type},",
+      "\t${2:field}: ${3:Type},",
       "}"
     ],
-    "description": "Définir une structure"
+    "description": "Déclaration de struct"
+  },
+  "Public Struct": {
+    "prefix": ["pstruct", "pubstruct"],
+    "body": [
+      "pub struct ${1:Name} {",
+      "\t${2:field}: ${3:Type},",
+      "}"
+    ],
+    "description": "Struct publique"
   },
   "Enum": {
-    "prefix": "enum",
+    "prefix": ["enum", "en"],
     "body": [
       "enum ${1:Name} {",
-      "    ${2:Variant1},",
-      "    ${3:Variant2},",
+      "\t${2:Variant1},",
+      "\t${3:Variant2}${4:( ${5:fields} )}",
       "}"
     ],
-    "description": "Définir une énumération"
+    "description": "Déclaration d’enum"
   },
-  "Impl": {
-    "prefix": "impl",
+  "Public Enum": {
+    "prefix": ["penum", "pubenum"],
     "body": [
-      "impl ${1:Type} {",
-      "    pub fn ${2:new}(${3:params}) -> ${1:Type} {",
-      "        $0",
-      "    }",
+      "pub enum ${1:Name} {",
+      "\t${2:Variant1},",
+      "\t${3:Variant2}${4:( ${5:fields} )}",
       "}"
     ],
-    "description": "Implémenter des méthodes pour un type"
+    "description": "Enum publique"
   },
   "Trait": {
-    "prefix": "trait",
+    "prefix": ["trait"],
     "body": [
       "trait ${1:TraitName} {",
-      "    fn ${2:method}(${3:self}) -> ${4:Type};",
+      "\tfn ${2:method}(${3:&self})${4: -> ${5:Type}};",
       "}"
     ],
-    "description": "Définir un trait (interface)"
+    "description": "Déclaration de trait (interface)"
   },
-  "For Loop": {
-    "prefix": "for",
+  "Impl": {
+    "prefix": ["impl"],
     "body": [
-      "for ${1:var} in ${2:iterable} {",
-      "    $0",
+      "impl ${1:TypeName} {",
+      "\tpub fn ${2:new}(${3:})${4: -> Self} {",
+      "\t\t$0",
+      "\t}",
       "}"
     ],
-    "description": "Boucle for"
+    "description": "Bloc d’implémentation sur un type"
   },
-  "While Loop": {
-    "prefix": "while",
+  "Impl for Trait": {
+    "prefix": ["implfor", "implt"],
     "body": [
-      "while ${1:condition} {",
-      "    $0",
+      "impl ${1:TraitName} for ${2:TypeName} {",
+      "\tfn ${3:method}(${4:&self})${5: -> ${6:Type}} {",
+      "\t\t$0",
+      "\t}",
+      "}"
+    ],
+    "description": "Implémenter un trait pour un type"
+  },
+
+  "Match": {
+    "prefix": ["match"],
+    "body": [
+      "match ${1:expr} {",
+      "\t${2:pattern} => ${3:expr},",
+      "\t_ => ${4:default},",
+      "}"
+    ],
+    "description": "Expression de sélection (match)"
+  },
+  "Match Option": {
+    "prefix": ["matchopt", "mopt"],
+    "body": [
+      "match ${1:opt} {",
+      "\tSome(${2:val}) => ${3},",
+      "\tNone => ${4},",
+      "}"
+    ],
+    "description": "Pattern matching sur Option"
+  },
+  "Match Result": {
+    "prefix": ["matchres", "mres"],
+    "body": [
+      "match ${1:res} {",
+      "\tOk(${2:val}) => ${3},",
+      "\tErr(${4:err}) => ${5},",
+      "}"
+    ],
+    "description": "Pattern matching sur Result"
+  },
+
+  "If": {
+    "prefix": ["if"],
+    "body": [
+      "if ${1:cond} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Bloc if"
+  },
+  "If / Else": {
+    "prefix": ["ife", "ifelse"],
+    "body": [
+      "if ${1:cond} {",
+      "\t${2}",
+      "} else {",
+      "\t${3}",
+      "}"
+    ],
+    "description": "Bloc if/else"
+  },
+  "Else if": {
+    "prefix": ["elif", "elseif"],
+    "body": [
+      "else if ${1:cond} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Branche else if"
+  },
+  "For in": {
+    "prefix": ["for"],
+    "body": [
+      "for ${1:item} in ${2:iterable} {",
+      "\t$0",
+      "}"
+    ],
+    "description": "Boucle for-in"
+  },
+  "While": {
+    "prefix": ["while"],
+    "body": [
+      "while ${1:cond} {",
+      "\t$0",
       "}"
     ],
     "description": "Boucle while"
   },
-  "Match": {
-    "prefix": "match",
+  "Loop": {
+    "prefix": ["loop"],
     "body": [
-      "match ${1:expr} {",
-      "    ${2:Pattern1} => { $3 },",
-      "    ${4:Pattern2} => { $5 },",
-      "    _ => { $0 }",
+      "loop {",
+      "\t$0",
       "}"
     ],
-    "description": "Expression match"
+    "description": "Boucle infinie"
   },
+
+  "Let binding": {
+    "prefix": ["let"],
+    "body": ["let ${1:name}${2:: ${3:Type}} = ${4:init};"],
+    "description": "Déclaration avec let"
+  },
+  "Const": {
+    "prefix": ["const"],
+    "body": ["const ${1:NAME}${2:: ${3:Type}} = ${4:value};"],
+    "description": "Constante"
+  },
+
+  "Attribute": {
+    "prefix": ["attr", "#["],
+    "body": ["#[${1:attribute}]"],
+    "description": "Attribut #[...]"
+  },
+  "Derive": {
+    "prefix": ["derive"],
+    "body": ["#[derive(${1:Debug,Clone})]"],
+    "description": "Attribut derive"
+  },
+  "Doc line": {
+    "prefix": ["doc", "///"],
+    "body": ["/// ${1:Description}"],
+    "description": "Commentaire de documentation (ligne)"
+  },
+  "Doc block": {
+    "prefix": ["/**", "docb"],
+    "body": [
+      "/**",
+      " * ${1:Résumé}",
+      " *",
+      " * ${2:Détails}",
+      " */"
+    ],
+    "description": "Bloc de documentation"
+  },
+  "Comment line": {
+    "prefix": ["//"],
+    "body": ["// ${1:note}"],
+    "description": "Commentaire simple"
+  },
+  "Comment block": {
+    "prefix": ["/*"],
+    "body": [
+      "/*",
+      " ${1:commentaire}",
+      " */"
+    ],
+    "description": "Commentaire multi-lignes"
+  },
+
+  "Panic": {
+    "prefix": ["panic"],
+    "body": ["panic(${1:\"message\"});"],
+    "description": "Arrêt avec message (panic)"
+  },
+
   "Test": {
-    "prefix": "test",
+    "prefix": ["test", "utest"],
     "body": [
-      "@test",
-      "fn ${1:it_should_do_x}() {",
-      "    // Arrange",
-      "    // Act",
-      "    // Assert",
-      "    $0",
+      "#[test]",
+      "fn ${1:it_works}() {",
+      "\t$0",
       "}"
     ],
-    "description": "Définir un test"
+    "description": "Test unitaire"
   },
-  "FFI C": {
-    "prefix": "ffi-c",
+  "Benchmark": {
+    "prefix": ["bench"],
     "body": [
-      "extern \"C\" {",
-      "    fn ${1:c_function}(${2:params}) -> ${3:Return};",
+      "#[bench]",
+      "fn ${1:bench_case}() {",
+      "\t$0",
       "}"
     ],
-    "description": "Déclaration FFI vers C"
+    "description": "Gabarit de benchmark"
   },
-  "FFI Rust": {
-    "prefix": "ffi-rust",
+
+  "Macro call": {
+    "prefix": ["mac", "macro"],
+    "body": ["${1:name}!(${2:args})${3:;}"],
+    "description": "Appel de macro name!(...)"
+  },
+
+  "File header": {
+    "prefix": ["header", "filehdr"],
     "body": [
-      "extern \"Rust\" {",
-      "    fn ${1:rust_function}(${2:params}) -> ${3:Return};",
-      "}"
+      "/// ${TM_FILENAME}",
+      "/// ${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}",
+      "/// ${1:Description}"
     ],
-    "description": "Déclaration FFI vers Rust"
-  },
-  "Vec": {
-    "prefix": "vec",
-    "body": ["let mut ${1:items}: Vec<${2:Type}> = Vec::new();"],
-    "description": "Créer un vecteur"
-  },
-  "Map": {
-    "prefix": "map",
-    "body": ["let mut ${1:map}: Map<${2:Key}, ${3:Value}> = Map::new();"],
-    "description": "Créer une map"
-  },
-  "Option": {
-    "prefix": "option",
-    "body": ["let ${1:maybe}: Option<${2:Type}> = None;"],
-    "description": "Créer une option"
-  },
-  "Result": {
-    "prefix": "result",
-    "body": ["let ${1:res}: Result<${2:Type}, ${3:Error}> = Ok(${4:value});"],
-    "description": "Créer un Result"
+    "description": "Entête de fichier"
   }
 }

@@ -1,0 +1,60 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build client",
+      "type": "shell",
+      "command": "npx tsc -b client",
+      "group": "build",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "build server",
+      "type": "shell",
+      "command": "npx tsc -b server",
+      "group": "build",
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "build all",
+      "dependsOn": ["build client", "build server"],
+      "group": { "kind": "build", "isDefault": true }
+    },
+    {
+      "label": "watch client",
+      "type": "shell",
+      "command": "npx tsc -b -w client",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch"
+    },
+    {
+      "label": "watch server",
+      "type": "shell",
+      "command": "npx tsc -b -w server",
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch"
+    },
+    {
+      "label": "watch all",
+      "dependsOn": ["watch client", "watch server"],
+      "isBackground": true
+    },
+    {
+      "label": "clean",
+      "type": "shell",
+      "command": "npx tsc -b --clean client server"
+    },
+    {
+      "label": "package vsix",
+      "type": "shell",
+      "command": "npx vsce package",
+      "dependsOn": ["build all"]
+    },
+    {
+      "label": "install vsix",
+      "type": "shell",
+      "command": "code --install-extension ./*.vsix",
+      "problemMatcher": []
+    }
+  ]
+}

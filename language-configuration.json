@@ -1,0 +1,43 @@
+{
+  "$schema": "vscode://schemas/language-configuration",
+  "comments": {
+    "blockComment": ["/*", "*/"]
+  },
+  "brackets": [["{","}"],["[","]"],["(",")"]],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "'", "close": "'", "notIn": ["string","comment"] },
+    { "open": "`", "close": "`", "notIn": ["string","comment"] }
+  ],
+  "surroundingPairs": [["{","}"],["[","]"],["(",")"],["\"","\""],["'","'"],["`","`"]],
+  "indentationRules": {
+    "increaseIndentPattern": "^.*\\{[^}\"']*$",
+    "decreaseIndentPattern": "^\\s*\\}"
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "^\\s*/\\*\\*(?!/)$",
+      "afterText": "^(?!\\s*\\*/)",
+      "action": { "indent": "indentOutdent", "appendText": " * " }
+    },
+    {
+      "beforeText": "^\\s*\\*(?:\\s.*)?$",
+      "action": { "indent": "none", "appendText": "* " }
+    },
+    {
+      "beforeText": "^\\s*/\\*[^*]*\\*$",
+      "action": { "indent": "none", "appendText": " " }
+    },
+    {
+      "beforeText": "^\\s*(?:fn|struct|enum|trait|impl|module|match|for|while|if|else)\\b.*\\{\\s*$",
+      "action": { "indent": "indent" }
+    },
+    {
+      "beforeText": "^\\s*\\}\\s*$",
+      "action": { "indent": "outdent" }
+    }
+  ]
+}

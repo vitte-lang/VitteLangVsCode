@@ -1,0 +1,12 @@
+**/.git/**
+**/.github/**
+**/.vscode/**
+**/.DS_Store
+**/tsconfig*.json
+**/*.map
+**/out/test/**
+**/node_modules/**/.bin/**
+**/node_modules/**/*.map
+**/server/src/**
+**/client/src/**
+**/scripts/**

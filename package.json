@@ -5,7 +5,7 @@
   "version": "0.1.0",
   "publisher": "vitte-lang",
   "engines": {
-    "vscode": "^1.70.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Programming Languages",
@@ -37,13 +37,18 @@
   "activationEvents": [
     "onLanguage:vitte"
   ],
-  "main": "./out/extension.js",
+  "main": "./client/out/extension.js",
   "contributes": {
     "languages": [
       {
         "id": "vitte",
-        "aliases": ["Vitte", "vitte"],
-        "extensions": [".vitte"],
+        "aliases": [
+          "Vitte",
+          "vitte"
+        ],
+        "extensions": [
+          ".vitte"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -70,7 +75,11 @@
         },
         "vitte.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Niveau de log pour le LSP"
         }
@@ -79,19 +88,18 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "lint": "eslint . --ext .ts",
-    "test": "npm run compile && node ./out/test/runTest.js",
+    "compile": "tsc -p ./client && tsc -p ./server",
+    "watch": "concurrently \"tsc -w -p ./client\" \"tsc -w -p ./server\"",
     "build": "vsce package",
     "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/vscode": "^1.70.0",
+    "@types/vscode": "^1.75.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0",
     "eslint": "^8.0.0",
-    "vsce": "^2.15.0"
+    "vsce": "^2.15.0",
+    "concurrently": "^8.0.0"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.0"

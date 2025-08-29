@@ -33,10 +33,3 @@ et cette extension suit le versioning [SemVer](https://semver.org/lang/fr/).
 ---
 
 ## [0.2.0] — En préparation
-### Prévu
-- 🚀 Support **LSP** (autocomplétion, diagnostics, hover, go-to-def, references, rename)
-- 🎨 Tokens sémantiques et folding regions
-- 🔧 Intégration avec `vitte-fmt` (formatter officiel)
-- 📖 Documentation contextuelle (hover docs)
-- ⚡ Amélioration des snippets (async, unsafe, macros)
-- 🧪 Tests automatiques de colorisation (fixtures basiques et avancées)
