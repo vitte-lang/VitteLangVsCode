@@ -3,10 +3,13 @@
   "displayName": "Vitte Language Support",
   "description": "Extension Visual Studio Code pour le langage Vitte : coloration syntaxique, snippets, configuration de langage et base pour LSP.",
   "version": "0.1.0",
-  "publisher": "vitte-lang",
+  "publisher": "VitteStudio",
   "engines": {
     "vscode": "^1.75.0"
   },
+  "extensionKind": [
+    "workspace"
+  ],
   "categories": [
     "Programming Languages",
     "Snippets",
@@ -33,9 +36,6 @@
     "compiler",
     "bytecode",
     "programming language"
-  ],
-  "activationEvents": [
-    "onLanguage:vitte"
   ],
   "main": "./client/out/extension.js",
   "contributes": {
@@ -94,14 +94,17 @@
     "publish": "vsce publish"
   },
   "devDependencies": {
-    "@types/vscode": "^1.75.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^3.6.0",
+    "concurrently": "^8.0.0",
     "eslint": "^8.0.0",
-    "vsce": "^2.15.0",
-    "concurrently": "^8.0.0"
+    "typescript": "^5.0.0",
+    "vsce": "^2.15.0"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.0"
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
   }
 }

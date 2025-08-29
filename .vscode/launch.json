@@ -15,14 +15,13 @@
     },
     {
       "name": "Attach to Vitte Server (6009)",
-      "type": "node",            // ← moderne
+      "type": "node",
       "request": "attach",
       "port": 6009,
       "restart": true,
       "smartStep": true,
       "outFiles": ["${workspaceFolder}/server/out/**/*.js"],
       "skipFiles": ["<node_internals>/**"]
-      // <- plus de "protocol"
     }
   ],
   "compounds": [
