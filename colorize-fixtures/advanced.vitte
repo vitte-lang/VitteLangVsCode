@@ -1,0 +1,189 @@
+/*! advanced.vitte — fixture de colorisation avancée pour Vitte
+   Couvre : generics, where, trait+impl, imports groupés/alias, attributes,
+   async/await, FFI extern, motifs complexes, raw strings, escapes, nombres.
+*/
+
+///! Doc du module — version avancée
+module demo.advanced
+
+// Imports groupés + alias + glob
+use std.io::{println as p, eprintln, *}
+use std.time::{Instant, Duration}
+use std.math::{pow, sqrt}
+use std.collections::{Map as HashMap, Set}
+
+// Attributs façon tests/inline (pour test hi-light des #[])
+#[test]
+#[should_panic(false)]
+fn sanity() -> () { return () }
+
+// Constantes & formats numériques
+const MASK: u64 = 0xFF_FF_00_00
+const OCTAL: i32 = 0o755
+const BIN:   i32 = 0b1011_0101
+const SCI:   f64 = 6.022e23
+const BIG:   i128 = 9_223_372_036_854_775_807
+
+// Chaînes : escapes, unicode, “raw-like”, multi-ligne simulée
+let s1 = "quote: \" \n tab:\t smile:\u{1F60A}"
+let path = "C:\\Users\\vince\\code\\file.vit"
+// Raw style (si tu veux tester un mode brut dans la grammaire)
+let raw = r#"line1 {"no interpolate"} \n line2 #"#
+
+// Commentaires imbriqués (doivent rester stables pour le tokenizer)
+/*
+  niveau 1
+  /* niveau 2 */
+  fin niveau 1
+*/
+
+// -------------------- Génériques, contraintes, trait + impl --------------------
+
+trait Num {
+  fn zero() -> Self
+  fn add(self, rhs: Self) -> Self
+}
+
+// Générique avec contrainte
+struct Vec2<T: Num> { x: T, y: T }
+
+impl<T: Num> Vec2<T> {
+  fn new(x: T, y: T) -> Self { return Vec2 { x, y } }
+
+  fn norm2(&self) -> T where T: Num {
+    // pseudo: x*x + y*y (ici juste add(zero))
+    let mut acc = T::zero()
+    acc = acc.add(self.x)
+    acc = acc.add(self.y)
+    return acc
+  }
+}
+
+// Specialisation par “where” (syntaxe indicative pour la colorisation)
+impl<T> Vec2<T> where T: Num {
+  fn map<U: Num>(&self, f: fn(T) -> U) -> Vec2<U> {
+    return Vec2 { x: f(self.x), y: f(self.y) }
+  }
+}
+
+// -------------------- FFI extern (headers C) --------------------
+
+extern "C" {
+  fn c_add(a: i32, b: i32) -> i32
+  fn c_log(msg: *const u8) -> ()
+}
+
+// Wrapper “safe-ish”
+fn add_ffi(a: i32, b: i32) -> i32 {
+  // unsafe pour test de mot-clé si tu le supportes
+  unsafe {
+    return c_add(a, b)
+  }
+}
+
+// -------------------- Async/Await (optionnel pour colorisation) --------------------
+
+async fn fetch_demo(url: &str) -> Result<String, Error> {
+  // Simule un I/O async
+  await sleep(100)
+  return Ok("OK")
+}
+
+async fn run_async() -> Result<(), Error> {
+  let r = await fetch_demo("https://example.com")
+  match r {
+    Ok(body) => { p("body len {body.len()}") }
+    Err(e)   => { eprintln("err: {e}") }
+  }
+  return Ok(())
+}
+
+// -------------------- Motifs velus : tuples, ranges, guards --------------------
+
+enum Token {
+  Ident(String),
+  Number(i64),
+  LParen, RParen,
+  Comma,
+}
+
+fn lex_demo(toks: &Vec<Token>) -> i32 {
+  let mut score = 0
+  for (idx, t) in toks.enumerate() {
+    match t {
+      Token::Ident(name) if name.len() > 3 => { score += 3 }
+      Token::Ident(_) => { score += 1 }
+      Token::Number(n) if n >= 0 && n <= 10 => { score += n as i32 }
+      Token::Number(n) if n > 10 => { score += 10 }
+      Token::LParen | Token::RParen => { score += 0 }
+      _ => {}
+    }
+  }
+  return score
+}
+
+// Tuples & destructuring
+fn pair_sum(p: (i32, i32)) -> i32 {
+  let (a, b) = p
+  return a + b
+}
+
+// -------------------- Erreurs, Option/Result, early-return --------------------
+
+fn parse_i32(s: &str) -> Result<i32, Error> {
+  if s == "" { return Err(Error::new("empty")) }
+  // “? operator” si tu comptes le supporter ; sinon reste du sucre syntaxique pour les couleurs
+  let n = try_parse_i32(s)?  // test d’un opérateur spécial
+  return Ok(n)
+}
+
+// -------------------- Macros / Annotations inventaires pour tokenizer --------------------
+
+// Style macro appel
+log_debug!("value = {}", BIG)
+
+// “annotation” pseudo proc-macro
+@inline(always)
+fn hot_path(x: i32) -> i32 { return x + 1 }
+
+// -------------------- Longueur, whitespaces, etc. --------------------
+
+// Ligne très, très longue pour déclencher tes hints “line too long” si tu utilises le serveur LSP que je t’ai donné précédemment — elle dépasse joyeusement la limite de 120 caractères et permet de vérifier que ta coloration ne décroche pas en fin de ligne malgré la présence d’espaces et de tokens collés — oui, je fais exprès.
+
+fn main() -> i32 {
+  p("advanced demo")
+  let v = Vec2::<I32Num>::new(1, 2)
+  let _ = v.norm2()
+  let _ = v.map(|x| x + 1)
+
+  let sum = add_ffi(2, 40)
+  p("sum = {sum}")
+
+  // Test async (on ignore l’exec réel)
+  // await run_async()  // selon ton runtime
+
+  // Divers numéraux pour le thème
+  let _n1 = 123i64
+  let _n2 = 0xDEAD_BEEF_u32
+  let _n3 = 0o123_456
+  let _n4 = 0b1101_0010
+
+  // Caractères
+  let _c1 = '🦀'
+  let _c2 = '\n'
+  let _c3 = '\x7F'
+
+  return 0
+}
+
+// Impl de Num pour un type de démo
+struct I32Num { v: i32 }
+impl Num for I32Num {
+  fn zero() -> Self { return I32Num { v: 0 } }
+  fn add(self, rhs: Self) -> Self { return I32Num { v: self.v + rhs.v } }
+}
+
+// Conversion basique
+impl From<i32> for I32Num {
+  fn from(x: i32) -> Self { return I32Num { v: x } }
+}

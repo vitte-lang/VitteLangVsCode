@@ -1,0 +1,33 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Vitte Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": [
+        "${workspaceFolder}/client/out/**/*.js",
+        "${workspaceFolder}/server/out/**/*.js"
+      ],
+      "env": { "NODE_OPTIONS": "--enable-source-maps" }
+    },
+    {
+      "name": "Attach to Vitte Server (6009)",
+      "type": "node",
+      "request": "attach",
+      "port": 6009,
+      "restart": true,
+      "smartStep": true,
+      "outFiles": ["${workspaceFolder}/server/out/**/*.js"],
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Run Extension + Attach Server",
+      "configurations": ["Run Vitte Extension", "Attach to Vitte Server (6009)"]
+    }
+  ]
+}

@@ -32,11 +32,28 @@ et cette extension suit le versioning [SemVer](https://semver.org/lang/fr/).
 
 ---
 
-## [0.2.0] — En préparation
-### Prévu
-- 🚀 Support **LSP** (autocomplétion, diagnostics, hover, go-to-def, references, rename)
-- 🎨 Tokens sémantiques et folding regions
-- 🔧 Intégration avec `vitte-fmt` (formatter officiel)
-- 📖 Documentation contextuelle (hover docs)
-- ⚡ Amélioration des snippets (async, unsafe, macros)
-- 🧪 Tests automatiques de colorisation (fixtures basiques et avancées)
+## [0.2.0] - 2025-08-29
+### ✨ Added
+- Icône `.vitte` intégrée via `vitte-icon-theme.json` (thème agnostique, logo unique).
+- Support syntaxique enrichi :
+  - Nouvelles règles TextMate pour attributs `#[...]`, macros `name!`, raw strings `r#"..."#`.
+  - Nombres hex/bin/oct/float avec underscores.
+  - Keywords élargis (mut, async/await, package, typedef, mov/jmp, etc.).
+  - Reconnaissance d’opérateurs complexes (`::`, `->`, `=>`, `==`, `<=`, `&&`, `||`, `<<`, `>>`, etc.).
+- LSP amélioré :
+  - Diagnostics TODO/FIXME/??? et trailing spaces plus clairs.
+  - Détection heuristique des types (PascalCase).
+  - Hover docs étendues pour de nombreux mots-clés.
+  - Semantic tokens enrichis (keywords, types, numbers, strings, comments).
+- Snippets revus : `fn`, `struct`, `enum`, `trait`, `impl`, `match`, `for/while`, `main`.
+- Expérience développeur VSCode améliorée :
+  - Scripts `npm run compile`, `npm run watch`, `npm run build:vsix`.
+  - Configuration debug (Run Extension + Attach LSP).
+  - Publisher aligné : `VitteStudio`.
+
+### 🔧 Changed
+- Messages diagnostics plus explicites.
+- Consolidation des chemins d’icônes et du `package.json`.
+
+### 🚫 Breaking
+- Pas de rupture majeure. Vérifier les thèmes de couleurs custom trop stricts (scopes plus précis).
