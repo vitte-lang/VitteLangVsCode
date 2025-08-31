@@ -1,0 +1,42 @@
+// colorize-fixtures/basic.vitte
+// Démo basique pour tester la coloration syntaxique du langage Vitte.
+
+module fixtures.basic
+
+// Constantes globales
+const PI: f64 = 3.14159
+const MSG: string = "Hello Vitte!"
+
+// Structure simple
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+// Fonction : addition
+fn add(a: i32, b: i32) -> i32 {
+    return a + b
+}
+
+// Fonction principale
+pub fn main() {
+    // Variables mutables / immuables
+    let mut counter: i32 = 0
+    let p = Point { x: 10, y: 20 }
+
+    println(MSG)
+    println("PI =", PI)
+
+    // Boucle + condition
+    while counter < 5 {
+        if counter % 2 == 0 {
+            println("pair:", counter)
+        } else {
+            println("impair:", counter)
+        }
+        counter = add(counter, 1)
+    }
+
+    // Utilisation d’une structure
+    println("Point:", p.x, p.y)
+}

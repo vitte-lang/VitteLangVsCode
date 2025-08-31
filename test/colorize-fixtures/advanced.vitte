@@ -1,0 +1,75 @@
+// colorize-fixtures/advanced.vitte
+// Démo avancée pour tester la coloration syntaxique Vitte.
+
+module fixtures.advanced
+
+use std::math as m
+use std::io::Result
+
+// Enumération + variantes
+enum Shape {
+    Circle(f64),       // rayon
+    Rectangle(f64,f64) // largeur, hauteur
+    Point,             // unité
+}
+
+// Trait
+trait Area {
+    fn area(&self) -> f64
+}
+
+// Implémentation du trait pour Shape
+impl Area for Shape {
+    fn area(&self) -> f64 {
+        match self {
+            Shape::Circle(r)     => PI * r * r,
+            Shape::Rectangle(w,h)=> w * h,
+            Shape::Point         => 0.0,
+        }
+    }
+}
+
+// Fonction générique avec Result
+fn safe_div<T: Number>(a: T, b: T) -> Result<T, string> {
+    if b == 0 {
+        return Err("division par zéro")
+    }
+    return Ok(a / b)
+}
+
+// Fonction avec Option
+fn first<T>(arr: &Vec<T>) -> Option<&T> {
+    if arr.len() == 0 {
+        return None
+    }
+    return Some(&arr[0])
+}
+
+// Fonction principale
+pub fn main() {
+    let s1 = Shape::Circle(2.0)
+    let s2 = Shape::Rectangle(3.0, 4.0)
+
+    println("Aire du cercle:", s1.area())
+    println("Aire du rectangle:", s2.area())
+
+    // Test Result
+    match safe_div(10, 2) {
+        Ok(val)  => println("Résultat:", val),
+        Err(msg) => println("Erreur:", msg),
+    }
+
+    // Test Option
+    let nums = vec![42, 99, 123]
+    match first(&nums) {
+        Some(val) => println("Premier:", val),
+        None      => println("Vide!"),
+    }
+
+    // Closure
+    let square = |x: i32| -> i32 { x * x }
+    println("Square(7):", square(7))
+
+    // Panic volontaire
+    // panic("Test panic dans advanced.vitte")
+}
