@@ -8,9 +8,9 @@ use std::io::Result
 
 // Enumération + variantes
 enum Shape {
-    Circle(f64),       // rayon
-    Rectangle(f64,f64) // largeur, hauteur
-    Point,             // unité
+    Circle(f64),        // rayon
+    Rectangle(f64, f64) // largeur, hauteur
+    Point,              // unité
 }
 
 // Trait
@@ -22,9 +22,9 @@ trait Area {
 impl Area for Shape {
     fn area(&self) -> f64 {
         match self {
-            Shape::Circle(r)     => PI * r * r,
-            Shape::Rectangle(w,h)=> w * h,
-            Shape::Point         => 0.0,
+            Shape::Circle(r)      => m::PI * r * r,
+            Shape::Rectangle(w, h)=> w * h,
+            Shape::Point          => 0.0,
         }
     }
 }
@@ -32,17 +32,19 @@ impl Area for Shape {
 // Fonction générique avec Result
 fn safe_div<T: Number>(a: T, b: T) -> Result<T, string> {
     if b == 0 {
-        return Err("division par zéro")
+        Err("division par zéro")
+    } else {
+        Ok(a / b)
     }
-    return Ok(a / b)
 }
 
 // Fonction avec Option
 fn first<T>(arr: &Vec<T>) -> Option<&T> {
     if arr.len() == 0 {
-        return None
+        None
+    } else {
+        Some(&arr[0])
     }
-    return Some(&arr[0])
 }
 
 // Fonction principale
