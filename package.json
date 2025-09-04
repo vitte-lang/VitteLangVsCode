@@ -2,7 +2,7 @@
   "name": "vitte-lang",
   "displayName": "Vitte Language Support",
   "description": "Extension Visual Studio Code pour le langage Vitte : coloration syntaxique, snippets, configuration de langage, icônes et base pour LSP.",
-  "version": "0.4.1",
+  "version": "0.4.0",
   "publisher": "VitteStudio",
   "engines": {
     "vscode": "^1.75.0"
@@ -19,16 +19,17 @@
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vitte-lang/vscode-vitte"
+    "url": "https://github.com/vitte-lang/VitteLangVsCode"
   },
   "bugs": {
-    "url": "https://github.com/vitte-lang/vscode-vitte/issues"
+    "url": "https://github.com/vitte-lang/VitteLangVsCode/issues"
   },
-  "homepage": "https://vitte.dev",
+  "homepage": "https://github.com/vitte-lang/VitteLangVsCode#readme",
   "license": "MIT",
   "keywords": [
     "vitte",
     "vit",
+    "vitl",
     "language",
     "syntax highlighting",
     "snippets",
@@ -46,7 +47,9 @@
         "id": "vitte",
         "aliases": [
           "Vitte",
-          "vitte"
+          "vitte",
+          "Vitl",
+          "vitl"
         ],
         "extensions": [
           ".vitte",
@@ -61,12 +64,21 @@
         "language": "vitte",
         "scopeName": "source.vitte",
         "path": "./syntaxes/vitte.tmLanguage.json"
+      },
+      {
+        "language": "vitl",
+        "scopeName": "source.vitl",
+        "path": "./syntaxes/vitl.tmLanguage.json"
       }
     ],
     "snippets": [
       {
         "language": "vitte",
         "path": "./snippets/vitte.json"
+      },
+      {
+        "language": "vitl",
+        "path": "./snippets/vitl.json"
       }
     ],
     "configuration": {
@@ -75,7 +87,7 @@
         "vitte.enableLSP": {
           "type": "boolean",
           "default": false,
-          "description": "Activer le serveur de langage Vitte (si disponible)"
+          "description": "Activer le serveur de langage Vitte/Vitl (si disponible)"
         },
         "vitte.trace.server": {
           "type": "string",

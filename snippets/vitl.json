@@ -1,0 +1,152 @@
+{
+  "Module": {
+    "prefix": ["module","mod"],
+    "body": ["module ${1:name}","${0}"],
+    "description": "Déclare un module"
+  },
+  "Use / Import": {
+    "prefix": ["use","import","from"],
+    "body": ["use ${1:path}${2::${3:Symbol}}","${0}"],
+    "description": "Import"
+  },
+  "Fn": {
+    "prefix": ["fn","func"],
+    "body": [
+      "${1|pub,|}fn ${2:name}${3:<${4:T}>}(${5:args}): ${6:void} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Déclare une fonction (Vitl)"
+  },
+  "Def (style Python)": {
+    "prefix": ["def"],
+    "body": [
+      "def ${1:name}(${2:args})${3:: ${4:void}}:",
+      "  ${0}"
+    ],
+    "description": "Déclare une fonction style Python"
+  },
+  "Class": {
+    "prefix": ["class"],
+    "body": [
+      "class ${1:Name}${2:(${3:Base})} {",
+      "  def __init__(${4:self}${5:, args}):",
+      "    ${0}",
+      "}"
+    ],
+    "description": "Classe style Python"
+  },
+  "Struct": {
+    "prefix": ["struct"],
+    "body": [
+      "${1|pub,|}struct ${2:Name}${3:<${4:T}>} {",
+      "  ${5:field}: ${6:type}",
+      "}"
+    ],
+    "description": "Struct"
+  },
+  "Enum": {
+    "prefix": ["enum"],
+    "body": [
+      "${1|pub,|}enum ${2:Name} {",
+      "  ${3:Variant1},",
+      "  ${4:Variant2}",
+      "}"
+    ],
+    "description": "Enum"
+  },
+  "Interface": {
+    "prefix": ["interface","trait"],
+    "body": [
+      "interface ${1:Iface} {",
+      "  fn ${2:method}(${3:&self}): ${4:void};",
+      "}"
+    ],
+    "description": "Interface"
+  },
+  "Impl": {
+    "prefix": ["impl"],
+    "body": [
+      "impl ${1:Type} {",
+      "  fn ${2:new}(${3:args}): ${1:Type} {",
+      "    ${0}",
+      "  }",
+      "}"
+    ],
+    "description": "Impl bloc"
+  },
+  "Let": {
+    "prefix": ["let"],
+    "body": ["let ${1:name}${2:: ${3:type}} = ${4:init};${0}"],
+    "description": "Variable"
+  },
+  "Let Mut": {
+    "prefix": ["letm","mut"],
+    "body": ["let mut ${1:name}${2:: ${3:type}} = ${4:init};${0}"],
+    "description": "Variable mutable"
+  },
+  "Const": {
+    "prefix": ["const"],
+    "body": ["const ${1:NAME}: ${2:type} = ${3:value};${0}"],
+    "description": "Constante"
+  },
+  "If / Else": {
+    "prefix": ["if","ife"],
+    "body": [
+      "if ${1:cond} {",
+      "  ${2}",
+      "} else {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Condition"
+  },
+  "Match / Switch": {
+    "prefix": ["match","switch"],
+    "body": [
+      "match ${1:expr} {",
+      "  ${2:Pattern1} => ${3:expr1},",
+      "  ${4:Pattern2} => ${5:expr2},",
+      "  _ => ${0:default}",
+      "}"
+    ],
+    "description": "Branchement"
+  },
+  "For": {
+    "prefix": ["for"],
+    "body": [
+      "for ${1:item} in ${2:iter} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Boucle for"
+  },
+  "While": {
+    "prefix": ["while"],
+    "body": [
+      "while ${1:cond} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Boucle while"
+  },
+  "Loop": {
+    "prefix": ["loop"],
+    "body": [
+      "loop {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Boucle infinie"
+  },
+  "Print": {
+    "prefix": ["print","println"],
+    "body": ["println(${1:\"${2:text}\"});${0}"],
+    "description": "Affichage console"
+  },
+  "Doc Comment": {
+    "prefix": ["doc","///"],
+    "body": ["/// ${1:Résumé}", "///", "/// ${0:Détails}"],
+    "description": "Commentaire doc"
+  }
+}

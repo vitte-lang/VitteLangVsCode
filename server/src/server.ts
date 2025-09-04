@@ -1,4 +1,4 @@
-/* Vitte LSP — serveur (compact) */
+/* Vitte/Vitl LSP — serveur (compact) */
 import {
   createConnection, ProposedFeatures, InitializeParams, InitializeResult,
   DidChangeConfigurationNotification, TextDocumentSyncKind, CompletionItem, CompletionItemKind,
@@ -17,13 +17,26 @@ let workspaceFolders: WorkspaceFolder[] | null = null;
 
 interface ServerSettings { maxNumberOfProblems: number; lineLengthLimit: number; enableSemanticTokens: boolean; }
 const defaultSettings: ServerSettings = { maxNumberOfProblems: 200, lineLengthLimit: 120, enableSemanticTokens: true };
+
+/** Cache des réglages par (uri::section) pour vitte/vitl */
 const documentSettings = new Map<string, Thenable<ServerSettings>>();
-function getDocumentSettings(resource: string): Thenable<ServerSettings> {
+
+function sectionFor(doc: TextDocument): "vitte" | "vitl" {
+  return doc.languageId === "vitl" ? "vitl" : "vitte";
+}
+
+function settingsKey(uri: string, section: string): string {
+  return `${uri}::${section}`;
+}
+
+function getDocumentSettings(doc: TextDocument): Thenable<ServerSettings> {
+  const section = sectionFor(doc);
   if (!hasConfigurationCapability) return Promise.resolve(defaultSettings);
-  let r = documentSettings.get(resource);
+  const key = settingsKey(doc.uri, section);
+  let r = documentSettings.get(key);
   if (!r) {
-    r = connection.workspace.getConfiguration({ scopeUri: resource, section: "vitte" }) as Thenable<ServerSettings>;
-    documentSettings.set(resource, r);
+    r = connection.workspace.getConfiguration({ scopeUri: doc.uri, section }) as Thenable<ServerSettings>;
+    documentSettings.set(key, r);
   }
   return r;
 }
@@ -71,7 +84,7 @@ const DIAG_RE_QUESTION = /\?{3,}/g;
 const DIAG_RE_TRAILING_WS = /[ \t]+$/;
 
 async function validateTextDocument(textDocument: TextDocument): Promise<void> {
-  const settings = await getDocumentSettings(textDocument.uri);
+  const settings = await getDocumentSettings(textDocument);
   const lines = textDocument.getText().split(/\r?\n/);
   const diagnostics: Diagnostic[] = [];
   let problems = 0;
@@ -92,7 +105,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
         severity: DiagnosticSeverity.Warning,
         message: `Marqueur ${m[1]} détecté — à traiter.`,
         range: Range.create(Position.create(i, start), Position.create(i, start + m[1].length)),
-        source: "vitte-lsp",
+        source: "vitte/vitl-lsp",
       })) break;
     }
     if (problems >= settings.maxNumberOfProblems) break;
@@ -104,19 +117,19 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
         severity: DiagnosticSeverity.Error,
         message: `Séquence "???" détectée — remplace par du vrai code ou un TODO.`,
         range: Range.create(Position.create(i, start), Position.create(i, start + m[0].length)),
-        source: "vitte-lsp",
+        source: "vitte/vitl-lsp",
       })) break;
     }
     if (problems >= settings.maxNumberOfProblems) break;
 
-    // Trailing whitespace
+    // Espaces fin de ligne
     const tw = line.match(DIAG_RE_TRAILING_WS);
     if (tw && tw.index != null) {
       if (!pushDiag({
         severity: DiagnosticSeverity.Hint,
         message: "Espace(s) superflu(s) en fin de ligne.",
         range: Range.create(Position.create(i, tw.index), Position.create(i, line.length)),
-        source: "vitte-lsp",
+        source: "vitte/vitl-lsp",
         tags: [DiagnosticTag.Unnecessary],
       })) break;
     }
@@ -128,7 +141,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
         severity: DiagnosticSeverity.Information,
         message: `Ligne longue (${line.length} > ${settings.lineLengthLimit}).`,
         range: Range.create(Position.create(i, settings.lineLengthLimit), Position.create(i, line.length)),
-        source: "vitte-lsp",
+        source: "vitte/vitl-lsp",
       });
     }
     if (problems >= settings.maxNumberOfProblems) break;
@@ -137,29 +150,24 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
   connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
-
+/** Vocabulaire partagé Vitte/Vitl. Spécifiques Vitl à ajouter ici si besoin. */
 const KEYWORDS = [
-  
+  // Vitte / Rust-like
   "module","use","pub","fn","struct","enum","trait","impl","let","const","mut",
   "match","if","else","while","for","loop","return",
-
-  
+  // Python-like
   "def","class","import","from","as","in","is","and","or","not","elif","try","except","finally",
   "with","yield","lambda","pass","global","nonlocal","assert","del","raise","await","async",
-
-  
+  // Go-like
   "package","interface","map","chan","go","defer","select","type","var","const","break","continue",
   "fallthrough","range","default","switch","case",
-
-  
+  // C/C++
   "int","float","double","char","short","long","signed","unsigned","void","bool","sizeof","typedef",
   "union","static","extern","inline","volatile","restrict","goto","register","do",
-
-  
+  // ASM
   "mov","add","sub","mul","div","inc","dec","cmp","jmp","je","jne","jg","jl","jge","jle",
   "push","pop","call","ret","lea","xor","shl","shr","nop",
-
-  
+  // Divers
   "true","false","null","nil","none","self","this","super","new","delete","catch","throw","throws",
   "export","namespace","using","override","virtual","abstract","extends","implements","operator",
   "template","constexpr","friend","static_cast","dynamic_cast","reinterpret_cast"
@@ -170,7 +178,7 @@ connection.onCompletion((_params): CompletionItem[] => {
   const items: CompletionItem[] = [];
 
   for (const kw of KEYWORDS) {
-    items.push({ label: kw, kind: CompletionItemKind.Keyword, detail: "mot-clé Vitte" });
+    items.push({ label: kw, kind: CompletionItemKind.Keyword, detail: "mot-clé Vitte/Vitl" });
   }
 
   if (doc) {
@@ -180,7 +188,7 @@ connection.onCompletion((_params): CompletionItem[] => {
         kind:
           s.kind === SymbolKind.Function  ? CompletionItemKind.Function  :
           s.kind === SymbolKind.Struct    ? CompletionItemKind.Struct    :
-          s.kind === SymbolKind.Enum      ? CompletionItemKind.Enum      :
+          s.kind === SymbolKind.Enum      ? CompletionItemKindEnum       :
           s.kind === SymbolKind.Interface ? CompletionItemKind.Interface :
           s.kind === SymbolKind.Namespace ? CompletionItemKind.Module    :
                                             CompletionItemKind.Variable,
@@ -192,9 +200,7 @@ connection.onCompletion((_params): CompletionItem[] => {
 });
 
 const HOVER_DOC: Record<string,string> = {
-  // Vitte / Rust-like
   mut: "Marque la mutabilité (autorise la modification).",
-
   def: "Définit une fonction (style Python).",
   class: "Définit une classe (style Python).",
   import: "Importe un module ou symbole.",
@@ -202,14 +208,10 @@ const HOVER_DOC: Record<string,string> = {
   lambda: "Fonction anonyme (Python).",
   await: "Attente asynchrone.",
   async: "Déclare un contexte asynchrone.",
-
-
   package: "Déclare le paquet courant (Go).",
   interface: "Déclare une interface (Go).",
   defer: "Diffère l’exécution jusqu’au retour (Go).",
   select: "Multiplexage de canaux (Go).",
-
- 
   typedef: "Alias de type (C/C++).",
   sizeof: "Taille en octets d’un type/objet.",
   switch: "Sélection multi-branches.",
@@ -217,8 +219,6 @@ const HOVER_DOC: Record<string,string> = {
   break: "Sort d’une boucle/switch.",
   continue: "Passe à l’itération suivante.",
   inline: "Suggestion d’inlining.",
-
-  
   mov: "Copie registre/mémoire (ASM).",
   add: "Addition (ASM).",
   jmp: "Saut inconditionnel (ASM).",
@@ -226,8 +226,6 @@ const HOVER_DOC: Record<string,string> = {
   pop: "Dépile une valeur (ASM).",
   call: "Appel de sous-routine (ASM).",
   ret: "Retour de sous-routine (ASM).",
-
-
   module: "Déclare un module (espace de noms).",
   use: "Importe un symbole/module.",
   pub: "Rend public.",
@@ -246,7 +244,6 @@ const HOVER_DOC: Record<string,string> = {
   loop: "Boucle infinie.",
   return: "Retour de fonction."
 };
-
 
 connection.onHover((params) => {
   const doc = documents.get(params.textDocument.uri);
@@ -356,7 +353,7 @@ connection.languages.semanticTokens.on((params: SemanticTokensParams) => {
       continue;
     }
 
-    // String literals
+    // Strings
     for (const m of matchAllRx(/"([^"\\]|\\.)*"/g, line)) {
       builder.push(lineIdx, m.index, m[0].length, token("string"), NO_MOD);
     }
@@ -413,8 +410,8 @@ function* matchAllRx(rx: RegExp, line: string): Generator<RegExpMatchArray & { i
   let m: RegExpExecArray | null;
   while ((m = r.exec(line))) {
     const arr = m as RegExpMatchArray & { index: number };
-    arr.index = m.index ?? 0;            // force index défini pour TS
-    if (m[0].length === 0) r.lastIndex++; // anti-boucle infinie
+    arr.index = m.index ?? 0;
+    if (m[0].length === 0) r.lastIndex++;
     yield arr;
   }
 }
@@ -423,7 +420,8 @@ documents.onDidOpen((e) => validateTextDocument(e.document));
 documents.onDidChangeContent((e) => validateTextDocument(e.document));
 documents.onDidClose((e) => {
   connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
-  documentSettings.delete(e.document.uri);
+  documentSettings.delete(settingsKey(e.document.uri, "vitte"));
+  documentSettings.delete(settingsKey(e.document.uri, "vitl"));
 });
 
 documents.listen(connection);
