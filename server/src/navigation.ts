@@ -1,217 +1,175 @@
-// navigation.ts — Navigation et indexation Vitte/Vitl (LSP)
+// navigation.ts — symboles, définitions, références, rename, workspace symbols
+
 import {
-  Location,
   Position,
   Range,
+  Location,
   DocumentSymbol,
   SymbolKind,
   WorkspaceSymbol,
 } from "vscode-languageserver/node";
-import { extractSymbols } from "./symbols.js";
+import { TextDocument } from "vscode-languageserver-textdocument";
 
-type Doc = { getText(): string };
-type IndexedDecl = { name: string; kind: number; range: Range; selectionRange: Range };
+/* ------------------------------ Extraction base ------------------------------ */
 
-const KEYWORDS = new Set([
-  "module","import","use","as","pub","const","let","mut","fn",
-  "return","if","else","match","while","for","in","break","continue",
-  "type","impl","where","struct","mod","test","true","false"
-]);
-
-/* ============================== Utils ===================================== */
-
-function pos(l: number, c: number): Position { return Position.create(l, c); }
-function rng(l1: number, c1: number, l2: number, c2: number): Range { return Range.create(pos(l1,c1), pos(l2,c2)); }
-function cmpPos(a: Position, b: Position): number { return a.line - b.line || a.character - b.character; }
-function contains(outer: Range, inner: Range): boolean {
-  return cmpPos(outer.start, inner.start) <= 0 && cmpPos(outer.end, inner.end) >= 0;
+interface FlatSymbol {
+  name: string;
+  kind: SymbolKind;
+  range: Range;
+  selectionRange: Range;
 }
-function escapeRx(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
-function wordAt(line: string, ch: number): string | null {
-  if (ch > line.length) ch = line.length;
-  const l = line.slice(0, ch).match(/[A-Za-z_][A-Za-z0-9_]*$/)?.[0] ?? "";
-  const r = line.slice(ch).match(/^[A-Za-z_][A-Za-z0-9_]*/)?.[0] ?? "";
-  const w = l + r;
-  if (!w) return null;
-  return KEYWORDS.has(w) ? null : w;
+
+const RULES: Array<{ rx: RegExp; kind: SymbolKind; nameGroup: number }> = [
+  { rx: /^\s*(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Namespace, nameGroup: 1 },
+  { rx: /^\s*fn\s+([A-Za-z_]\w*)/gm,             kind: SymbolKind.Function,  nameGroup: 1 },
+  { rx: /^\s*struct\s+([A-Za-z_]\w*)/gm,         kind: SymbolKind.Struct,    nameGroup: 1 },
+  { rx: /^\s*enum\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Enum,      nameGroup: 1 },
+  { rx: /^\s*trait\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Interface, nameGroup: 1 },
+  { rx: /^\s*type\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Interface, nameGroup: 1 },
+  { rx: /^\s*let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SymbolKind.Variable,  nameGroup: 1 },
+  { rx: /^\s*const\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Constant,  nameGroup: 1 },
+];
+
+function collectFlatSymbols(doc: TextDocument): FlatSymbol[] {
+  const text = doc.getText();
+  const out: FlatSymbol[] = [];
+
+  for (const { rx, kind, nameGroup } of RULES) {
+    rx.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = rx.exec(text))) {
+      const name = m[nameGroup];
+      if (!name) continue;
+      const start = doc.positionAt(m.index ?? 0);
+      const end = doc.positionAt((m.index ?? 0) + m[0].length);
+      const nameOffset = (m.index ?? 0) + m[0].indexOf(name);
+      const nameStart = doc.positionAt(nameOffset);
+      const nameEnd = doc.positionAt(nameOffset + name.length);
+      out.push({
+        name,
+        kind,
+        range: Range.create(start, end),
+        selectionRange: Range.create(nameStart, nameEnd),
+      });
+      if (m[0].length === 0) rx.lastIndex++;
+    }
+  }
+  return dedupeBy(out, s => `${s.kind}:${s.name}:${posKey(s.selectionRange.start)}`);
 }
-function textLines(doc: Doc): string[] { return doc.getText().split(/\r?\n/); }
 
-/* ============================== Index ===================================== */
+/* --------------------------------- API doc --------------------------------- */
 
-export type SymbolIndex = {
-  byName: Map<string, IndexedDecl[]>;
-  all: IndexedDecl[];
-};
-
-export function indexDocument(doc: Doc): SymbolIndex {
-  const syms = extractSymbols(doc);
-  const decls: IndexedDecl[] = syms.map((s: any) => ({
+export function documentSymbols(doc: TextDocument): DocumentSymbol[] {
+  return collectFlatSymbols(doc).map(s => ({
     name: s.name,
-    kind: s.kind ?? SymbolKind.Variable,
-    range: s.range ?? rng(0,0,0,0),
-    selectionRange: s.selectionRange ?? (s.range ?? rng(0,0,0,0)),
+    kind: s.kind,
+    range: s.range,
+    selectionRange: s.selectionRange,
+    children: [],
   }));
-  const byName = new Map<string, IndexedDecl[]>();
-  for (const d of decls) {
-    const arr = byName.get(d.name);
-    if (arr) arr.push(d); else byName.set(d.name, [d]);
+}
+
+export function symbolOutline(doc: TextDocument): DocumentSymbol[] {
+  return documentSymbols(doc);
+}
+
+/* --------------------------- Définitions / refs ---------------------------- */
+
+export function definitionAtPosition(doc: TextDocument, pos: Position, uri: string): Location[] {
+  const word = wordAt(doc, pos);
+  if (!word) return [];
+  const defs = collectFlatSymbols(doc).filter(s => s.name === word);
+  return defs.map(d => Location.create(uri, d.selectionRange));
+}
+
+export function referencesAtPosition(doc: TextDocument, pos: Position, uri: string): Location[] {
+  const word = wordAt(doc, pos);
+  if (!word) return [];
+  const re = new RegExp(`\\b${escapeRx(word)}\\b`, "g");
+  const text = doc.getText();
+  const out: Location[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const start = doc.positionAt(m.index ?? 0);
+    const end = doc.positionAt((m.index ?? 0) + m[0].length);
+    out.push(Location.create(uri, Range.create(start, end)));
+    if (m[0].length === 0) re.lastIndex++;
   }
-  return { byName, all: decls };
+  return out;
 }
 
-/* =========================== Document Symbols ============================= */
+/* --------------------------------- Rename ---------------------------------- */
 
-function nestSymbols(nodes: IndexedDecl[]): DocumentSymbol[] {
-  const sorted = [...nodes].sort((a,b) =>
-    cmpPos(a.range.start, b.range.start) || -cmpPos(a.range.end, b.range.end));
-  const stack: { ds: DocumentSymbol; range: Range }[] = [];
-  const roots: DocumentSymbol[] = [];
-  for (const n of sorted) {
-    const ds: DocumentSymbol = {
-      name: n.name,
-      kind: mapKind(n.kind),
-      range: n.range,
-      selectionRange: n.selectionRange,
-      children: [],
-    };
-    while (stack.length && !contains(stack[stack.length-1].range, n.range)) stack.pop();
-    if (stack.length) stack[stack.length-1].ds.children!.push(ds);
-    else roots.push(ds);
-    stack.push({ ds, range: n.range });
-  }
-  return roots;
-}
-
-function mapKind(k: number): SymbolKind {
-  switch (k) {
-    case SymbolKind.Function: return SymbolKind.Function;
-    case SymbolKind.Method: return SymbolKind.Method;
-    case SymbolKind.Struct: return SymbolKind.Struct;
-    case SymbolKind.Enum: return SymbolKind.Enum;
-    case SymbolKind.Interface: return SymbolKind.Interface;
-    case SymbolKind.Module: return SymbolKind.Module;
-    case SymbolKind.Class: return SymbolKind.Class;
-    case SymbolKind.Property: return SymbolKind.Property;
-    case SymbolKind.Variable: return SymbolKind.Variable;
-    case SymbolKind.Constant: return SymbolKind.Constant;
-    default: return SymbolKind.Null;
-  }
-}
-
-export function documentSymbols(doc: Doc): DocumentSymbol[] {
-  const idx = indexDocument(doc);
-  return nestSymbols(idx.all);
-}
-
-/* ============================ Definition/Refs ============================= */
-
-export function definitionAtPosition(doc: Doc, position: Position, uri = "file://unknown"): Location[] {
-  const lines = textLines(doc);
-  if (position.line >= lines.length) return [];
-  const w = wordAt(lines[position.line], position.character);
-  if (!w) return [];
-  const idx = indexDocument(doc);
-  const decls = idx.byName.get(w);
-  if (!decls?.length) return [];
-  return decls.map(d => ({ uri, range: d.selectionRange ?? d.range }));
-}
-
-export function referencesAtPosition(doc: Doc, position: Position, uri = "file://unknown"): Location[] {
-  const lines = textLines(doc);
-  if (position.line >= lines.length) return [];
-  const w = wordAt(lines[position.line], position.character);
-  if (!w) return [];
-  const rx = new RegExp(`\\b${escapeRx(w)}\\b`, "g");
-  const locs: Location[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    let m: RegExpExecArray | null;
-    while ((m = rx.exec(lines[i]))) locs.push({ uri, range: rng(i, m.index!, i, m.index! + w.length) });
-  }
-  return locs;
-}
-
-/* ================================ Rename ================================== */
-
-export function renameSymbol(doc: Doc, position: Position, newName: string): { range: Range; newText: string }[] {
-  const lines = textLines(doc);
-  if (position.line >= lines.length) return [];
-  const w = wordAt(lines[position.line], position.character);
-  if (!w) return [];
-  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(newName) || KEYWORDS.has(newName)) return [];
-  const rx = new RegExp(`\\b${escapeRx(w)}\\b`, "g");
-  const edits: { range: Range; newText: string }[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    let m: RegExpExecArray | null;
-    while ((m = rx.exec(lines[i]))) edits.push({ range: rng(i, m.index!, i, m.index! + w.length), newText: newName });
+export function renameSymbol(doc: TextDocument, pos: Position, newName: string): Array<{ range: Range; newText: string }> {
+  const old = wordAt(doc, pos);
+  if (!old || !isValidIdent(newName)) return [];
+  const re = new RegExp(`\\b${escapeRx(old)}\\b`, "g");
+  const text = doc.getText();
+  const edits: Array<{ range: Range; newText: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const start = doc.positionAt(m.index ?? 0);
+    const end = doc.positionAt((m.index ?? 0) + m[0].length);
+    edits.push({ range: Range.create(start, end), newText: newName });
+    if (m[0].length === 0) re.lastIndex++;
   }
   return edits;
 }
 
-/* ============================ Workspace Symbols =========================== */
+/* ----------------------------- Workspace symbols --------------------------- */
 
-export function workspaceSymbols(query: string, docs: { uri: string; doc: Doc }[], limit = 200): WorkspaceSymbol[] {
+export function workspaceSymbols(
+  query: string,
+  openDocs: Array<{ uri: string; doc: TextDocument }>,
+  limit = 200
+): WorkspaceSymbol[] {
   const q = query.trim();
-  if (!q) return [];
-  const out: WorkspaceSymbol[] = [];
-  for (const { uri, doc } of docs) {
-    const idx = indexDocument(doc);
-    for (const d of idx.all) {
-      const s = fuzzyScore(q, d.name);
-      if (s <= 0) continue;
-      out.push({
-        name: d.name,
-        kind: mapKind(d.kind),
-        location: { uri, range: d.selectionRange ?? d.range },
-        containerName: containerNameOf(d, idx.all),
+  const result: WorkspaceSymbol[] = [];
+  for (const { uri, doc } of openDocs) {
+    for (const s of collectFlatSymbols(doc)) {
+      if (q && !s.name.toLowerCase().includes(q.toLowerCase())) continue;
+      result.push({
+        name: s.name,
+        kind: s.kind,
+        location: Location.create(uri, s.selectionRange),
       });
+      if (result.length >= limit) return result;
     }
   }
-  return out
-    .sort((a,b) => {
-      const sa = fuzzyScore(q, a.name), sb = fuzzyScore(q, b.name);
-      if (sb !== sa) return sb - sa;
-      return a.name.localeCompare(b.name);
-    })
-    .slice(0, limit);
+  return result;
 }
 
-function containerNameOf(d: IndexedDecl, all: IndexedDecl[]): string | undefined {
-  let best: IndexedDecl | undefined;
-  for (const other of all) {
-    if (other === d) continue;
-    if (contains(other.range, d.range)) {
-      if (!best || contains(best.range, other.range)) best = other;
-    }
-  }
-  return best?.name;
+/* --------------------------------- Utils ----------------------------------- */
+
+function wordAt(doc: TextDocument, pos: Position): string | null {
+  const text = doc.getText();
+  const off = doc.offsetAt(pos);
+  let s = off, e = off;
+  while (s > 0 && /[A-Za-z0-9_]/.test(text.charAt(s - 1))) s--;
+  while (e < text.length && /[A-Za-z0-9_]/.test(text.charAt(e))) e++;
+  return e > s ? text.slice(s, e) : null;
 }
 
-function fuzzyScore(q: string, s: string): number {
-  let i = 0, j = 0, score = 0, streak = 0;
-  const qq = q.toLowerCase(), ss = s.toLowerCase();
-  while (i < qq.length && j < ss.length) {
-    if (qq[i] === ss[j]) { score += 1 + streak; streak++; i++; j++; }
-    else { streak = 0; j++; }
-  }
-  return i === qq.length ? score : 0;
+function escapeRx(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/* ============================== Symbol Outline ============================ */
+function posKey(p: Position): string {
+  return `${p.line}:${p.character}`;
+}
 
-export function symbolOutline(doc: Doc): { name: string; kind: SymbolKind; level: number; range: Range }[] {
-  const flat: { name: string; kind: SymbolKind; range: Range }[] =
-    indexDocument(doc).all.map(d => ({ name: d.name, kind: mapKind(d.kind), range: d.range }));
-  const levels = new Array(flat.length).fill(0);
-  for (let i = 0; i < flat.length; i++) {
-    for (let j = 0; j < flat.length; j++) {
-      if (i === j) continue;
-      if (contains(flat[j].range, flat[i].range)) levels[i]++;
-    }
+function dedupeBy<T>(arr: T[], keyFn: (t: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const v of arr) {
+    const k = keyFn(v);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(v);
   }
-  return flat
-    .map((f, i) => ({ name: f.name, kind: f.kind, level: levels[i], range: f.range }))
-    .sort((a,b) =>
-      cmpPos(a.range.start, b.range.start) ||
-      -cmpPos(a.range.end, b.range.end));
+  return out;
+}
+
+function isValidIdent(s: string): boolean {
+  return /^[A-Za-z_]\w*$/.test(s);
 }

@@ -133,9 +133,3 @@ export async function deactivate(): Promise<void> {
   await client?.stop();
   client = undefined;
 }
-
-
-export async function deactivate(): Promise<void> {
-  await client?.stop();
-  client = undefined;
-}
