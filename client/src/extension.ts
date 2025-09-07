@@ -5,7 +5,7 @@ import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
-  TransportKind
+  TransportKind,
 } from "vscode-languageclient/node";
 
 let client: LanguageClient | undefined;
@@ -23,12 +23,12 @@ function resolveServerOptions(ctx: vscode.ExtensionContext): ServerOptions {
     throw new Error(msg);
   }
 
-  const inspect = process.env.VITTE_LSP_INSPECT;
+  const inspect = process.env.VITTE_LSP_INSPECT; // ex: "6009"
   const debugExecArgv = inspect ? ["--nolazy", `--inspect=${inspect}`] : [];
 
   return {
     run:   { module: serverJs, transport: TransportKind.ipc, options: { env: process.env } },
-    debug: { module: serverJs, transport: TransportKind.ipc, options: { execArgv: debugExecArgv, env: process.env } }
+    debug: { module: serverJs, transport: TransportKind.ipc, options: { execArgv: debugExecArgv, env: process.env } },
   };
 }
 
@@ -37,6 +37,13 @@ export async function activate(context: vscode.ExtensionContext) {
   const enable = cfg.get<boolean>("enableLSP", false);
   const output = vscode.window.createOutputChannel("Vitte/Vitl LSP");
   const trace  = vscode.window.createOutputChannel("Vitte/Vitl LSP Trace");
+
+  // Commande utilitaire pour activation manuelle
+  context.subscriptions.push(
+    vscode.commands.registerCommand("vitte.hello", () => {
+      vscode.window.showInformationMessage("Vitte/Vitl extension active");
+    })
+  );
 
   output.appendLine("[vitte/vitl] Activation de l’extension…");
   if (!enable) {
@@ -52,7 +59,7 @@ export async function activate(context: vscode.ExtensionContext) {
           { language: "vitte", scheme: "file" },
           { language: "vitte", scheme: "untitled" },
           { language: "vitl",  scheme: "file" },
-          { language: "vitl",  scheme: "untitled" }
+          { language: "vitl",  scheme: "untitled" },
         ],
         synchronize: {
           configurationSection: ["vitte", "vitl"],
@@ -60,12 +67,12 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.workspace.createFileSystemWatcher("**/.vitteconfig"),
             vscode.workspace.createFileSystemWatcher("**/vitte.toml"),
             vscode.workspace.createFileSystemWatcher("**/.vitlconfig"),
-            vscode.workspace.createFileSystemWatcher("**/vitl.toml")
-          ]
+            vscode.workspace.createFileSystemWatcher("**/vitl.toml"),
+          ],
         },
         initializationOptions: { telemetry: true },
         outputChannel: output,
-        traceOutputChannel: trace
+        traceOutputChannel: trace,
       };
 
       client = new LanguageClient(
@@ -108,8 +115,8 @@ export async function activate(context: vscode.ExtensionContext) {
       await client?.sendNotification("workspace/didChangeConfiguration", {
         settings: {
           vitte: vscode.workspace.getConfiguration("vitte"),
-          vitl:  vscode.workspace.getConfiguration("vitl")
-        }
+          vitl:  vscode.workspace.getConfiguration("vitl"),
+        },
       });
     })
   );

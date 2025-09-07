@@ -1,14 +1,19 @@
 {
+  "$schema": "vscode://schemas/icon-theme",
   "iconDefinitions": {
-    "_vitte": { "iconPath": "./vitte.png" }
+    "_vitte": {
+      "iconPath": "./vitte.svg"
+    }
   },
+
   "fileExtensions": {
+    "vit": "_vitte",
+    "vitl": "_vitte",
     "vitte": "_vitte"
   },
+
   "fileNames": {
-    "main.vitte": "_vitte"
-  },
-  "languageIds": {
-    "vitte": "_vitte"
+    "Vittefile": "_vitte",
+    "vitte.config": "_vitte"
   }
 }

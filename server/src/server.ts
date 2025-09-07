@@ -1,12 +1,21 @@
 /* Vitte/Vitl LSP — serveur (compact) */
 import {
-  createConnection, ProposedFeatures, InitializeParams, InitializeResult,
-  DidChangeConfigurationNotification, TextDocumentSyncKind, CompletionItem, CompletionItemKind,
-  Diagnostic, DiagnosticSeverity, DiagnosticTag, Position, Range, Location, SymbolKind,
-  DocumentSymbol, WorkspaceFolder, SemanticTokensParams, SemanticTokensLegend, SemanticTokensBuilder,
-  TextDocuments,
+  createConnection, ProposedFeatures,
+  InitializeParams, InitializeResult,
+  DidChangeConfigurationNotification,
+  TextDocumentSyncKind,
+  CompletionItem, CompletionItemKind,
+  Diagnostic, DiagnosticSeverity, DiagnosticTag,
+  Position, Range, Location,
+  SymbolKind, DocumentSymbol, WorkspaceFolder,
+  SemanticTokensParams, SemanticTokensLegend, SemanticTokensBuilder,
+  TextDocuments
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+
+/* -------------------------------------------------------------------------- */
+/* Connexion / Documents                                                      */
+/* -------------------------------------------------------------------------- */
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
@@ -15,20 +24,29 @@ let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
 let workspaceFolders: WorkspaceFolder[] | null = null;
 
-interface ServerSettings { maxNumberOfProblems: number; lineLengthLimit: number; enableSemanticTokens: boolean; }
-const defaultSettings: ServerSettings = { maxNumberOfProblems: 200, lineLengthLimit: 120, enableSemanticTokens: true };
+/* -------------------------------------------------------------------------- */
+/* Réglages                                                                   */
+/* -------------------------------------------------------------------------- */
 
+interface ServerSettings {
+  maxNumberOfProblems: number;
+  lineLengthLimit: number;
+  enableSemanticTokens: boolean;
+}
+const defaultSettings: ServerSettings = {
+  maxNumberOfProblems: 200,
+  lineLengthLimit: 120,
+  enableSemanticTokens: true
+};
 /** Cache des réglages par (uri::section) pour vitte/vitl */
 const documentSettings = new Map<string, Thenable<ServerSettings>>();
 
 function sectionFor(doc: TextDocument): "vitte" | "vitl" {
   return doc.languageId === "vitl" ? "vitl" : "vitte";
 }
-
 function settingsKey(uri: string, section: string): string {
   return `${uri}::${section}`;
 }
-
 function getDocumentSettings(doc: TextDocument): Thenable<ServerSettings> {
   const section = sectionFor(doc);
   if (!hasConfigurationCapability) return Promise.resolve(defaultSettings);
@@ -41,43 +59,9 @@ function getDocumentSettings(doc: TextDocument): Thenable<ServerSettings> {
   return r;
 }
 
-connection.onInitialize((params: InitializeParams): InitializeResult => {
-  const caps = params.capabilities;
-  hasConfigurationCapability = !!(caps.workspace && caps.workspace.configuration);
-  hasWorkspaceFolderCapability = !!(caps.workspace && caps.workspace.workspaceFolders);
-  workspaceFolders = params.workspaceFolders ?? null;
-
-  const init: InitializeResult = {
-    capabilities: {
-      textDocumentSync: TextDocumentSyncKind.Incremental,
-      completionProvider: { resolveProvider: false, triggerCharacters: [".", ":", ">"] },
-      hoverProvider: true,
-      definitionProvider: true,
-      documentSymbolProvider: true,
-      semanticTokensProvider: { legend: SEMANTIC_LEGEND, full: true, range: false },
-    },
-  };
-  if (hasWorkspaceFolderCapability) {
-    init.capabilities.workspace = { workspaceFolders: { supported: true, changeNotifications: true } };
-  }
-  return init;
-});
-
-connection.onInitialized(() => {
-  if (hasConfigurationCapability) connection.client.register(DidChangeConfigurationNotification.type, undefined);
-  if (hasWorkspaceFolderCapability) {
-    connection.workspace.onDidChangeWorkspaceFolders((e) => {
-      workspaceFolders = e.added.length
-        ? e.added
-        : (workspaceFolders?.filter((wf) => !e.removed.find((r) => r.uri === wf.uri)) ?? null);
-    });
-  }
-});
-
-connection.onDidChangeConfiguration(() => {
-  documentSettings.clear();
-  documents.all().forEach(validateTextDocument);
-});
+/* -------------------------------------------------------------------------- */
+/* Lint basique                                                               */
+/* -------------------------------------------------------------------------- */
 
 const DIAG_RE_TODO = /\b(TODO|FIXME)\b/g;
 const DIAG_RE_QUESTION = /\?{3,}/g;
@@ -124,11 +108,11 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
 
     // Espaces fin de ligne
     const tw = line.match(DIAG_RE_TRAILING_WS);
-    if (tw && tw.index != null) {
+    if (tw && (tw as any).index != null) {
       if (!pushDiag({
         severity: DiagnosticSeverity.Hint,
         message: "Espace(s) superflu(s) en fin de ligne.",
-        range: Range.create(Position.create(i, tw.index), Position.create(i, line.length)),
+        range: Range.create(Position.create(i, (tw as any).index), Position.create(i, line.length)),
         source: "vitte/vitl-lsp",
         tags: [DiagnosticTag.Unnecessary],
       })) break;
@@ -150,7 +134,10 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
   connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
-/** Vocabulaire partagé Vitte/Vitl. Spécifiques Vitl à ajouter ici si besoin. */
+/* -------------------------------------------------------------------------- */
+/* Symboles / Complétion / Hover / Définitions                                */
+/* -------------------------------------------------------------------------- */
+
 const KEYWORDS = [
   // Vitte / Rust-like
   "module","use","pub","fn","struct","enum","trait","impl","let","const","mut",
@@ -173,6 +160,27 @@ const KEYWORDS = [
   "template","constexpr","friend","static_cast","dynamic_cast","reinterpret_cast"
 ];
 
+/** Mapping propre SymbolKind → CompletionItemKind */
+function mapSymbolKindToCompletionItemKind(k: SymbolKind): CompletionItemKind {
+  switch (k) {
+    case SymbolKind.Function:  return CompletionItemKind.Function;
+    case SymbolKind.Method:    return CompletionItemKind.Method;
+    case SymbolKind.Struct:    return CompletionItemKind.Struct;
+    case SymbolKind.Enum:      return CompletionItemKind.Enum;
+    case SymbolKind.Interface: return CompletionItemKind.Interface;
+    case SymbolKind.Namespace: return CompletionItemKind.Module;
+    case SymbolKind.Class:     return CompletionItemKind.Class;
+    case SymbolKind.Property:  return CompletionItemKind.Property;
+    case SymbolKind.Variable:  return CompletionItemKind.Variable;
+    case SymbolKind.Constant:  return CompletionItemKind.Constant;
+    case SymbolKind.Module:    return CompletionItemKind.Module;
+    case SymbolKind.Field:     return CompletionItemKind.Field;
+    case SymbolKind.Constructor:return CompletionItemKind.Constructor;
+    case SymbolKind.TypeParameter:return CompletionItemKind.TypeParameter;
+    default:                   return CompletionItemKind.Text;
+  }
+}
+
 connection.onCompletion((_params): CompletionItem[] => {
   const doc = documents.get(_params.textDocument.uri);
   const items: CompletionItem[] = [];
@@ -185,14 +193,8 @@ connection.onCompletion((_params): CompletionItem[] => {
     for (const s of extractSymbols(doc)) {
       items.push({
         label: s.name,
-        kind:
-          s.kind === SymbolKind.Function  ? CompletionItemKind.Function  :
-          s.kind === SymbolKind.Struct    ? CompletionItemKind.Struct    :
-          s.kind === SymbolKind.Enum      ? CompletionItemKindEnum       :
-          s.kind === SymbolKind.Interface ? CompletionItemKind.Interface :
-          s.kind === SymbolKind.Namespace ? CompletionItemKind.Module    :
-                                            CompletionItemKind.Variable,
-        detail: "symbole (doc)",
+        kind: mapSymbolKindToCompletionItemKind(s.kind),
+        detail: "symbole (doc)"
       });
     }
   }
@@ -266,7 +268,7 @@ connection.onDefinition((params) => {
     new RegExp(`\\bstruct\\s+${escapeRx(word)}\\b`),
     new RegExp(`\\benum\\s+${escapeRx(word)}\\b`),
     new RegExp(`\\btrait\\s+${escapeRx(word)}\\b`),
-    new RegExp(`\\bmodule\\s+${escapeRx(word)}\\b`),
+    new RegExp(`\\bmodule\\s+${escapeRx(word)}\\b`)
   ];
 
   const text = doc.getText();
@@ -317,9 +319,19 @@ function extractSymbols(doc: TextDocument): DocumentSymbol[] {
   return symbols;
 }
 
-const TOKEN_TYPES = ["namespace","type","function","variable","parameter","property","keyword","number","string","comment"] as const;
+/* -------------------------------------------------------------------------- */
+/* Semantic Tokens                                                            */
+/* -------------------------------------------------------------------------- */
+
+const TOKEN_TYPES = [
+  "namespace","type","function","variable","parameter",
+  "property","keyword","number","string","comment"
+] as const;
 const TOKEN_MODS: string[] = [];
-const SEMANTIC_LEGEND: SemanticTokensLegend = { tokenTypes: Array.from(TOKEN_TYPES), tokenModifiers: TOKEN_MODS };
+const SEMANTIC_LEGEND: SemanticTokensLegend = {
+  tokenTypes: Array.from(TOKEN_TYPES),
+  tokenModifiers: TOKEN_MODS
+};
 
 const TOKEN_MAP = {
   namespace: TOKEN_TYPES.indexOf("namespace"),
@@ -392,6 +404,54 @@ connection.languages.semanticTokens.on((params: SemanticTokensParams) => {
   return builder.build();
 });
 
+/* -------------------------------------------------------------------------- */
+/* Initialisation / événements                                                 */
+/* -------------------------------------------------------------------------- */
+
+connection.onInitialize((params: InitializeParams): InitializeResult => {
+  const caps = params.capabilities;
+  hasConfigurationCapability = !!(caps.workspace && caps.workspace.configuration);
+  hasWorkspaceFolderCapability = !!(caps.workspace && caps.workspace.workspaceFolders);
+  workspaceFolders = params.workspaceFolders ?? null;
+
+  const init: InitializeResult = {
+    capabilities: {
+      textDocumentSync: TextDocumentSyncKind.Incremental,
+      completionProvider: { resolveProvider: false, triggerCharacters: [".", ":", ">"] },
+      hoverProvider: true,
+      definitionProvider: true,
+      documentSymbolProvider: true,
+      semanticTokensProvider: { legend: SEMANTIC_LEGEND, full: true, range: false },
+    },
+  };
+  if (hasWorkspaceFolderCapability) {
+    init.capabilities.workspace = { workspaceFolders: { supported: true, changeNotifications: true } };
+  }
+  return init;
+});
+
+connection.onInitialized(() => {
+  if (hasConfigurationCapability) {
+    connection.client.register(DidChangeConfigurationNotification.type, undefined);
+  }
+  if (hasWorkspaceFolderCapability) {
+    connection.workspace.onDidChangeWorkspaceFolders((e) => {
+      workspaceFolders = e.added.length
+        ? e.added
+        : (workspaceFolders?.filter((wf) => !e.removed.find((r) => r.uri === wf.uri)) ?? null);
+    });
+  }
+});
+
+connection.onDidChangeConfiguration(() => {
+  documentSettings.clear();
+  documents.all().forEach(validateTextDocument);
+});
+
+/* -------------------------------------------------------------------------- */
+/* Utilitaires                                                                 */
+/* -------------------------------------------------------------------------- */
+
 function getWordAt(doc: TextDocument, pos: Position): string | null {
   const text = doc.getText();
   const offset = doc.offsetAt(pos);
@@ -415,6 +475,10 @@ function* matchAllRx(rx: RegExp, line: string): Generator<RegExpMatchArray & { i
     yield arr;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Fils d’événements LSP                                                      */
+/* -------------------------------------------------------------------------- */
 
 documents.onDidOpen((e) => validateTextDocument(e.document));
 documents.onDidChangeContent((e) => validateTextDocument(e.document));

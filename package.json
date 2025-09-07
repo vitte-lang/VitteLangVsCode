@@ -2,114 +2,98 @@
   "name": "vitte-lang",
   "displayName": "Vitte Language Support",
   "description": "Extension Visual Studio Code pour le langage Vitte : coloration syntaxique, snippets, configuration de langage, icônes et base pour LSP.",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "publisher": "VitteStudio",
-  "engines": {
-    "vscode": "^1.75.0"
-  },
-  "extensionKind": [
-    "workspace"
-  ],
-  "categories": [
-    "Programming Languages",
-    "Snippets",
-    "Linters",
-    "Formatters"
-  ],
+  "engines": { "vscode": "^1.75.0" },
+  "extensionKind": ["workspace"],
+  "categories": ["Programming Languages", "Snippets", "Linters", "Formatters"],
   "icon": "icon.png",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/vitte-lang/VitteLangVsCode"
-  },
-  "bugs": {
-    "url": "https://github.com/vitte-lang/VitteLangVsCode/issues"
-  },
+  "repository": { "type": "git", "url": "https://github.com/vitte-lang/VitteLangVsCode" },
+  "bugs": { "url": "https://github.com/vitte-lang/VitteLangVsCode/issues" },
   "homepage": "https://github.com/vitte-lang/VitteLangVsCode#readme",
   "license": "MIT",
-  "keywords": [
-    "vitte",
-    "vit",
-    "vitl",
-    "language",
-    "syntax highlighting",
-    "snippets",
-    "vscode",
-    "lsp",
-    "compiler",
-    "bytecode",
-    "programming language",
-    "icons"
-  ],
+  "keywords": ["vitte","vit","vitl","language","syntax highlighting","snippets","vscode","lsp","compiler","bytecode","programming language","icons"],
   "main": "./client/out/extension.js",
+
+  "activationEvents": [
+    "onCommand:vitte.hello"
+  ],
+
   "contributes": {
+    "iconThemes": [
+      { "id": "vitte-icons", "label": "Vitte Icons", "path": "./icons/vitte-icon-theme.json" }
+    ],
+
     "languages": [
       {
         "id": "vitte",
-        "aliases": [
-          "Vitte",
-          "vitte",
-          "Vitl",
-          "vitl"
-        ],
-        "extensions": [
-          ".vitte",
-          ".vit",
-          ".vitl"
-        ],
+        "aliases": ["Vitte","vitte"],
+        "extensions": [".vitte",".vit"],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "vitl",
+        "aliases": ["Vitl","vitl"],
+        "extensions": [".vitl"],
         "configuration": "./language-configuration.json"
       }
     ],
+
     "grammars": [
-      {
-        "language": "vitte",
-        "scopeName": "source.vitte",
-        "path": "./syntaxes/vitte.tmLanguage.json"
-      },
-      {
-        "language": "vitl",
-        "scopeName": "source.vitl",
-        "path": "./syntaxes/vitl.tmLanguage.json"
-      }
+      { "language": "vitte", "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
+      { "language": "vitl",  "scopeName": "source.vitl",  "path": "./syntaxes/vitl.tmLanguage.json" }
     ],
+
     "snippets": [
-      {
-        "language": "vitte",
-        "path": "./snippets/vitte.json"
-      },
-      {
-        "language": "vitl",
-        "path": "./snippets/vitl.json"
-      }
+      { "language": "vitte", "path": "./snippets/vitte.json" },
+      { "language": "vitl",  "path": "./snippets/vitl.json" }
     ],
+
     "configuration": {
-      "title": "Vitte",
-      "properties": {
-        "vitte.enableLSP": {
-          "type": "boolean",
-          "default": false,
-          "description": "Activer le serveur de langage Vitte/Vitl (si disponible)"
-        },
-        "vitte.trace.server": {
-          "type": "string",
-          "enum": [
-            "off",
-            "messages",
-            "verbose"
-          ],
-          "default": "off",
-          "description": "Niveau de log pour le LSP"
-        }
-      }
+  "title": "Vitte",
+  "properties": {
+    "vitte.enableLSP": {
+      "type": "boolean",
+      "default": false,
+      "description": "Activer le serveur de langage Vitte/Vitl (si disponible)"
     },
-    "iconThemes": [
-      {
-        "id": "vitte-icons",
-        "label": "Vitte Icons",
-        "path": "./icons/vitte-icon-theme.json"
-      }
+    "vitte.trace.server": {
+      "type": "string",
+      "enum": ["off", "messages", "verbose"],
+      "default": "off",
+      "description": "Niveau de log pour le LSP"
+    }
+  },
+    "commands": [
+      { "command": "vitte.hello", "title": "Vitte: Hello", "category": "Vitte" }
     ]
   },
+
   "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./client && tsc -p ./server",
+    "watch": "concurrently \"tsc -w -p ./client\" \"tsc -w -p ./server\"",
+    "check:vsix": "npx @vscode/vsce ls",
+    "build:vsix": "npm run compile && npm run check:vsix && npx @vscode/vsce package",
+    "publish": "npm run compile && npx @vscode/vsce publish"
+  },
+
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^3.6.0",
+    "concurrently": "^8.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.9.2"
+  },
+
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  }
+},
+"scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./client && tsc -p ./server",
     "watch": "concurrently \"tsc -w -p ./client\" \"tsc -w -p ./server\"",
@@ -131,3 +115,4 @@
     "vscode-languageserver-textdocument": "^1.0.12"
   }
 }
+

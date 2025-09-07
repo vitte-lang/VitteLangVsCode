@@ -11,7 +11,9 @@
         "${workspaceFolder}/client/out/**/*.js",
         "${workspaceFolder}/server/out/**/*.js"
       ],
-      "env": { "NODE_OPTIONS": "--enable-source-maps" }
+      "env": {
+        "NODE_OPTIONS": "--enable-source-maps"
+      }
     },
     {
       "name": "Attach to Vitte Server (6009)",
@@ -27,7 +29,10 @@
   "compounds": [
     {
       "name": "Run Extension + Attach Server",
-      "configurations": ["Run Vitte Extension", "Attach to Vitte Server (6009)"]
+      "configurations": [
+        "Run Vitte Extension",
+        "Attach to Vitte Server (6009)"
+      ]
     }
   ]
 }
