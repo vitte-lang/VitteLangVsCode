@@ -1,8 +1,8 @@
 {
-  "name": "vitte-lang",
+  "name": "vitte_lang",
   "displayName": "Vitte Language Support",
   "description": "Extension Visual Studio Code pour le langage Vitte : coloration syntaxique, snippets, configuration de langage, icônes et base pour LSP.",
-  "version": "0.4.2",
+  "version": "1.4.2",
   "publisher": "VitteStudio",
   "engines": { "vscode": "^1.75.0" },
   "extensionKind": ["workspace"],
@@ -13,36 +13,107 @@
   "homepage": "https://github.com/vitte-lang/VitteLangVsCode#readme",
   "license": "MIT",
   "keywords": [
-    "vitte","vit","vitl","language","syntax highlighting","snippets","vscode","lsp","compiler","bytecode","programming language","icons"
+    "vitte",
+    "vit",
+    "vitl",
+    "language",
+    "syntax highlighting",
+    "snippets",
+    "vscode",
+    "lsp",
+    "compiler",
+    "bytecode",
+    "programming language",
+    "icons"
   ],
   "main": "./client/out/extension.js",
+
   "contributes": {
     "iconThemes": [
       { "id": "vitte-icons", "label": "Vitte Icons", "path": "./icons/vitte-icon-theme.json" }
     ],
     "languages": [
-      { "id": "vitte", "aliases": ["Vitte","vitte"], "extensions": [".vitte",".vit"], "configuration": "./language-configuration.json" },
-      { "id": "vitl",  "aliases": ["Vitl","vitl"], "extensions": [".vitl"], "configuration": "./language-configuration.json" }
+      { "id": "vitte", "aliases": ["Vitte", "vitte"], "extensions": [".vitte", ".vit"], "configuration": "./language-configuration.json" },
+      { "id": "vitl", "aliases": ["Vitl", "vitl"], "extensions": [".vitl"], "configuration": "./language-configuration-vitl.json" }
     ],
     "grammars": [
       { "language": "vitte", "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
-      { "language": "vitl",  "scopeName": "source.vitl",  "path": "./syntaxes/vitl.tmLanguage.json" }
+      { "language": "vitl", "scopeName": "source.vitl", "path": "./syntaxes/vitl.tmLanguage.json" }
     ],
     "snippets": [
       { "language": "vitte", "path": "./snippets/vitte.json" },
-      { "language": "vitl",  "path": "./snippets/vitl.json" }
+      { "language": "vitl", "path": "./snippets/vitl.json" }
     ],
     "configuration": {
       "title": "Vitte",
       "properties": {
-        "vitte.enableLSP": { "type": "boolean", "default": false, "description": "Activer le serveur de langage Vitte/Vitl (si disponible)" },
-        "vitte.trace.server": { "type": "string", "enum": ["off","messages","verbose"], "default": "off", "description": "Niveau de log pour le LSP" }
+        "vitte.enableLSP": { "type": "boolean", "default": true, "description": "Activer le serveur de langage Vitte/Vitl" },
+        "vitte.trace.server": { "type": "string", "enum": ["off", "messages", "verbose"], "default": "off", "description": "Niveau de log pour le LSP" },
+        "vitte.diagnostics.maxProblems": { "type": "number", "default": 500, "description": "Nombre max de diagnostics par fichier" },
+        "vitte.diagnostics.lineLength": { "type": "number", "default": 120, "description": "Longueur de ligne max avant avertissement" },
+        "vitte.semanticTokens": { "type": "boolean", "default": true, "description": "Activer les semantic tokens" },
+        "vitte.format.enable": { "type": "boolean", "default": true, "description": "Activer le formatage de document" },
+        "vitte.codeActions.fixAll": { "type": "boolean", "default": true, "description": "Activer source.fixAll" },
+        "vitte.organizeImports": { "type": "boolean", "default": true, "description": "Activer source.organizeImports" },
+        "vitte.server.path": { "type": "string", "default": "", "description": "Chemin d’un binaire LSP externe" },
+        "vitte.server.inspect": { "type": "integer", "default": 0, "description": "Port d’inspection Node (0 = off)" }
       }
     },
     "commands": [
-      { "command": "vitte.hello", "title": "Vitte: Hello", "category": "Vitte" }
+      { "command": "vitte.showServerLog", "title": "Vitte: Ouvrir le journal LSP", "category": "Vitte" },
+      { "command": "vitte.restartServer", "title": "Vitte: Redémarrer le serveur", "category": "Vitte" },
+      { "command": "vitte.runAction", "title": "Vitte: Exécuter une action rapide", "category": "Vitte" },
+      { "command": "vitte.runActionWithArgs", "title": "Vitte: Exécuter une action…", "category": "Vitte" },
+      { "command": "vitte.debug.runFile", "title": "Vitte: Debug fichier courant", "category": "Vitte" },
+      { "command": "vitte.debug.attachServer", "title": "Vitte: Attach serveur (6009)", "category": "Vitte" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "vitte.showServerLog", "when": "true" },
+        { "command": "vitte.restartServer", "when": "true" },
+        { "command": "vitte.runAction", "when": "editorLangId == vitte || editorLangId == vitl" },
+        { "command": "vitte.runActionWithArgs", "when": "editorLangId == vitte || editorLangId == vitl" },
+        { "command": "vitte.debug.runFile", "when": "resourceLangId == vitte || resourceLangId == vitl" },
+        { "command": "vitte.debug.attachServer", "when": "true" }
+      ],
+      "editor/context": [
+        { "command": "vitte.runAction", "group": "navigation@9", "when": "editorLangId == vitte || editorLangId == vitl" }
+      ]
+    },
+    "keybindings": [
+      { "command": "vitte.restartServer", "key": "ctrl+alt+r", "when": "editorLangId == vitte || editorLangId == vitl" },
+      { "command": "vitte.runAction", "key": "ctrl+alt+a", "when": "editorLangId == vitte || editorLangId == vitl" },
+      { "command": "vitte.debug.runFile", "key": "f9", "when": "resourceLangId == vitte || resourceLangId == vitl" }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        { "id": "vitte_sidebar", "title": "Vitte", "icon": "icon.png" }
+      ]
+    },
+    "views": {
+      "vitte_sidebar": [
+        { "id": "vitte_problemsView", "name": "Diagnostics Vitte" },
+        { "id": "vitte_serverView", "name": "Serveur LSP" }
+      ]
+    },
+    "problemMatchers": [
+      {
+        "name": "vitte-problemMatcher",
+        "owner": "vitte",
+        "source": "vitte",
+        "fileLocation": ["autoDetect"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(error|warning|info):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
     ]
   },
+
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./client && tsc -p ./server",
@@ -51,6 +122,7 @@
     "build:vsix": "npm run compile && npm run check:vsix && npx @vscode/vsce package",
     "publish": "npm run compile && npx @vscode/vsce publish"
   },
+
   "devDependencies": {
     "@types/node": "24.3.1",
     "@types/vscode": "^1.75.0",
