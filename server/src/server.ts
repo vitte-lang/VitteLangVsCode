@@ -1,4 +1,4 @@
-/* Vitte/Vitl LSP — serveur (compact) */
+/* Vitte/Vitl LSP — serveur compact et robuste */
 import {
   createConnection, ProposedFeatures,
   InitializeParams, InitializeResult,
@@ -19,6 +19,9 @@ import { TextDocument } from "vscode-languageserver-textdocument";
 
 const connection = createConnection(ProposedFeatures.all);
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+
+/** Anti-bruit: anti-revalidate per-doc */
+const debounceTimers = new Map<string, NodeJS.Timeout>();
 
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
@@ -107,7 +110,7 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     if (problems >= settings.maxNumberOfProblems) break;
 
     // Espaces fin de ligne
-    const tw = line.match(DIAG_RE_TRAILING_WS);
+    const tw = line.match(DIAG_RE_TRAILING_WS) as (RegExpMatchArray & { index?: number }) | null;
     if (tw && (tw as any).index != null) {
       if (!pushDiag({
         severity: DiagnosticSeverity.Hint,
@@ -382,20 +385,20 @@ connection.languages.semanticTokens.on((params: SemanticTokensParams) => {
       }
     }
 
-    // Déclarations
-    const decls: Array<[RegExp, keyof typeof TOKEN_MAP]> = [
-      [/^\s*module\s+([A-Za-z_]\w*)/g,      "namespace"],
-      [/^\s*fn\s+([A-Za-z_]\w*)/g,          "function"],
-      [/^\s*struct\s+([A-Za-z_]\w*)/g,      "type"],
-      [/^\s*enum\s+([A-Za-z_]\w*)/g,        "type"],
-      [/^\s*trait\s+([A-Za-z_]\w*)/g,       "type"],
-      [/^\s*(let|const)\s+([A-Za-z_]\w*)/g, "variable"],
+    // Déclarations (colorer le nom uniquement)
+    const decls: Array<[RegExp, keyof typeof TOKEN_MAP, 1 | 2]> = [
+      [/^\s*module\s+([A-Za-z_]\w*)/g,      "namespace", 1],
+      [/^\s*fn\s+([A-Za-z_]\w*)/g,          "function",  1],
+      [/^\s*struct\s+([A-Za-z_]\w*)/g,      "type",      1],
+      [/^\s*enum\s+([A-Za-z_]\w*)/g,        "type",      1],
+      [/^\s*trait\s+([A-Za-z_]\w*)/g,       "type",      1],
+      [/^\s*(let|const)\s+([A-Za-z_]\w*)/g, "variable",  2],
     ];
-    for (const [rx, kind] of decls) {
+    for (const [rx, kind, group] of decls) {
       for (const m of matchAllRx(rx, line)) {
-        const name = (m as any)[1] ?? (m as any)[2];
+        const name = m[group];
         if (!name) continue;
-        const start = line.indexOf(name, (m as any).index ?? 0);
+        const start = line.indexOf(name, m.index ?? 0);
         if (start >= 0) builder.push(lineIdx, start, name.length, token(kind), NO_MOD);
       }
     }
@@ -421,8 +424,8 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
       hoverProvider: true,
       definitionProvider: true,
       documentSymbolProvider: true,
-      semanticTokensProvider: { legend: SEMANTIC_LEGEND, full: true, range: false },
-    },
+      semanticTokensProvider: { legend: SEMANTIC_LEGEND, full: true, range: false }
+    }
   };
   if (hasWorkspaceFolderCapability) {
     init.capabilities.workspace = { workspaceFolders: { supported: true, changeNotifications: true } };
@@ -445,12 +448,28 @@ connection.onInitialized(() => {
 
 connection.onDidChangeConfiguration(() => {
   documentSettings.clear();
-  documents.all().forEach(validateTextDocument);
+  // Revalider tous les documents ouverts après changement de conf
+  for (const doc of documents.all()) {
+    scheduleValidate(doc);
+  }
 });
 
 /* -------------------------------------------------------------------------- */
 /* Utilitaires                                                                 */
 /* -------------------------------------------------------------------------- */
+
+function scheduleValidate(doc: TextDocument, ms = 120): void {
+  const key = doc.uri;
+  const t = debounceTimers.get(key);
+  if (t) clearTimeout(t);
+  debounceTimers.set(
+    key,
+    setTimeout(() => {
+      debounceTimers.delete(key);
+      void validateTextDocument(doc);
+    }, ms)
+  );
+}
 
 function getWordAt(doc: TextDocument, pos: Position): string | null {
   const text = doc.getText();
@@ -480,12 +499,15 @@ function* matchAllRx(rx: RegExp, line: string): Generator<RegExpMatchArray & { i
 /* Fils d’événements LSP                                                      */
 /* -------------------------------------------------------------------------- */
 
-documents.onDidOpen((e) => validateTextDocument(e.document));
-documents.onDidChangeContent((e) => validateTextDocument(e.document));
+documents.onDidOpen((e) => scheduleValidate(e.document, 10));
+documents.onDidChangeContent((e) => scheduleValidate(e.document, 120));
 documents.onDidClose((e) => {
   connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
   documentSettings.delete(settingsKey(e.document.uri, "vitte"));
   documentSettings.delete(settingsKey(e.document.uri, "vitl"));
+  const t = debounceTimers.get(e.document.uri);
+  if (t) clearTimeout(t);
+  debounceTimers.delete(e.document.uri);
 });
 
 documents.listen(connection);
