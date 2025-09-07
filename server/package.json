@@ -1,15 +1,11 @@
 {
-  "name": "vitte-client",
+  "name": "vitte-server",
   "private": true,
   "version": "0.1.0",
-  "description": "VS Code client for the Vitte/Vitl language server",
+  "description": "Language Server Protocol (LSP) server for the Vitte/Vitl language",
   "author": "VitteStudio",
   "license": "MIT",
-  "main": "./out/extension.js",
-  "publisher": "VitteStudio",
-  "engines": {
-    "vscode": "^1.75.0"
-  },
+  "main": "./out/server.js",
   "files": [
     "out/**/*",
     "src/**/*",
@@ -25,17 +21,11 @@
   },
   "devDependencies": {
     "typescript": "^5.3.3",
-    "@types/node": "24.3.1",
-    "@types/vscode": "^1.75.0",
+    "@types/node": "^24.3.1",
     "eslint": "9.35.0"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1"
-  }
-}
-
-  "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0"
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
   }
 }
