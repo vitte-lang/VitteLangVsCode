@@ -10,14 +10,14 @@
     "sourceMap": true,
     "inlineSources": true,
     "strict": true,
+    "noEmitOnError": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["vscode", "node"],
-    "composite": true,
-    "tsBuildInfoFile": "tsconfig.tsbuildinfo",
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "tsBuildInfoFile": "tsconfig.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "out", ".vscode-test"]

@@ -5,7 +5,7 @@
     "lib": ["ES2020"],
     "module": "commonjs",
     "moduleResolution": "node",
-    "rootDir": "src",
+    "rootDir": ".",
     "outDir": "out",
     "sourceMap": true,
     "inlineSources": true,
@@ -15,10 +15,13 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["vscode", "node"],
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
-    "composite": true,
-    "tsBuildInfoFile": "tsconfig.tsbuildinfo"
+    "allowSyntheticDefaultImports": true
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "client/**/*.ts",
+    "server/**/*.ts",
+    "*.ts"
+  ],
   "exclude": ["node_modules", "out", ".vscode-test"]
 }

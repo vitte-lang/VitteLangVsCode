@@ -1,3 +1,4 @@
+/* src/extension.ts */
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -24,23 +25,23 @@ function resolveServerOptions(ctx: vscode.ExtensionContext): ServerOptions {
   }
 
   const inspect = process.env.VITTE_LSP_INSPECT;
-  const debugExecArgv = inspect ? ["--nolazy", `--inspect=${inspect}`] : [];
+  const execArgv = inspect ? ["--nolazy", `--inspect=${inspect}`] : [];
 
   return {
     run:   { module: serverJs, transport: TransportKind.ipc, options: { env: process.env } },
-    debug: { module: serverJs, transport: TransportKind.ipc, options: { execArgv: debugExecArgv, env: process.env } },
+    debug: { module: serverJs, transport: TransportKind.ipc, options: { execArgv, env: process.env } },
   };
 }
 
 export async function activate(context: vscode.ExtensionContext) {
-  const cfg = vscode.workspace.getConfiguration("vitte");
+  const cfg    = vscode.workspace.getConfiguration("vitte");
   const enable = cfg.get<boolean>("enableLSP", false);
   const output = vscode.window.createOutputChannel("Vitte/Vitl LSP");
   const trace  = vscode.window.createOutputChannel("Vitte/Vitl LSP Trace");
 
   context.subscriptions.push(
     vscode.commands.registerCommand("vitte.hello", () => {
-      vscode.window.showInformationMessage("Vitte/Vitl extension active");
+      void vscode.window.showInformationMessage("Vitte/Vitl extension active");
     }),
     vscode.commands.registerCommand("vitte.restartLSP", async () => {
       await client?.stop();
@@ -51,7 +52,10 @@ export async function activate(context: vscode.ExtensionContext) {
       const conf = vscode.workspace.getConfiguration("vitte");
       const cur = conf.get<boolean>("enableLSP", false);
       await conf.update("enableLSP", !cur, vscode.ConfigurationTarget.Global);
-    })
+    }),
+    output,
+    trace,
+    { dispose: () => { void client?.stop(); } }
   );
 
   output.appendLine("[vitte/vitl] Activation de l’extension…");
@@ -60,7 +64,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const startClient = async () => {
     if (client) return;
     try {
-      const serverOptions = resolveServerOptions(context);
+      const serverOptions: ServerOptions = resolveServerOptions(context);
+
       const clientOptions: LanguageClientOptions = {
         documentSelector: [
           { language: "vitte", scheme: "file" },
@@ -89,7 +94,6 @@ export async function activate(context: vscode.ExtensionContext) {
         clientOptions
       );
 
-      context.subscriptions.push({ dispose: () => { void client?.stop(); } }, output, trace);
       await client.start();
       output.appendLine("[vitte/vitl] Client LSP démarré ✅");
     } catch (err) {
