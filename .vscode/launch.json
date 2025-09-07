@@ -6,14 +6,20 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
       "outFiles": [
         "${workspaceFolder}/client/out/**/*.js",
         "${workspaceFolder}/server/out/**/*.js"
       ],
       "env": {
         "NODE_OPTIONS": "--enable-source-maps"
-      }
+      },
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "internalConsoleOptions": "neverOpen"
     },
     {
       "name": "Attach to Vitte Server (6009)",
@@ -22,8 +28,25 @@
       "port": 6009,
       "restart": true,
       "smartStep": true,
-      "outFiles": ["${workspaceFolder}/server/out/**/*.js"],
-      "skipFiles": ["<node_internals>/**"]
+      "outFiles": [
+        "${workspaceFolder}/server/out/**/*.js"
+      ],
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Debug Client (Node)",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/client/out/extension.js",
+      "cwd": "${workspaceFolder}/client",
+      "outFiles": [
+        "${workspaceFolder}/client/out/**/*.js"
+      ],
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
     }
   ],
   "compounds": [
@@ -32,6 +55,14 @@
       "configurations": [
         "Run Vitte Extension",
         "Attach to Vitte Server (6009)"
+      ]
+    },
+    {
+      "name": "Full Debug (Extension + Server + Client)",
+      "configurations": [
+        "Run Vitte Extension",
+        "Attach to Vitte Server (6009)",
+        "Debug Client (Node)"
       ]
     }
   ]
