@@ -3,14 +3,14 @@
    async/await, FFI extern, motifs complexes, raw strings, escapes, nombres.
 */
 
-///! Doc du module — version avancée
+//! Doc du module — version avancée
 module demo.advanced
 
 // Imports groupés + alias + glob
-use std.io::{println as p, eprintln, *}
-use std.time::{Instant, Duration}
-use std.math::{pow, sqrt}
-use std.collections::{Map as HashMap, Set}
+use std.io::{ println as p, eprintln, * }
+use std.time::{ Instant, Duration }
+use std.math::{ pow, sqrt }
+use std.collections::{ Map as HashMap, Set }
 
 // Attributs façon tests/inline (pour test hi-light des #[])
 #[test]
@@ -18,17 +18,17 @@ use std.collections::{Map as HashMap, Set}
 fn sanity() -> () { return () }
 
 // Constantes & formats numériques
-const MASK: u64 = 0xFF_FF_00_00
+const MASK: u64  = 0xFF_FF_00_00
 const OCTAL: i32 = 0o755
 const BIN:   i32 = 0b1011_0101
 const SCI:   f64 = 6.022e23
 const BIG:   i128 = 9_223_372_036_854_775_807
 
 // Chaînes : escapes, unicode, “raw-like”, multi-ligne simulée
-let s1 = "quote: \" \n tab:\t smile:\u{1F60A}"
+let s1   = "quote: \" \n tab:\t smile:\u{1F60A}"
 let path = "C:\\Users\\vince\\code\\file.vit"
 // Raw style (si tu veux tester un mode brut dans la grammaire)
-let raw = r#"line1 {"no interpolate"} \n line2 #"#
+let raw  = r#"line1 {"no interpolate"} \n line2 "#
 
 // Commentaires imbriqués (doivent rester stables pour le tokenizer)
 /*
@@ -59,7 +59,7 @@ impl<T: Num> Vec2<T> {
   }
 }
 
-// Specialisation par “where” (syntaxe indicative pour la colorisation)
+// Spécialisation par “where” (syntaxe indicative pour la colorisation)
 impl<T> Vec2<T> where T: Num {
   fn map<U: Num>(&self, f: fn(T) -> U) -> Vec2<U> {
     return Vec2 { x: f(self.x), y: f(self.y) }
@@ -137,7 +137,7 @@ fn parse_i32(s: &str) -> Result<i32, Error> {
   return Ok(n)
 }
 
-// -------------------- Macros / Annotations inventaires pour tokenizer --------------------
+// -------------------- Macros / Annotations inventées pour tokenizer --------------------
 
 // Style macro appel
 log_debug!("value = {}", BIG)
