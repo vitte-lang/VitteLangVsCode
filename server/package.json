@@ -1,24 +1,39 @@
 {
-  "name": "vitte-vscode-server",
+  "name": "vitte-client",
   "private": true,
   "version": "0.1.0",
-  "type": "commonjs",
-  "main": "out/server.js",
+  "description": "VS Code client for the Vitte/Vitl language server",
+  "author": "VitteStudio",
+  "license": "MIT",
+  "main": "./out/extension.js",
+  "publisher": "VitteStudio",
   "engines": {
-    "node": ">=20"
+    "vscode": "^1.75.0"
   },
+  "files": [
+    "out/**/*",
+    "src/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc -b",
     "watch": "tsc -b -w",
     "clean": "tsc -b --clean",
-    "start": "node --enable-source-maps out/server.js",
-    "prepare": "npm run build",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "echo \"No tests defined\" && exit 0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "@types/node": "24.3.1",
+    "@types/vscode": "^1.75.0",
+    "eslint": "9.35.0"
   },
   "dependencies": {
-    "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.8"
-  },
+    "vscode-languageclient": "^9.0.1"
+  }
+}
+
   "devDependencies": {
     "typescript": "^5.0.0",
     "@types/node": "^20.0.0"
