@@ -29,24 +29,44 @@ Extension Visual Studio Code pour le langage **Vitte** et le dialecte **Vitl**. 
 
 ## Fonctionnalités
 
-- **Deux langages** : `vitte` et `vitl`.
+- **Deux langages supportés** : `vitte` et `vitl`.
 - **Extensions de fichiers** : `.vitte`, `.vit` et `.vitl`.
-- **Coloration** : `syntaxes/vitte.tmLanguage.json` et `syntaxes/vitl.tmLanguage.json`.
-- **Snippets** : `snippets/vitte.json` et `snippets/vitl.json`.
-- **Configuration de langage** : `language-configuration.json` et `language-configuration-vitl.json` (optionnel).
-- **LSP intégré** (node):
-  - Complétion, Hover, Go to Definition, Document Symbols
-  - **Semantic Tokens**
-  - Diagnostics : `TODO/FIXME`, `???`, espaces en fin de ligne, longueur de ligne
-  - **Watchers**: `**/.vitteconfig`, `**/vitte.toml`, `**/.vitlconfig`, `**/vitl.toml`
-  - **Sélecteurs** de documents : `vitte` et `vitl` (file + untitled)
+- **Coloration syntaxique** :
+  - `syntaxes/vitte.tmLanguage.json`
+  - `syntaxes/vitl.tmLanguage.json`
+- **Snippets intégrés** :
+  - `snippets/vitte.json`
+  - `snippets/vitl.json`
+- **Configuration de langage** :
+  - `language-configuration.json` (Vitte)
+  - `language-configuration-vitl.json` (Vitl, optionnel)
+- **LSP intégré (Node.js)** :
+  - **Fonctionnalités** : complétion, hover, go to definition, document symbols
+  - **Semantic Tokens** avec surlignage fin (keywords, fonctions, variables, constantes, etc.)
+  - **Diagnostics** :
+    - `TODO` / `FIXME`
+    - Séquence `???`
+    - Espaces en fin de ligne
+    - Ligne trop longue
+  - **Watchers de configuration** :
+    - `**/.vitteconfig`, `**/vitte.toml`
+    - `**/.vitlconfig`, `**/vitl.toml`
+  - **Sélecteurs de documents** :
+    - Langage : `vitte` et `vitl`
+    - Types : fichiers (`file`) et non sauvegardés (`untitled`)
   - **Options d’exécution** :
-    - `VITTE_LSP_PATH` pour pointer vers un binaire serveur externe
-    - `VITTE_LSP_INSPECT` pour activer l’inspection Node (ex. `6009`)
-- **Thème d’icônes** : `icons/vitte-icon-theme.json`.
-- **Compatibilité** : VS Code `^1.75.0`, Node 18+ recommandé.
+    - `VITTE_LSP_PATH` : pointer vers un binaire serveur externe
+    - `VITTE_LSP_INSPECT` : activer l’inspection Node (ex. `6009`)
+- **Thème d’icônes** :
+  - `icons/vitte-icon-theme.json`
+- **Compatibilité** :
+  - Visual Studio Code `^1.75.0`
+  - Node.js `>=18` recommandé
+- **Build & packaging** :
+  - Scripts `npm run build`, `watch`, `clean`
+  - Génération VSIX via `npx vsce package`
+  - Installation locale avec `code --install-extension vitte-lang-*.vsix`
 
----
 
 ## Formats pris en charge
 
