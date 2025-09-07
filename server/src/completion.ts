@@ -11,29 +11,9 @@ import { extractSymbols } from "./symbols.js";
 /* -------------------------------------------------------------------------- */
 
 const KEYWORDS = [
-  "module","use","pub","fn","struct","enum","trait","impl","let","const","mut",
-  "match","if","else","while","for","loop","return","break","continue",
-
-  "def","class","import","from","as","in","is","and","or","not","elif","try",
-  "except","finally","with","yield","lambda","pass","global","nonlocal","assert",
-  "del","raise","await","async",
-
-  "package","interface","map","chan","go","defer","select","type","var","fallthrough",
-  "range","default","switch","case",
-
-  "int","i8","i16","i32","i64","i128",
-  "u8","u16","u32","u64","u128",
-  "f16","f32","f64","f128",
-  "float","double","char","short","long","signed","unsigned","void","bool","sizeof",
-  "typedef","union","static","extern","inline","volatile","restrict","goto","register","do",
-
-  "mov","add","sub","mul","div","inc","dec","cmp","jmp","je","jne","jg","jl",
-  "jge","jle","push","pop","call","ret","lea","xor","shl","shr","nop",
-
-  "true","false","null","nil","none","self","this","super","new","delete","catch",
-  "throw","throws","export","namespace","using","override","virtual","abstract",
-  "extends","implements","operator","template","constexpr","friend",
-  "macro_rules","macro","static_cast","dynamic_cast","reinterpret_cast"
+  "module","import","use","as","pub","const","let","mut","fn",
+  "return","if","else","match","while","for","in","break","continue",
+  "type","impl","where","struct","mod","test","true","false"
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -175,8 +155,8 @@ function mapSymbolKindToCompletionKind(k) {
     case 3:  return CompletionItemKind.Module;
     case 5:  return CompletionItemKind.Class;
     case 7:  return CompletionItemKind.Property;
-    case 13: return CompletionItemKind.Variable;
-    case 14: return CompletionItemKind.Constant;
+    case 21: return CompletionItemKind.Constant; // corrigé: Constant
+    case 6:  return CompletionItemKind.Variable; // fallback si votre enum interne = 6
     default: return CompletionItemKind.Text;
   }
 }
