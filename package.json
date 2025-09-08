@@ -40,7 +40,7 @@
     "programming language",
     "icons"
   ],
-  "main": "out/extension.js",
+  "main": "./out/extension.js",
   "activationEvents": [
     "onLanguage:vitte",
     "onLanguage:vitl",
@@ -161,34 +161,20 @@
     "watch": "tsc -w -p ./",
     "check:vsix": "npx @vscode/vsce ls",
     "build:vsix": "npm run compile && npm run check:vsix && npx @vscode/vsce package",
-    "publish": "npm run compile && npx @vscode/vsce publish",
-    "build": "tsc -p . && (test -d server && tsc -p server || true)",
-    "lint": "eslint \"**/*.ts\"",
-    "package": "mkdir -p dist && npx @vscode/vsce package --out dist/${npm_package_name}-${npm_package_version}.vsix"
+    "publish": "npm run compile && npx @vscode/vsce publish"
   },
   "devDependencies": {
-    "@eslint/js": "^9.35.0",
-    "@types/node": "^24.3.1",
+    "@types/node": "24.3.1",
     "@types/vscode": "^1.75.0",
-    "@typescript-eslint/eslint-plugin": "^8.43.0",
-    "@typescript-eslint/parser": "^8.43.0",
     "@vscode/vsce": "^3.6.0",
-    "concurrently": "^9.2.1",
-    "eslint": "^9.35.0",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.9.2",
-    "vscode": "^1.1.34"
+    "concurrently": "9.2.1",
+    "eslint": "9.35.0",
+    "typescript": "^5.9.2"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12",
     "vscode-uri": "^3.1.0"
-  },
-  "overrides": {
-    "ansi-regex": "^6.0.1",
-    "minimist": "^1.2.8",
-    "qs": "^6.14.0",
-    "parse5": "^7.1.2"
   }
 }
