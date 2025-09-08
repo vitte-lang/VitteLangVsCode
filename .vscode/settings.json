@@ -3,6 +3,13 @@
     "vitte",
     "vitl",
     "VitteLight",
-    "DebugAdapterInlineImplementation"
+    "DebugAdapterInlineImplementation",
+    "onLanguage:vitl",
+    "onCommand:vitte.showServerLog",
+    "onCommand:vitte.restartServer",
+    "onCommand:vitte.runAction",
+    "onCommand:vitte.runActionWithArgs",
+    "onCommand:vitte.debug.runFile",
+    "onCommand:vitte.debug.attachServer",
   ]
 }
