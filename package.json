@@ -40,7 +40,7 @@
     "programming language",
     "icons"
   ],
-  "main": "./out/extension.js",
+  "main": "out/extension.js",
   "activationEvents": [
     "onLanguage:vitte",
     "onLanguage:vitl",
@@ -161,7 +161,10 @@
     "watch": "tsc -w -p ./",
     "check:vsix": "npx @vscode/vsce ls",
     "build:vsix": "npm run compile && npm run check:vsix && npx @vscode/vsce package",
-    "publish": "npm run compile && npx @vscode/vsce publish"
+    "publish": "npm run compile && npx @vscode/vsce publish",
+    "build": "tsc -p .",
+    "lint": "eslint \"**/*.ts\"",
+    "package": "mkdir -p dist && npx @vscode/vsce package --out dist/${npm_package_name}-${npm_package_version}.vsix"
   },
   "devDependencies": {
     "@types/node": "24.3.1",

@@ -10,3 +10,8 @@
 **/server/src/**
 **/client/src/**
 **/scripts/**
+
+!out/**
+!client/out/**
+!server/out/**
+!extension/out/**

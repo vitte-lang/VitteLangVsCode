@@ -1,5 +1,6 @@
 /* src/extension.ts */
 import * as fs from "fs";
+import { registerVitlDebugAdapter } from "./debug/vitlDebugAdapter";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
