@@ -5,9 +5,18 @@
   "version": "1.4.2",
   "publisher": "VitteStudio",
   "license": "MIT",
-  "engines": { "vscode": "^1.75.0" },
-  "extensionKind": ["workspace"],
-  "categories": ["Programming Languages", "Snippets", "Linters", "Formatters"],
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters",
+    "Formatters"
+  ],
   "icon": "icon.png",
   "repository": {
     "type": "git",
@@ -31,7 +40,7 @@
     "programming language",
     "icons"
   ],
-  "main": "./out/extension.js",
+  "main": "out/extension.js",
   "activationEvents": [
     "onLanguage:vitte",
     "onLanguage:vitl",
@@ -49,24 +58,49 @@
     "languages": [
       {
         "id": "vitte",
-        "aliases": ["Vitte", "vitte"],
-        "extensions": [".vitte", ".vit"],
+        "aliases": [
+          "Vitte",
+          "vitte"
+        ],
+        "extensions": [
+          ".vitte",
+          ".vit"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "vitl",
-        "aliases": ["Vitl", "vitl"],
-        "extensions": [".vitl"],
+        "aliases": [
+          "Vitl",
+          "vitl"
+        ],
+        "extensions": [
+          ".vitl"
+        ],
         "configuration": "./language-configuration-vitl.json"
       }
     ],
     "grammars": [
-      { "language": "vitte", "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
-      { "language": "vitl", "scopeName": "source.vitl", "path": "./syntaxes/vitl.tmLanguage.json" }
+      {
+        "language": "vitte",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      },
+      {
+        "language": "vitl",
+        "scopeName": "source.vitl",
+        "path": "./syntaxes/vitl.tmLanguage.json"
+      }
     ],
     "snippets": [
-      { "language": "vitte", "path": "./snippets/vitte.json" },
-      { "language": "vitl", "path": "./snippets/vitl.json" }
+      {
+        "language": "vitte",
+        "path": "./snippets/vitte.json"
+      },
+      {
+        "language": "vitl",
+        "path": "./snippets/vitl.json"
+      }
     ],
     "configuration": {
       "title": "Vitte",
@@ -78,19 +112,47 @@
         },
         "vitte.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Niveau de log pour le LSP"
         }
       }
     },
     "commands": [
-      { "command": "vitte.showServerLog", "title": "Vitte: Ouvrir le journal LSP", "category": "Vitte" },
-      { "command": "vitte.restartServer", "title": "Vitte: Redémarrer le serveur", "category": "Vitte" },
-      { "command": "vitte.runAction", "title": "Vitte: Exécuter une action rapide", "category": "Vitte" },
-      { "command": "vitte.runActionWithArgs", "title": "Vitte: Exécuter une action…", "category": "Vitte" },
-      { "command": "vitte.debug.runFile", "title": "Vitte: Debug fichier courant", "category": "Vitte" },
-      { "command": "vitte.debug.attachServer", "title": "Vitte: Attach serveur (6009)", "category": "Vitte" }
+      {
+        "command": "vitte.showServerLog",
+        "title": "Vitte: Ouvrir le journal LSP",
+        "category": "Vitte"
+      },
+      {
+        "command": "vitte.restartServer",
+        "title": "Vitte: Redémarrer le serveur",
+        "category": "Vitte"
+      },
+      {
+        "command": "vitte.runAction",
+        "title": "Vitte: Exécuter une action rapide",
+        "category": "Vitte"
+      },
+      {
+        "command": "vitte.runActionWithArgs",
+        "title": "Vitte: Exécuter une action…",
+        "category": "Vitte"
+      },
+      {
+        "command": "vitte.debug.runFile",
+        "title": "Vitte: Debug fichier courant",
+        "category": "Vitte"
+      },
+      {
+        "command": "vitte.debug.attachServer",
+        "title": "Vitte: Attach serveur (6009)",
+        "category": "Vitte"
+      }
     ]
   },
   "scripts": {
@@ -99,19 +161,34 @@
     "watch": "tsc -w -p ./",
     "check:vsix": "npx @vscode/vsce ls",
     "build:vsix": "npm run compile && npm run check:vsix && npx @vscode/vsce package",
-    "publish": "npm run compile && npx @vscode/vsce publish"
+    "publish": "npm run compile && npx @vscode/vsce publish",
+    "build": "tsc -p . && (test -d server && tsc -p server || true)",
+    "lint": "eslint \"**/*.ts\"",
+    "package": "mkdir -p dist && npx @vscode/vsce package --out dist/${npm_package_name}-${npm_package_version}.vsix"
   },
   "devDependencies": {
-    "@types/node": "24.3.1",
+    "@eslint/js": "^9.35.0",
+    "@types/node": "^24.3.1",
     "@types/vscode": "^1.75.0",
+    "@typescript-eslint/eslint-plugin": "^8.43.0",
+    "@typescript-eslint/parser": "^8.43.0",
     "@vscode/vsce": "^3.6.0",
-    "concurrently": "9.2.1",
-    "eslint": "9.35.0",
-    "typescript": "^5.9.2"
+    "concurrently": "^9.2.1",
+    "eslint": "^9.35.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.2",
+    "vscode": "^1.1.34"
   },
   "dependencies": {
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.12"
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "vscode-uri": "^3.1.0"
+  },
+  "overrides": {
+    "ansi-regex": "^6.0.1",
+    "minimist": "^1.2.8",
+    "qs": "^6.14.0",
+    "parse5": "^7.1.2"
   }
 }
