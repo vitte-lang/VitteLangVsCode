@@ -1,36 +1,29 @@
 {
   "version": 1,
-  "project": {
-    "name": "VitteLangVsCode",
-    "language": "typescript"
-  },
   "files": {
     "include": [
-      "src/**/*.ts",
-      "package.json",
-      "tsconfig.json",
-      "tsconfig.*.json",
-      "README.md",
-      ".vscode/settings.json",
-      ".vscode/extensions.json",
-      ".vscode/launch.json",
-      ".vscode/tasks.json"
+      "${workspaceFolder}/**/*.{ts,tsx,js,jsx,json,md,html,css,scss,vue,svelte,rs,c,cpp,h,hpp,vit,vitl,vitte}"
     ],
     "exclude": [
-      "node_modules/**",
-      "out/**",
-      "dist/**",
-      ".vscode-test/**",
-      "coverage/**",
-      "test-results/**",
-      "logs/**",
-      "tmp/**",
-      "temp/**"
-    ]
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/out/**",
+      "**/.git/**",
+      "**/.vscode-test/**",
+      "**/.cache/**",
+      "**/coverage/**",
+      "**/logs/**",
+      "**/tmp/**",
+      "**/temp/**"
+    ],
+    "max_file_size_mb": 3,
+    "max_files": 300
   },
   "runtime": {
-    "max_input_tokens": 6000,
-    "max_output_tokens": 1200,
+    "model": "qwen-coder-fast-ultra:latest",
+    "max_input_tokens": 12288,
+    "max_output_tokens": 4096,
+    "request_timeout_ms": 25000,
     "verbosity": "minimal"
   }
 }
