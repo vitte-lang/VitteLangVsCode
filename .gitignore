@@ -31,7 +31,9 @@ logs/
 coverage/
 *.tsbuildinfo
 
+# ==========================
 # Système
+# ==========================
 .DS_Store
 Thumbs.db
 
@@ -47,15 +49,29 @@ test-results/
 coverage-final.json
 .nyc_output/
 
+# ==========================
 # Env secrets
+# ==========================
 .env
 .env.local
 .env.*.local
 
+# ==========================
 # IDE / JetBrains
+# ==========================
 .idea/
 *.iml
 
-# Misc
+# ==========================
+# Cline / Ollama
+# ==========================
+.cline/
+cline.log
+.cline-cache/
+ollama.log
+
+# ==========================
+# Divers / temporaire
+# ==========================
 tmp/
 temp/
