@@ -1,4 +1,13 @@
-# Vitte Language Support (Vitte/Vitl) — VS Code Extension
+# VitteStudio
+
+## 🚀 Commandes d'autocomplétion
+- `vitte.autocomplete.c` : Activer l'autocomplétion C-style
+- `vitte.autocomplete.cpp` : Activer l'autocomplétion C++-style
+
+## 🛠️ Débogage
+1. Ouvrez un fichier `.vitte` ou `.vitl`
+2. Appuyez sur `F5` pour lancer le débogage
+3. Utilisez `vitte.debug.start`/`vitte.debug.stop` pour gérer le débogage# Vitte Language Support (Vitte/Vitl) — VS Code Extension
 
 [![Marketplace](https://img.shields.io/badge/VS%20Code-%E2%86%92%20Marketplace-blue)](https://marketplace.visualstudio.com/manage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -10,20 +19,31 @@ Extension Visual Studio Code pour le langage **Vitte** et le dialecte **Vitl**. 
 ---
 
 ## Sommaire
-- [Fonctionnalités](#fonctionnalités)
-- [Formats pris en charge](#formats-pris-en-charge)
-- [Installation rapide](#installation-rapide)
-- [Utilisation](#utilisation)
-- [Paramètres](#paramètres)
-- [Arborescence du projet](#arborescence-du-projet)
-- [Développement](#développement)
-- [Build VSIX](#build-vsix)
-- [Publication Marketplace](#publication-marketplace)
-- [Exemples](#exemples)
-- [Dépannage](#dépannage)
-- [Feuille de route](#feuille-de-route)
-- [Contribuer](#contribuer)
-- [Licence](#licence)
+- [VitteStudio](#vittestudio)
+  - [🚀 Commandes d'autocomplétion](#-commandes-dautocomplétion)
+  - [🛠️ Débogage](#️-débogage)
+  - [Sommaire](#sommaire)
+  - [Fonctionnalités](#fonctionnalités)
+  - [Formats pris en charge](#formats-pris-en-charge)
+  - [Installation rapide](#installation-rapide)
+    - [Depuis un fichier `.vsix`](#depuis-un-fichier-vsix)
+    - [Depuis le Marketplace](#depuis-le-marketplace)
+  - [Utilisation](#utilisation)
+  - [Paramètres](#paramètres)
+  - [Arborescence du projet](#arborescence-du-projet)
+  - [Développement](#développement)
+    - [Scripts utiles](#scripts-utiles)
+  - [Build VSIX](#build-vsix)
+    - [Unix](#unix)
+    - [Windows (PowerShell)](#windows-powershell)
+  - [Publication Marketplace](#publication-marketplace)
+  - [Exemples](#exemples)
+    - [`examples/hello.vitte`](#exampleshellovitte)
+    - [`examples/hello.vitl`](#exampleshellovitl)
+  - [Dépannage](#dépannage)
+  - [Feuille de route](#feuille-de-route)
+  - [Contribuer](#contribuer)
+  - [Licence](#licence)
 
 ---
 
