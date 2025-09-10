@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "project": {
+    "name": "VitteLangVsCode",
+    "language": "typescript"
+  },
+  "files": {
+    "include": [
+      "src/**/*.ts",
+      "package.json",
+      "tsconfig.json",
+      "tsconfig.*.json",
+      "README.md",
+      ".vscode/settings.json",
+      ".vscode/extensions.json",
+      ".vscode/launch.json",
+      ".vscode/tasks.json"
+    ],
+    "exclude": [
+      "node_modules/**",
+      "out/**",
+      "dist/**",
+      ".vscode-test/**",
+      "coverage/**",
+      "test-results/**",
+      "logs/**",
+      "tmp/**",
+      "temp/**"
+    ]
+  },
+  "runtime": {
+    "max_input_tokens": 6000,
+    "max_output_tokens": 1200,
+    "verbosity": "minimal"
+  }
+}
