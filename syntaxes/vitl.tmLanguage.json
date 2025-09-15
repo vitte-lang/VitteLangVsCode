@@ -2,8 +2,9 @@
   "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
   "name": "Vitl",
   "scopeName": "source.vitl",
-  "fileTypes": ["vitl"],
+  "fileTypes": ["vitl", "vit", "vitte"],
   "uuid": "c2b8c7be-8f9a-4b1a-9152-7f2f1e0f4a33",
+
   "patterns": [
     { "include": "#shebang" },
     { "include": "#comments" },
@@ -19,22 +20,21 @@
     { "include": "#operators" },
     { "include": "#punctuation" }
   ],
+
   "repository": {
     "shebang": {
       "name": "comment.line.shebang.vitl",
       "match": "^(#!).*$"
     },
+
     "comments": {
       "patterns": [
-        {
-          "name": "comment.line.double-slash.vitl",
-          "match": "//.*$"
-        },
+        { "name": "comment.line.double-slash.vitl", "match": "//.*$" },
         {
           "name": "comment.block.documentation.vitl",
           "begin": "/\\*\\*",
-          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitl" } },
           "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitl" } },
           "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitl" } },
           "patterns": [
             { "include": "#doc-tags" },
@@ -44,8 +44,8 @@
         {
           "name": "comment.block.vitl",
           "begin": "/\\*",
-          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitl" } },
           "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitl" } },
           "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitl" } },
           "patterns": [
             { "include": "#comments" },
@@ -54,6 +54,7 @@
         }
       ]
     },
+
     "doc-tags": {
       "patterns": [
         {
@@ -62,67 +63,69 @@
         }
       ]
     },
+
     "todo": {
       "name": "keyword.other.todo.vitl",
       "match": "\\b(TODO|FIXME|HACK|XXX|BUG)\\b"
     },
+
     "attributes": {
       "patterns": [
         {
           "name": "meta.attribute.bracket.vitl",
           "begin": "#\\[",
-          "beginCaptures": { "0": { "name": "punctuation.definition.attribute.begin.vitl" } },
           "end": "\\]",
+          "beginCaptures": { "0": { "name": "punctuation.definition.attribute.begin.vitl" } },
           "endCaptures": { "0": { "name": "punctuation.definition.attribute.end.vitl" } },
           "patterns": [
-            {
-              "name": "entity.other.attribute-name.vitl",
-              "match": "[A-Za-z_][\\w-]*"
-            },
+            { "name": "entity.other.attribute-name.vitl", "match": "[A-Za-z_][\\w-]*" },
             { "include": "#strings" },
             { "include": "#numbers" },
             { "include": "#punctuation" }
           ]
         },
-        {
-          "name": "meta.annotation.vitl",
-          "match": "@[A-Za-z_][\\w.:-]*"
-        }
+        { "name": "meta.annotation.vitl", "match": "@[A-Za-z_][\\w.:-]*" }
       ]
     },
+
     "directives": {
       "name": "keyword.control.directive.vitl",
       "match": "^\\s*#(include|define|pragma|error|region|endregion)\\b"
     },
+
     "strings": {
       "patterns": [
         {
           "name": "string.quoted.double.vitl",
           "begin": "\"",
-          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.vitl" } },
           "end": "\"",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.vitl" } },
           "endCaptures": { "0": { "name": "punctuation.definition.string.end.vitl" } },
           "patterns": [
-            { "name": "constant.character.escape.vitl", "match": "\\\\(x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|n|r|t|\"|\\\\)" },
+            {
+              "name": "constant.character.escape.vitl",
+              "match": "\\\\(x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|n|r|t|\"|\\\\)"
+            },
             { "include": "#interpolation" }
           ]
         },
         {
           "name": "string.quoted.raw.vitl",
           "begin": "r(#*)\"",
-          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.vitl" } },
           "end": "\"\\1",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.vitl" } },
           "endCaptures": { "0": { "name": "punctuation.definition.string.end.vitl" } }
         }
       ]
     },
+
     "interpolation": {
       "patterns": [
         {
           "name": "meta.interpolation.vitl",
           "begin": "\\$\\{",
-          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.vitl" } },
           "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.vitl" } },
           "endCaptures": { "0": { "name": "punctuation.section.interpolation.end.vitl" } },
           "patterns": [
             { "include": "#strings" },
@@ -136,16 +139,18 @@
         }
       ]
     },
+
     "chars": {
       "name": "constant.character.vitl",
       "begin": "'",
-      "beginCaptures": { "0": { "name": "punctuation.definition.char.begin.vitl" } },
       "end": "'",
+      "beginCaptures": { "0": { "name": "punctuation.definition.char.begin.vitl" } },
       "endCaptures": { "0": { "name": "punctuation.definition.char.end.vitl" } },
       "patterns": [
         { "name": "constant.character.escape.vitl", "match": "\\\\(x[0-9A-Fa-f]{2}|u\\{[0-9A-Fa-f]+\\}|'|n|r|t|\\\\)" }
       ]
     },
+
     "numbers": {
       "patterns": [
         { "name": "constant.numeric.hex.vitl", "match": "\\b0x[0-9A-Fa-f](_?[0-9A-Fa-f])*\\b" },
@@ -154,60 +159,36 @@
         { "name": "constant.numeric.float.vitl", "match": "\\b\\d(_?\\d)*(\\.\\d(_?\\d)*)?([eE][+-]?\\d(_?\\d)*)?\\b" }
       ]
     },
+
     "keywords": {
       "patterns": [
-        {
-          "name": "keyword.control.vitl",
-          "match": "\\b(if|else|match|while|for|loop|break|continue|return|switch|case|default|try|except|finally|with)\\b"
-        },
-        {
-          "name": "storage.modifier.vitl",
-          "match": "\\b(pub|mut|const|static|extern|inline|volatile|abstract|virtual|override)\\b"
-        },
-        {
-          "name": "keyword.declaration.vitl",
-          "match": "\\b(module|use|fn|struct|enum|trait|impl|let|type|class|def|interface|package|namespace)\\b"
-        },
-        {
-          "name": "keyword.operator.logical.vitl",
-          "match": "\\b(and|or|not)\\b"
-        },
-        {
-          "name": "keyword.other.async.vitl",
-          "match": "\\b(async|await|yield|lambda)\\b"
-        },
-        {
-          "name": "constant.language.vitl",
-          "match": "\\b(true|false|null|nil|none|self|this|super|new)\\b"
-        }
+        { "name": "keyword.control.vitl", "match": "\\b(if|else|match|while|for|loop|break|continue|return|switch|case|default|try|except|finally|with)\\b" },
+        { "name": "storage.modifier.vitl", "match": "\\b(pub|mut|const|static|extern|inline|volatile|abstract|virtual|override)\\b" },
+        { "name": "keyword.declaration.vitl", "match": "\\b(module|use|fn|struct|enum|trait|impl|let|type|class|def|interface|package|namespace)\\b" },
+        { "name": "keyword.operator.logical.vitl", "match": "\\b(and|or|not)\\b" },
+        { "name": "keyword.other.async.vitl", "match": "\\b(async|await|yield|lambda)\\b" },
+        { "name": "constant.language.vitl", "match": "\\b(true|false|null|nil|none|self|this|super|new)\\b" }
       ]
     },
+
     "types": {
       "patterns": [
-        {
-          "name": "storage.type.primitive.vitl",
-          "match": "\\b(u?int(8|16|32|64)?|float(32|64)?|double|char|short|long|void|bool|usize|isize|string|bytes?)\\b"
-        },
-        {
-          "name": "entity.name.type.vitl",
-          "match": "\\b[A-Z][A-Za-z0-9_]*\\b"
-        },
-        {
-          "name": "support.type.builtin.vitl",
-          "match": "\\b(Result|Option|Vec|Map|Set|Chan)\\b"
-        }
+        { "name": "storage.type.primitive.vitl", "match": "\\b(u?int(8|16|32|64)?|float(32|64)?|double|char|short|long|void|bool|usize|isize|string|bytes?)\\b" },
+        { "name": "entity.name.type.vitl", "match": "\\b[A-Z][A-Za-z0-9_]*\\b" },
+        { "name": "support.type.builtin.vitl", "match": "\\b(Result|Option|Vec|Map|Set|Chan)\\b" }
       ]
     },
+
     "declarations": {
       "patterns": [
         {
           "name": "meta.declaration.function.vitl",
           "begin": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "end": "(?=\\{|;|$)",
           "beginCaptures": {
             "1": { "name": "storage.type.function.vitl" },
             "2": { "name": "entity.name.function.vitl" }
           },
-          "end": "(?=\\{|;|$)",
           "patterns": [
             { "include": "#generics" },
             { "include": "#parameters" },
@@ -217,41 +198,41 @@
         {
           "name": "meta.declaration.struct.vitl",
           "begin": "\\b(struct)\\s+([A-Z][A-Za-z0-9_]*)",
+          "end": "(?=\\{|;|$)",
           "beginCaptures": {
             "1": { "name": "storage.type.struct.vitl" },
             "2": { "name": "entity.name.type.struct.vitl" }
           },
-          "end": "(?=\\{|;|$)",
           "patterns": [{ "include": "#generics" }]
         },
         {
           "name": "meta.declaration.enum.vitl",
           "begin": "\\b(enum)\\s+([A-Z][A-Za-z0-9_]*)",
+          "end": "(?=\\{|;|$)",
           "beginCaptures": {
             "1": { "name": "storage.type.enum.vitl" },
             "2": { "name": "entity.name.type.enum.vitl" }
           },
-          "end": "(?=\\{|;|$)",
           "patterns": [{ "include": "#generics" }]
         },
         {
           "name": "meta.declaration.trait.vitl",
           "begin": "\\b(trait)\\s+([A-Z][A-Za-z0-9_]*)",
+          "end": "(?=\\{|;|$)",
           "beginCaptures": {
             "1": { "name": "storage.type.trait.vitl" },
             "2": { "name": "entity.name.type.trait.vitl" }
           },
-          "end": "(?=\\{|;|$)",
           "patterns": [{ "include": "#generics" }]
         },
         {
           "name": "meta.declaration.variable.vitl",
           "begin": "\\b(let|const)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "end": "(?=;|$)",
           "beginCaptures": {
             "1": { "name": "storage.type.var.vitl" },
             "2": { "name": "variable.other.definition.vitl" }
           },
-          "end": "(?=;|$)",
           "patterns": [
             { "include": "#type-annotation" },
             { "include": "#operators" },
@@ -277,59 +258,60 @@
         }
       ]
     },
+
     "generics": {
       "name": "meta.generics.vitl",
       "begin": "<",
-      "beginCaptures": { "0": { "name": "punctuation.definition.generic.begin.vitl" } },
       "end": ">",
+      "beginCaptures": { "0": { "name": "punctuation.definition.generic.begin.vitl" } },
       "endCaptures": { "0": { "name": "punctuation.definition.generic.end.vitl" } },
       "patterns": [
         { "include": "#types" },
         { "include": "#punctuation" }
       ]
     },
+
     "parameters": {
       "name": "meta.parameters.vitl",
       "begin": "\\(",
-      "beginCaptures": { "0": { "name": "punctuation.section.parameters.begin.vitl" } },
       "end": "\\)",
+      "beginCaptures": { "0": { "name": "punctuation.section.parameters.begin.vitl" } },
       "endCaptures": { "0": { "name": "punctuation.section.parameters.end.vitl" } },
       "patterns": [
-        {
-          "name": "variable.parameter.vitl",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b"
-        },
+        { "name": "variable.parameter.vitl", "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b" },
         { "include": "#type-annotation" },
         { "include": "#strings" },
         { "include": "#numbers" },
         { "include": "#punctuation" }
       ]
     },
+
     "return-type": {
       "name": "meta.return-type.vitl",
       "begin": "\\s*:\\s*",
-      "beginCaptures": { "0": { "name": "punctuation.separator.type.vitl" } },
       "end": "(?=\\{|;|$)",
+      "beginCaptures": { "0": { "name": "punctuation.separator.type.vitl" } },
       "patterns": [{ "include": "#types" }]
     },
+
     "type-annotation": {
       "name": "meta.type-annotation.vitl",
       "begin": "\\s*:\\s*",
-      "beginCaptures": { "0": { "name": "punctuation.separator.type.vitl" } },
       "end": "(?=,|;|=|\\)|$)",
+      "beginCaptures": { "0": { "name": "punctuation.separator.type.vitl" } },
       "patterns": [{ "include": "#types" }]
     },
+
     "calls": {
       "patterns": [
         {
           "name": "meta.function-call.vitl",
           "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
-          "captures": {
-            "1": { "name": "entity.name.function.vitl" }
-          }
+          "captures": { "1": { "name": "entity.name.function.vitl" } }
         }
       ]
     },
+
     "operators": {
       "patterns": [
         { "name": "keyword.operator.assignment.vitl", "match": "(\\+=|-=|\\*=|/=|%=|=)" },
@@ -341,6 +323,7 @@
         { "name": "keyword.operator.unary.vitl", "match": "(\\+|-|\\*|/|%)" }
       ]
     },
+
     "punctuation": {
       "patterns": [
         { "name": "punctuation.separator.comma.vitl", "match": "," },
@@ -358,10 +341,12 @@
       ]
     }
   },
+
   "foldingStartMarker": "(\\{\\s*(//.*)?$)|(/\\*\\*)",
   "foldingStopMarker": "(^\\s*\\})|(\\*/)",
+
   "injections": {
-    "L:source.vitl comment.block.documentation.vitl - comment.block documentation": {
+    "source.vitl comment.block.documentation.vitl": {
       "patterns": [{ "include": "text.html.markdown" }]
     }
   }
