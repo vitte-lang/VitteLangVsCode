@@ -1,83 +1,95 @@
 {
-  "name": "vitte",
-  "displayName": "Vitte",
-  "description": "Extension VSCode pour le langage Vitte",
-  "version": "0.4.1",
-  "publisher": "jclg",
-  "engines": { "vscode": "^1.75.0" },
-  "categories": ["Other"],
+  "name": "vittelang-vscode",
+  "displayName": "VitteLang VSCode",
+  "description": "Support complet pour les langages Vitte, Vit et Vitl (syntaxe, LSP, debug, snippets, icônes).",
+  "version": "0.4.0",
+  "publisher": "jclgl",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Other"
+  ],
   "main": "./out/extension.js",
   "dependencies": {
     "vscode-nls": "^5.0.0"
   },
   "activationEvents": [
-    "onLanguage:vitte",
-    "onCommand:vitte.showServerLog",
-    "onCommand:vitte.restartServer",
-    "onCommand:vitte.runAction",
-    "onCommand:vitte.runActionWithArgs",
-    "onCommand:vitte.debug.runFile",
-    "onCommand:vitte.debug.attachServer"
+    "onLanguage:vitte"
   ],
   "contributes": {
     "languages": [
       {
         "id": "vitte",
-        "aliases": ["Vitte", "vitte"],
-        "extensions": [".vitte"],
+        "aliases": ["Vitte", "vit", "vitl"],
+        "extensions": [".vitte", ".vit", ".vitl"],
         "configuration": "./language-configuration.json"
       }
     ],
-    "commands": [
-      { "command": "vitte.showServerLog", "title": "Vitte: Show Server Log" },
-      { "command": "vitte.restartServer", "title": "Vitte: Restart Server" },
-      { "command": "vitte.runAction", "title": "Vitte: Run Action" },
-      { "command": "vitte.runActionWithArgs", "title": "Vitte: Run Action (With Args)" },
-      { "command": "vitte.debug.runFile", "title": "Vitte: Debug Run File" },
-      { "command": "vitte.debug.attachServer", "title": "Vitte: Debug Attach Server" }
+    "grammars": [
+      {
+        "language": "vitte",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      }
     ],
-    "menus": {
-      "commandPalette": [
-        { "command": "vitte.showServerLog", "when": "editorLangId == vitte", "group": "navigation" },
-        { "command": "vitte.restartServer", "when": "editorLangId == vitte", "group": "navigation" },
-        { "command": "vitte.runAction", "when": "editorLangId == vitte", "group": "navigation" },
-        { "command": "vitte.runActionWithArgs", "when": "editorLangId == vitte", "group": "navigation" },
-        { "command": "vitte.debug.runFile", "when": "editorLangId == vitte", "group": "navigation" },
-        { "command": "vitte.debug.attachServer", "when": "editorLangId == vitte", "group": "navigation" }
-      ]
-    },
+    "commands": [
+      {
+        "command": "vitte.showServerLog",
+        "title": "Vitte: Show Server Log"
+      },
+      {
+        "command": "vitte.restartServer",
+        "title": "Vitte: Restart Language Server"
+      },
+      {
+        "command": "vitte.runAction",
+        "title": "Vitte: Run Action"
+      },
+      {
+        "command": "vitte.runActionWithArgs",
+        "title": "Vitte: Run Action with Args"
+      },
+      {
+        "command": "vitte.debug.runFile",
+        "title": "Vitte Debug: Run File"
+      },
+      {
+        "command": "vitte.debug.attachServer",
+        "title": "Vitte Debug: Attach to Server"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "vitte.restartServer",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == vitte"
+      }
+    ],
     "configuration": {
       "type": "object",
-      "title": "Configuration de Vitte",
+      "title": "Vitte Language",
       "properties": {
-        "vitte.serverPath": {
-          "type": "string",
-          "default": "",
-          "description": "Chemin vers l'exécutable du serveur Vitte (laisser vide pour utiliser le serveur intégré)."
-        },
-        "vitte.serverArgs": {
-          "type": "array",
-          "default": [],
-          "description": "Arguments supplémentaires à passer au serveur Vitte.",
-          "items": { "type": "string" }
-        },
         "vitte.trace.server": {
           "type": "string",
           "enum": ["off", "messages", "verbose"],
           "default": "off",
-          "description": "Niveau de trace pour le serveur Vitte."
-        },
-        "vitte.logFilePath": {
-          "type": ["string", "null"],
-          "default": null,
-          "description": "Chemin vers le fichier de log du serveur Vitte (laisser vide pour désactiver la journalisation)."
-        },
-        "vitte.enableDebugging": {
-          "type": "boolean",
-          "default": false,
-          "description": "Activer le mode débogage pour le serveur Vitte (utile pendant le développement)."
+          "description": "Active le traçage du serveur de langage Vitte."
         }
       }
     }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "npm run compile && node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "@types/node": "14.x",
+    "typescript": "^5.0.0",
+    "eslint": "^8.0.0"
   }
 }
