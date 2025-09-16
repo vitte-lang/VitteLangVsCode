@@ -1,17 +1,6 @@
 /* ----------------------------------------------------------------------------
  * extension.ts — Extension VS Code pour Vitte / Vit / Vitl
  * SPDX-License-Identifier: MIT
- *
- * Objectifs:
- *  - Activer le support de base des langages vitte, vit, vitl
- *  - Fournir des commandes: run, build, fmt, test, docs
- *  - Enregistrer un formateur basique et un linter par diagnostics
- *  - Enregistrer un hover provider simple
- *  - Enregistrer un adaptateur de debug via un process externe (vitlv --dap)
- *  - Afficher un bouton de barre d'état Run
- *
- * Cette implémentation évite les imports cassés en intégrant l'usine d'adaptateur.
- * Elle reste compatible avec une future séparation par fichiers.
  * --------------------------------------------------------------------------- */
 
 import * as vscode from "vscode";
@@ -169,7 +158,8 @@ const hoverProvider: vscode.HoverProvider = {
     const word = doc.getText(doc.getWordRangeAtPosition(pos));
     if (!word) return undefined;
     const md = new vscode.MarkdownString();
-    md.appendCodeblock(word, doc.languageId);
+    // fix: compat globale sans appendCodeblock
+    md.appendMarkdown("```" + doc.languageId + "\n" + word + "\n```");
     md.appendMarkdown("\nSymbole détecté. Aucun index de symboles disponible.");
     md.isTrusted = true;
     return new vscode.Hover(md);
@@ -178,15 +168,16 @@ const hoverProvider: vscode.HoverProvider = {
 
 // ---------------------- Debug Adapter via process externe ------------------
 class VitlInlineDebugAdapter implements vscode.DebugAdapter {
+  private readonly emitter = new vscode.EventEmitter<vscode.DebugProtocolMessage>();
+  public readonly onDidSendMessage: vscode.Event<vscode.DebugProtocolMessage>;
   private proc: ReturnType<typeof spawn> | undefined;
 
-  constructor(private command: string, private args: string[], private cwd?: string) {}
-
-  onDidSendMessage?: vscode.Event<vscode.DebugProtocolMessage> | undefined;
-  private emitter = new vscode.EventEmitter<vscode.DebugProtocolMessage>();
+  constructor(private command: string, private args: string[], private cwd?: string) {
+    // fix: non optionnel
+    this.onDidSendMessage = this.emitter.event;
+  }
 
   start(): void {
-    this.onDidSendMessage = this.emitter.event;
     this.proc = spawn(this.command, this.args, { cwd: this.cwd, env: { ...process.env } });
     this.proc.stdout?.on("data", d => this.forward(d));
     this.proc.stderr?.on("data", d => this.forward(d));
@@ -223,7 +214,9 @@ class VitlDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory, v
     const cwd = workspaceFolderFor()?.uri.fsPath;
     const impl = new VitlInlineDebugAdapter(exe, args, cwd);
     impl.start();
-    return new vscode.DebugAdapterInlineImplementation(impl);
+    // fix: cast explicite vers DebugAdapterDescriptor
+    const inline = new (vscode as any).DebugAdapterInlineImplementation(impl);
+    return inline as vscode.DebugAdapterDescriptor;
   }
 
   dispose(): void {

@@ -1,0 +1,71 @@
+{
+  // --- Configuration spécifique à VitteLangVSCode ---
+  "vitte.paths.vitl": "/usr/local/bin/vitl",
+  "vitte.paths.vitlv": "/usr/local/bin/vitlv",
+  "vitte.format.useExternal": true,
+  "vitte.docs.url": "https://vitte-lang.example/docs",
+  "vitte.trace.server": "off",
+
+  // --- Associations de fichiers ---
+  "files.associations": {
+    "*.vitl": "vitl",
+    "*.vit": "vit",
+    "*.vitte": "vitte"
+  },
+
+  // --- Formatage & lint ---
+  "files.eol": "\n",
+  "files.encoding": "utf8",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": false,
+  "editor.formatOnType": false,
+  "editor.formatOnSaveMode": "file",
+
+  // --- Style par langage ---
+  "[vitl]":  { "editor.tabSize": 2, "editor.insertSpaces": true, "editor.formatOnSave": true },
+  "[vit]":   { "editor.tabSize": 2, "editor.insertSpaces": true, "editor.formatOnSave": true },
+  "[vitte]": { "editor.tabSize": 2, "editor.insertSpaces": true, "editor.formatOnSave": true },
+
+  // --- Éditeur ---
+  "editor.rulers": [100],
+  "editor.renderWhitespace": "boundary",
+  "editor.cursorBlinking": "smooth",
+  "editor.minimap.enabled": true,
+  "editor.wordWrap": "off",
+  "editor.stickyScroll.enabled": true,
+  "editor.smoothScrolling": true,
+
+  // --- Exclusions ---
+  "files.exclude": {
+    "**/.git": true,
+    "**/node_modules": true,
+    "**/out": true,
+    "**/dist": true,
+    "**/.vscode-test": true,
+    "**/coverage": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/out": true,
+    "**/dist": true,
+    "**/.vscode-test": true,
+    "**/coverage": true
+  },
+
+  // --- Debug ---
+  "debug.openDebug": "openOnSessionStart",
+  "debug.inlineValues": true,
+  "debug.console.fontSize": 13,
+
+  // --- Actions automatiques ---
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // --- Sécurité & télémétrie ---
+  "telemetry.telemetryLevel": "off",
+  "security.workspace.trust.untrustedFiles": "open"
+}
