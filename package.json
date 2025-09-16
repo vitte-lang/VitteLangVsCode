@@ -1,28 +1,66 @@
 {
   "name": "vittelang-vscode",
-  "displayName": "VitteLang VSCode",
-  "description": "Support complet pour les langages Vitte, Vit et Vitl (syntaxe, LSP, debug, snippets, icônes).",
-  "version": "0.4.0",
+  "displayName": "VitteLang VS Code",
+  "description": "Support complet pour Vitte, Vit et Vitl : grammaire, LSP, debug, snippets, icônes.",
+  "version": "0.4.1",
   "publisher": "jclgl",
+  "license": "MIT",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.93.0"
   },
   "categories": [
-    "Other"
+    "Programming Languages",
+    "Debuggers"
   ],
+  "icon": "images/icon.png",
   "main": "./out/extension.js",
-  "dependencies": {
-    "vscode-nls": "^5.0.0"
-  },
   "activationEvents": [
-    "onLanguage:vitte"
+    "onLanguage:vitte",
+    "onLanguage:vit",
+    "onLanguage:vitl",
+    "onCommand:vitte.showServerLog",
+    "onCommand:vitte.restartServer",
+    "onCommand:vitte.runAction",
+    "onCommand:vitte.runActionWithArgs",
+    "onCommand:vitte.debug.runFile",
+    "onCommand:vitte.debug.attachServer",
+    "onDebugResolve:vitl"
   ],
   "contributes": {
     "languages": [
       {
         "id": "vitte",
-        "aliases": ["Vitte", "vit", "vitl"],
-        "extensions": [".vitte", ".vit", ".vitl"],
+        "aliases": [
+          "Vitte",
+          "vit",
+          "vitl"
+        ],
+        "extensions": [
+          ".vitte",
+          ".vit",
+          ".vitl"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "vit",
+        "aliases": [
+          "Vit"
+        ],
+        "extensions": [
+          ".vit"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "vitl",
+        "aliases": [
+          "Vitl",
+          "Vitte Light"
+        ],
+        "extensions": [
+          ".vitl"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -31,6 +69,66 @@
         "language": "vitte",
         "scopeName": "source.vitte",
         "path": "./syntaxes/vitte.tmLanguage.json"
+      },
+      {
+        "language": "vit",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      },
+      {
+        "language": "vitl",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "vitl",
+        "label": "Vitl Debug",
+        "languages": [
+          "vitte",
+          "vit",
+          "vitl"
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Fichier à exécuter",
+                "default": "${file}"
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Répertoire de travail",
+                "default": "${workspaceFolder}"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments CLI",
+                "default": []
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "vitl",
+            "request": "launch",
+            "name": "Vitl: Launch current file",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": true,
+            "args": []
+          }
+        ]
       }
     ],
     "commands": [
@@ -64,6 +162,16 @@
         "command": "vitte.restartServer",
         "key": "ctrl+shift+r",
         "when": "editorLangId == vitte"
+      },
+      {
+        "command": "vitte.restartServer",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == vit"
+      },
+      {
+        "command": "vitte.restartServer",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == vitl"
       }
     ],
     "configuration": {
@@ -72,7 +180,11 @@
       "properties": {
         "vitte.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Active le traçage du serveur de langage Vitte."
         }
@@ -80,16 +192,34 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "build": "tsc -p ./",
+    "watch": "tsc -w -p ./",
+    "compile": "npm run build",
     "lint": "eslint src --ext ts",
-    "test": "npm run compile && node ./out/test/runTest.js"
+    "package": "vsce package",
+    "vscode:prepublish": "npm run build",
+    "test": "npm run build && node ./out/test/runTest.js"
+  },
+  "dependencies": {
+    "vscode-nls": "^5.0.0"
   },
   "devDependencies": {
-    "@types/vscode": "^1.75.0",
-    "@types/node": "14.x",
-    "typescript": "^5.0.0",
-    "eslint": "^8.0.0"
-  }
+    "@types/node": "^22.5.4",
+    "@types/vscode": "^1.93.0",
+    "eslint": "^9.9.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.2",
+    "vsce": "^2.15.0",
+    "vscode": "^1.1.37"
+  },
+  "files": [
+    "out/**/*",
+    "syntaxes/**/*",
+    "snippets/**/*",
+    "images/**/*",
+    "language-configuration.json",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ]
 }

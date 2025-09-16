@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "npm: build",
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "npm: watch",
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "group": "build",
+      "problemMatcher": ["$tsc-watch"]
+    },
+    {
+      "label": "npm: lint",
+      "type": "npm",
+      "script": "lint",
+      "problemMatcher": ["$eslint-stylish"]
+    },
+    {
+      "label": "npm: test",
+      "type": "npm",
+      "script": "test",
+      "group": "test",
+      "dependsOn": ["npm: build"]
+    },
+    {
+      "label": "clean: out",
+      "type": "shell",
+      "command": "rimraf out || rm -rf out",
+      "problemMatcher": []
+    },
+    {
+      "label": "package: vsix",
+      "type": "npm",
+      "script": "package",
+      "dependsOn": ["npm: build"],
+      "problemMatcher": []
+    },
+    {
+      "label": "publish: vsce",
+      "type": "shell",
+      "command": "npx vsce publish",
+      "problemMatcher": []
+    },
+    {
+      "label": "build+lint",
+      "dependsOn": ["npm: build", "npm: lint"],
+      "group": "build"
+    },
+    {
+      "label": "watch+lint",
+      "dependsOn": ["npm: watch", "npm: lint"],
+      "problemMatcher": []
+    }
+  ]
+}

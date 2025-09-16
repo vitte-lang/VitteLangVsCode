@@ -1,0 +1,84 @@
+{
+  // Fichier de configuration de debug VS Code
+  // Voir https://go.microsoft.com/fwlink/?linkid=830387 pour la doc
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Extension: Run Extension Host",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ],
+      "preLaunchTask": "npm: build",
+      "internalConsoleOptions": "openOnSessionStart"
+    },
+    {
+      "name": "Extension: Run Tests",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionTestsPath=${workspaceFolder}/out/test/suite/index"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/test/**/*.js"
+      ],
+      "preLaunchTask": "npm: build",
+      "internalConsoleOptions": "openOnSessionStart"
+    },
+    {
+      "name": "Vitl: Launch current file",
+      "type": "vitl",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": true,
+      "args": [],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Vitl: Launch workspace main.vitl",
+      "type": "vitl",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.vitl",
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": false,
+      "args": ["--verbose"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
+    {
+      "name": "Vitl: Attach to running server",
+      "type": "vitl",
+      "request": "attach",
+      "port": 4711,
+      "host": "localhost",
+      "timeout": 10000
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Dev: Extension + Launch Vitl file",
+      "configurations": [
+        "Extension: Run Extension Host",
+        "Vitl: Launch current file"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "CI: Extension + Tests",
+      "configurations": [
+        "Extension: Run Extension Host",
+        "Extension: Run Tests"
+      ],
+      "stopAll": true
+    }
+  ]
+}

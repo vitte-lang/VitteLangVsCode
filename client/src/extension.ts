@@ -1,140 +1,344 @@
-/* src/extension.ts */
-import * as fs from "fs";
-import { registerVitlDebugAdapter } from "./debug/vitlDebugAdapter";
-import * as path from "path";
+/* ----------------------------------------------------------------------------
+ * extension.ts — Extension VS Code pour Vitte / Vit / Vitl
+ * SPDX-License-Identifier: MIT
+ *
+ * Objectifs:
+ *  - Activer le support de base des langages vitte, vit, vitl
+ *  - Fournir des commandes: run, build, fmt, test, docs
+ *  - Enregistrer un formateur basique et un linter par diagnostics
+ *  - Enregistrer un hover provider simple
+ *  - Enregistrer un adaptateur de debug via un process externe (vitlv --dap)
+ *  - Afficher un bouton de barre d'état Run
+ *
+ * Cette implémentation évite les imports cassés en intégrant l'usine d'adaptateur.
+ * Elle reste compatible avec une future séparation par fichiers.
+ * --------------------------------------------------------------------------- */
+
 import * as vscode from "vscode";
-import {
-  LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
-  TransportKind,
-} from "vscode-languageclient/node";
+import * as path from "path";
+import * as fs from "fs";
+import { spawn, SpawnOptionsWithoutStdio } from "child_process";
 
-let client: LanguageClient | undefined;
+// ----------------------------- Constantes ----------------------------------
+const LANGS = [
+  { id: "vitl", exts: [".vitl"], aliases: ["Vitte Light", "Vitl"] },
+  { id: "vit",  exts: [".vit"],  aliases: ["Vitte", "Vit"] },
+  { id: "vitte", exts: [".vitte"],aliases: ["Vitte Canonical"] },
+];
 
-function resolveServerOptions(ctx: vscode.ExtensionContext): ServerOptions {
-  const envPath = process.env.VITTE_LSP_PATH;
-  if (envPath && fs.existsSync(envPath)) {
-    return { command: envPath, args: [], options: { env: process.env } };
-  }
+const CMD = {
+  RUN: "vitte.runFile",
+  BUILD: "vitte.buildWorkspace",
+  FMT: "vitte.formatFile",
+  TEST: "vitte.testWorkspace",
+  DOCS: "vitte.openDocs",
+  CREATE_SAMPLE: "vitte.createSample",
+};
 
-  const serverJs = ctx.asAbsolutePath(path.join("server", "out", "server.js"));
-  if (!fs.existsSync(serverJs)) {
-    const msg = `[vitte/vitl] Introuvable: ${serverJs}. Lancez "npm run compile".`;
-    void vscode.window.showErrorMessage(msg);
-    throw new Error(msg);
-  }
-
-  const inspect = process.env.VITTE_LSP_INSPECT;
-  const execArgv = inspect ? ["--nolazy", `--inspect=${inspect}`] : [];
-
-  return {
-    run:   { module: serverJs, transport: TransportKind.ipc, options: { env: process.env } },
-    debug: { module: serverJs, transport: TransportKind.ipc, options: { execArgv, env: process.env } },
-  };
+// ---------------------------- Utilitaires ----------------------------------
+function getCfg() {
+  return vscode.workspace.getConfiguration("vitte");
 }
 
-export async function activate(context: vscode.ExtensionContext) {
-  const cfg    = vscode.workspace.getConfiguration("vitte");
-  const enable = cfg.get<boolean>("enableLSP", false);
-  const output = vscode.window.createOutputChannel("Vitte/Vitl LSP");
-  const trace  = vscode.window.createOutputChannel("Vitte/Vitl LSP Trace");
+function toolPath(name: string): string {
+  const cfg = getCfg();
+  const configured: string | undefined = cfg.get("paths." + name);
+  if (configured && configured.trim().length > 0) return configured;
+  return name; // cherche dans PATH
+}
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("vitte.hello", () => {
-      void vscode.window.showInformationMessage("Vitte/Vitl extension active");
-    }),
-    vscode.commands.registerCommand("vitte.restartLSP", async () => {
-      await client?.stop();
-      client = undefined;
-      await startClient();
-    }),
-    vscode.commands.registerCommand("vitte.toggleLSP", async () => {
-      const conf = vscode.workspace.getConfiguration("vitte");
-      const cur = conf.get<boolean>("enableLSP", false);
-      await conf.update("enableLSP", !cur, vscode.ConfigurationTarget.Global);
-    }),
-    output,
-    trace,
-    { dispose: () => { void client?.stop(); } }
-  );
+function workspaceFolderFor(doc?: vscode.TextDocument): vscode.WorkspaceFolder | undefined {
+  if (doc) return vscode.workspace.getWorkspaceFolder(doc.uri) ?? undefined;
+  const folders = vscode.workspace.workspaceFolders;
+  return folders && folders.length > 0 ? folders[0] : undefined;
+}
 
-  output.appendLine("[vitte/vitl] Activation de l’extension…");
-  if (!enable) output.appendLine("[vitte/vitl] LSP désactivé. Rien à démarrer.");
+function runInTerminal(cmd: string, args: string[], cwd?: string) {
+  const term = vscode.window.createTerminal({ name: "Vitte", cwd });
+  term.show();
+  const line = [cmd, ...args.map(a => shellEscape(a))].join(" ");
+  term.sendText(line);
+}
 
-  const startClient = async () => {
-    if (client) return;
-    try {
-      const serverOptions: ServerOptions = resolveServerOptions(context);
+function shellEscape(s: string): string {
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(s)) return s;
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}
 
-      const clientOptions: LanguageClientOptions = {
-        documentSelector: [
-          { language: "vitte", scheme: "file" },
-          { language: "vitte", scheme: "untitled" },
-          { language: "vitl",  scheme: "file" },
-          { language: "vitl",  scheme: "untitled" }
-        ],
-        synchronize: {
-          configurationSection: ["vitte", "vitl"],
-          fileEvents: [
-            vscode.workspace.createFileSystemWatcher("**/.vitteconfig"),
-            vscode.workspace.createFileSystemWatcher("**/vitte.toml"),
-            vscode.workspace.createFileSystemWatcher("**/.vitlconfig"),
-            vscode.workspace.createFileSystemWatcher("**/vitl.toml")
-          ]
-        },
-        initializationOptions: { telemetry: true },
-        outputChannel: output,
-        traceOutputChannel: trace
-      };
+async function fileExists(p: string): Promise<boolean> {
+  try { await fs.promises.access(p, fs.constants.F_OK); return true; } catch { return false; }
+}
 
-      client = new LanguageClient(
-        "vitteLanguageServer",
-        "Vitte/Vitl Language Server",
-        serverOptions,
-        clientOptions
-      );
+function asExecutableMaybe(p: string): string {
+  if (process.platform === "win32" && !/[.]exe$/i.test(p)) return p + ".exe";
+  return p;
+}
 
-      await client.start();
-      output.appendLine("[vitte/vitl] Client LSP démarré ✅");
-    } catch (err) {
-      const msg = `[vitte/vitl] Échec démarrage LSP: ${String(err)}`;
-      output.appendLine(msg);
-      void vscode.window.showErrorMessage(msg);
-    }
+function pickActiveDoc(): vscode.TextDocument | undefined {
+  const ed = vscode.window.activeTextEditor;
+  return ed?.document;
+}
+
+// --------------------- Diagnostics et Linting léger ------------------------
+const diag = vscode.languages.createDiagnosticCollection("vitte");
+
+async function lintDocument(doc: vscode.TextDocument) {
+  if (!LANGS.some(l => l.exts.some(e => doc.fileName.endsWith(e)))) return;
+
+  const cfg = getCfg();
+  const linter = asExecutableMaybe(toolPath("vitl"));
+  const args = ["fmt", "--check", "--quiet", doc.fileName];
+
+  const spawnOpts: SpawnOptionsWithoutStdio = {
+    cwd: workspaceFolderFor(doc)?.uri.fsPath,
+    env: { ...process.env },
   };
 
-  if (enable) {
-    await startClient();
-  }
+  return new Promise<void>((resolve) => {
+    const p = spawn(linter, args, spawnOpts);
+    const output: string[] = [];
+    const errs: string[] = [];
 
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration(async (e) => {
-      if (!e.affectsConfiguration("vitte") && !e.affectsConfiguration("vitl")) return;
+    p.stdout.on("data", d => output.push(String(d)));
+    p.stderr.on("data", d => errs.push(String(d)));
 
-      const newEnable = vscode.workspace.getConfiguration("vitte").get<boolean>("enableLSP", false);
-      output.appendLine(`[vitte/vitl] Config mise à jour. enableLSP=${newEnable}`);
+    p.on("error", () => {
+      diag.set(doc.uri, []); // pas de linter disponible
+      resolve();
+    });
 
-      if (newEnable && !client) {
-        await startClient();
-      } else if (!newEnable && client) {
-        output.appendLine("[vitte/vitl] Arrêt du LSP (enableLSP=false)...");
-        await client.stop();
-        client = undefined;
-        output.appendLine("[vitte/vitl] LSP arrêté ✅");
+    p.on("close", () => {
+      const text = output.join("") + errs.join("");
+      const diags: vscode.Diagnostic[] = [];
+
+      // Parse très basique: "path:line:col: message"
+      const re = /^(.*?):(\d+):(\d+):\s*(.*)$/gm;
+      for (let m; (m = re.exec(text)); ) {
+        const line = Math.max(0, parseInt(m[2], 10) - 1);
+        const col = Math.max(0, parseInt(m[3], 10) - 1);
+        const range = new vscode.Range(line, col, line, col + 1);
+        diags.push(new vscode.Diagnostic(range, m[4], vscode.DiagnosticSeverity.Warning));
       }
+      diag.set(doc.uri, diags);
+      resolve();
+    });
+  });
+}
 
-      await client?.sendNotification("workspace/didChangeConfiguration", {
-        settings: {
-          vitte: vscode.workspace.getConfiguration("vitte"),
-          vitl:  vscode.workspace.getConfiguration("vitl")
-        }
-      });
-    })
+// ---------------------- Formateur minimal intégré --------------------------
+const formatter: vscode.DocumentFormattingEditProvider = {
+  provideDocumentFormattingEdits(doc) {
+    const edits: vscode.TextEdit[] = [];
+    const cfg = getCfg();
+    const useExternal = cfg.get<boolean>("format.useExternal", true);
+
+    if (useExternal) {
+      // Déclenche le formateur externe via une commande shell
+      const exec = asExecutableMaybe(toolPath("vitl"));
+      const cwd = workspaceFolderFor(doc)?.uri.fsPath;
+      runInTerminal(exec, ["fmt", doc.fileName], cwd);
+      return edits; // pas de remplacement en place
+    }
+
+    // Fallback naïf: normalise indent en 2 espaces et trim trailing spaces
+    const indentUnit = "  ";
+    let level = 0;
+    const lines = Array.from({ length: doc.lineCount }, (_, i) => doc.lineAt(i).text);
+
+    const reOpen = /\{\s*$/;
+    const reClose = /^\s*\}/;
+
+    const newLines = lines.map((raw) => {
+      let s = raw.replace(/\s+$/g, "");
+      if (reClose.test(s)) level = Math.max(0, level - 1);
+      const pref = indentUnit.repeat(level);
+      const out = pref + s.trimStart();
+      if (reOpen.test(s)) level += 1;
+      return out;
+    });
+
+    const full = new vscode.Range(0, 0, doc.lineCount, 0);
+    edits.push(vscode.TextEdit.replace(full, newLines.join("\n")));
+    return edits;
+  },
+};
+
+// ---------------------- Hover Provider simple ------------------------------
+const hoverProvider: vscode.HoverProvider = {
+  provideHover(doc, pos) {
+    const word = doc.getText(doc.getWordRangeAtPosition(pos));
+    if (!word) return undefined;
+    const md = new vscode.MarkdownString();
+    md.appendCodeblock(word, doc.languageId);
+    md.appendMarkdown("\nSymbole détecté. Aucun index de symboles disponible.");
+    md.isTrusted = true;
+    return new vscode.Hover(md);
+  },
+};
+
+// ---------------------- Debug Adapter via process externe ------------------
+class VitlInlineDebugAdapter implements vscode.DebugAdapter {
+  private proc: ReturnType<typeof spawn> | undefined;
+
+  constructor(private command: string, private args: string[], private cwd?: string) {}
+
+  onDidSendMessage?: vscode.Event<vscode.DebugProtocolMessage> | undefined;
+  private emitter = new vscode.EventEmitter<vscode.DebugProtocolMessage>();
+
+  start(): void {
+    this.onDidSendMessage = this.emitter.event;
+    this.proc = spawn(this.command, this.args, { cwd: this.cwd, env: { ...process.env } });
+    this.proc.stdout?.on("data", d => this.forward(d));
+    this.proc.stderr?.on("data", d => this.forward(d));
+    this.proc.on("error", err => {
+      this.emitter.fire({ type: "event", event: "output", body: { category: "stderr", output: String(err) + "\n" } } as any);
+    });
+  }
+
+  handleMessage(message: vscode.DebugProtocolMessage): void {
+    if (!this.proc || !this.proc.stdin) return;
+    try { this.proc.stdin.write(JSON.stringify(message) + "\n"); } catch { /* ignore */ }
+  }
+
+  dispose(): void {
+    try { this.proc?.kill(); } catch { /* ignore */ }
+    this.emitter.dispose();
+  }
+
+  private forward(d: Buffer) {
+    // Suppose que la cible émet une ligne JSON DAP par ligne
+    const lines = String(d).split(/\r?\n/).filter(Boolean);
+    for (const line of lines) {
+      try { this.emitter.fire(JSON.parse(line)); } catch { /* ignore output non DAP */ }
+    }
+  }
+}
+
+class VitlDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory, vscode.Disposable {
+  private subs: vscode.Disposable[] = [];
+
+  createDebugAdapterDescriptor(_session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
+    const exe = asExecutableMaybe(toolPath("vitlv"));
+    const args = ["--dap"]; // le runtime doit exposer un serveur DAP en ligne de commande
+    const cwd = workspaceFolderFor()?.uri.fsPath;
+    const impl = new VitlInlineDebugAdapter(exe, args, cwd);
+    impl.start();
+    return new vscode.DebugAdapterInlineImplementation(impl);
+  }
+
+  dispose(): void {
+    this.subs.forEach(d => d.dispose());
+    this.subs = [];
+  }
+}
+
+class VitlDebugConfigProvider implements vscode.DebugConfigurationProvider {
+  resolveDebugConfiguration(_folder: vscode.WorkspaceFolder | undefined, config: vscode.DebugConfiguration): vscode.ProviderResult<vscode.DebugConfiguration> {
+    config.type ??= "vitl";
+    config.request ??= "launch";
+    config.name ??= "Vitl: Launch current file";
+    config.program ??= "${file}";
+    config.cwd ??= "${workspaceFolder}";
+    config.stopOnEntry ??= true;
+    config.args ??= [];
+    return config;
+  }
+}
+
+// ---------------------- Status Bar -----------------------------------------
+let status: vscode.StatusBarItem | undefined;
+function ensureStatusBar(context: vscode.ExtensionContext) {
+  if (!status) {
+    status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    status.text = "$(play) Vitl Run";
+    status.tooltip = "Exécuter le fichier actif avec vitl run";
+    status.command = CMD.RUN;
+    context.subscriptions.push(status);
+  }
+  status.show();
+}
+
+// ---------------------- Commands -------------------------------------------
+function registerCommands(context: vscode.ExtensionContext) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand(CMD.RUN, async () => {
+      const doc = pickActiveDoc();
+      if (!doc) { vscode.window.showWarningMessage("Aucun fichier actif."); return; }
+      await doc.save();
+      const exe = asExecutableMaybe(toolPath("vitl"));
+      runInTerminal(exe, ["run", doc.fileName], workspaceFolderFor(doc)?.uri.fsPath);
+    }),
+
+    vscode.commands.registerCommand(CMD.BUILD, async () => {
+      const exe = asExecutableMaybe(toolPath("vitl"));
+      runInTerminal(exe, ["build"], workspaceFolderFor()?.uri.fsPath);
+    }),
+
+    vscode.commands.registerCommand(CMD.FMT, async () => {
+      const doc = pickActiveDoc();
+      if (!doc) { vscode.window.showWarningMessage("Aucun fichier actif."); return; }
+      const exe = asExecutableMaybe(toolPath("vitl"));
+      runInTerminal(exe, ["fmt", doc.fileName], workspaceFolderFor(doc)?.uri.fsPath);
+    }),
+
+    vscode.commands.registerCommand(CMD.TEST, async () => {
+      const exe = asExecutableMaybe(toolPath("vitl"));
+      runInTerminal(exe, ["test"], workspaceFolderFor()?.uri.fsPath);
+    }),
+
+    vscode.commands.registerCommand(CMD.DOCS, async () => {
+      const url = getCfg().get<string>("docs.url", "https://vitte-lang.example/docs");
+      vscode.env.openExternal(vscode.Uri.parse(url));
+    }),
+
+    vscode.commands.registerCommand(CMD.CREATE_SAMPLE, async () => {
+      const ws = workspaceFolderFor();
+      if (!ws) { vscode.window.showWarningMessage("Ouvrez un dossier."); return; }
+      const p = path.join(ws.uri.fsPath, "hello.vitl");
+      if (!(await fileExists(p))) await fs.promises.writeFile(p, "print(\"Hello, Vitl!\")\n");
+      const doc = await vscode.workspace.openTextDocument(p);
+      await vscode.window.showTextDocument(doc);
+    }),
   );
 }
 
-export async function deactivate(): Promise<void> {
-  await client?.stop();
-  client = undefined;
+// ---------------------- Activation -----------------------------------------
+export function activate(context: vscode.ExtensionContext) {
+  // Diagnostics on open and change
+  context.subscriptions.push(diag);
+  vscode.workspace.onDidOpenTextDocument(lintDocument, null, context.subscriptions);
+  vscode.workspace.onDidSaveTextDocument(lintDocument, null, context.subscriptions);
+  if (vscode.window.activeTextEditor) lintDocument(vscode.window.activeTextEditor.document);
+
+  // Languages registration
+  for (const l of LANGS) {
+    context.subscriptions.push(
+      vscode.languages.registerDocumentFormattingEditProvider(l.id, formatter),
+      vscode.languages.registerHoverProvider(l.id, hoverProvider),
+    );
+  }
+
+  // Debug registration
+  const dbgFactory = new VitlDebugAdapterFactory();
+  context.subscriptions.push(
+    vscode.debug.registerDebugAdapterDescriptorFactory("vitl", dbgFactory),
+    vscode.debug.registerDebugConfigurationProvider("vitl", new VitlDebugConfigProvider()),
+    dbgFactory,
+  );
+
+  // Commands and status bar
+  registerCommands(context);
+  ensureStatusBar(context);
+
+  // Info
+  vscode.commands.executeCommand("setContext", "vitte.active", true);
 }
+
+export function deactivate() {
+  // VS Code dispose automatiquement via subscriptions
+}
+
+// ---------------------- Configuration conseillée (settings.json) ------------
+// "vitte.paths.vitl": "/usr/local/bin/vitl",
+// "vitte.paths.vitlv": "/usr/local/bin/vitlv",
+// "vitte.format.useExternal": true,
