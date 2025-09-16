@@ -24,43 +24,33 @@
     "onCommand:vitte.runActionWithArgs",
     "onCommand:vitte.debug.runFile",
     "onCommand:vitte.debug.attachServer",
+    "onCommand:vitte.formatDocument",
+    "onCommand:vitte.organizeImports",
+    "onCommand:vitte.fixAll",
+    "onCommand:vitte.renameSymbol",
+    "onCommand:vitte.applyEditSample",
+    "onCommand:vitte.progressSample",
+    "onCommand:vitte.showInfo",
     "onDebugResolve:vitl"
   ],
   "contributes": {
     "languages": [
       {
         "id": "vitte",
-        "aliases": [
-          "Vitte",
-          "vit",
-          "vitl"
-        ],
-        "extensions": [
-          ".vitte",
-          ".vit",
-          ".vitl"
-        ],
+        "aliases": ["Vitte", "vit", "vitl"],
+        "extensions": [".vitte", ".vit", ".vitl"],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "vit",
-        "aliases": [
-          "Vit"
-        ],
-        "extensions": [
-          ".vit"
-        ],
+        "aliases": ["Vit"],
+        "extensions": [".vit"],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "vitl",
-        "aliases": [
-          "Vitl",
-          "Vitte Light"
-        ],
-        "extensions": [
-          ".vitl"
-        ],
+        "aliases": ["Vitl", "Vitte Light"],
+        "extensions": [".vitl"],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -85,16 +75,10 @@
       {
         "type": "vitl",
         "label": "Vitl Debug",
-        "languages": [
-          "vitte",
-          "vit",
-          "vitl"
-        ],
+        "languages": ["vitte", "vit", "vitl"],
         "configurationAttributes": {
           "launch": {
-            "required": [
-              "program"
-            ],
+            "required": ["program"],
             "properties": {
               "program": {
                 "type": "string",
@@ -132,47 +116,24 @@
       }
     ],
     "commands": [
-      {
-        "command": "vitte.showServerLog",
-        "title": "Vitte: Show Server Log"
-      },
-      {
-        "command": "vitte.restartServer",
-        "title": "Vitte: Restart Language Server"
-      },
-      {
-        "command": "vitte.runAction",
-        "title": "Vitte: Run Action"
-      },
-      {
-        "command": "vitte.runActionWithArgs",
-        "title": "Vitte: Run Action with Args"
-      },
-      {
-        "command": "vitte.debug.runFile",
-        "title": "Vitte Debug: Run File"
-      },
-      {
-        "command": "vitte.debug.attachServer",
-        "title": "Vitte Debug: Attach to Server"
-      }
+      { "command": "vitte.showServerLog", "title": "Vitte: Show Server Log" },
+      { "command": "vitte.restartServer", "title": "Vitte: Restart Language Server" },
+      { "command": "vitte.runAction", "title": "Vitte: Run Action" },
+      { "command": "vitte.runActionWithArgs", "title": "Vitte: Run Action (Args)" },
+      { "command": "vitte.debug.runFile", "title": "Vitte Debug: Run File" },
+      { "command": "vitte.debug.attachServer", "title": "Vitte Debug: Attach" },
+      { "command": "vitte.formatDocument", "title": "Vitte: Format Document" },
+      { "command": "vitte.organizeImports", "title": "Vitte: Organize Imports" },
+      { "command": "vitte.fixAll", "title": "Vitte: Fix All" },
+      { "command": "vitte.renameSymbol", "title": "Vitte: Rename Symbol" },
+      { "command": "vitte.applyEditSample", "title": "Vitte: Apply Sample Edit" },
+      { "command": "vitte.progressSample", "title": "Vitte: Progress Sample" },
+      { "command": "vitte.showInfo", "title": "Vitte: Show Info" }
     ],
     "keybindings": [
-      {
-        "command": "vitte.restartServer",
-        "key": "ctrl+shift+r",
-        "when": "editorLangId == vitte"
-      },
-      {
-        "command": "vitte.restartServer",
-        "key": "ctrl+shift+r",
-        "when": "editorLangId == vit"
-      },
-      {
-        "command": "vitte.restartServer",
-        "key": "ctrl+shift+r",
-        "when": "editorLangId == vitl"
-      }
+      { "command": "vitte.restartServer", "key": "ctrl+shift+r", "when": "editorLangId == vitte" },
+      { "command": "vitte.restartServer", "key": "ctrl+shift+r", "when": "editorLangId == vit" },
+      { "command": "vitte.restartServer", "key": "ctrl+shift+r", "when": "editorLangId == vitl" }
     ],
     "configuration": {
       "type": "object",
@@ -180,11 +141,7 @@
       "properties": {
         "vitte.trace.server": {
           "type": "string",
-          "enum": [
-            "off",
-            "messages",
-            "verbose"
-          ],
+          "enum": ["off", "messages", "verbose"],
           "default": "off",
           "description": "Active le traçage du serveur de langage Vitte."
         }
