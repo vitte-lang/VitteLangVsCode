@@ -2,7 +2,7 @@
   "name": "vittelang-vscode",
   "displayName": "VitteLang VS Code",
   "description": "Support complet pour Vitte, Vit et Vitl : grammaire, LSP, debug, snippets, icônes.",
-  "version": "0.4.1",
+  "version": "1.4.3",
   "publisher": "jclgl",
   "license": "MIT",
   "engines": {
