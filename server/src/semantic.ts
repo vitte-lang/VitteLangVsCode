@@ -1,4 +1,12 @@
-// semantic.ts — simple et robuste
+// semantic.ts — simple, robuste, et plus complet
+// Améliorations clés:
+// - Lexer en un seul passage: collecte des plages commentaires et chaînes + masque code
+// - Émission triée et sans chevauchement pour respecter LSP SemanticTokens
+// - Coloration ciblée des noms de déclarations (module/fn/struct/enum/type/let|const)
+// - Paramètres de fonctions et propriétés de struct
+// - Mots-clés et nombres uniquement en zones de code
+// - Cache par document/version
+// - Hover concis sur mots-clés
 
 import {
   Position,
@@ -11,7 +19,7 @@ import {
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 /* ------------------------------ Legend stable ----------------------------- */
-/* Garder l’ordre en phase avec server.ts */
+// Garder l’ordre en phase avec server.ts
 const TOKEN_TYPES = [
   "namespace", // 0
   "type",      // 1
@@ -61,7 +69,7 @@ const HOVER_DOC: Record<string, string> = {
   impl: "Bloc d’implémentation.",
   type: "Alias de type.",
   where: "Contraintes de type.",
-  if: "Conditionnelle.",
+  if: "Instruction conditionnelle.",
   else: "Branche alternative.",
   match: "Branchements par motifs.",
   while: "Boucle conditionnelle.",
@@ -82,6 +90,94 @@ export function provideHover(doc: TextDocument, position: Position): Hover | nul
   return { contents: { kind: MarkupKind.Markdown, value: `**${w}** — ${info}` } };
 }
 
+/* --------------------------- Semantic tokeniser --------------------------- */
+
+const KW = new Set([
+  "module","import","use","as","pub","const","let","mut","fn","return",
+  "if","else","match","while","for","in","break","continue",
+  "type","impl","where","struct","mod","test","true","false",
+]);
+
+// Cache basique par document/version
+const semCache = new WeakMap<TextDocument, { version: number; tokens: SemanticTokens }>();
+
+export function buildSemanticTokens(doc: TextDocument): SemanticTokens {
+  const cached = semCache.get(doc);
+  if (cached && cached.version === doc.version) return cached.tokens;
+
+  const text = doc.getText();
+  const lex = scanLex(text); // { mask, strings, comments }
+  const nlIdx = buildLineIndex(text);
+
+  // On collecte d’abord tous les spans, puis on trie, puis on émet
+  type Span = { start: number; end: number; type: number };
+  const spans: Span[] = [];
+
+  // 1) commentaires et chaînes (priorité forte)
+  for (const [s, e] of lex.comments) insertSpan(spans, s, e, TYPE_INDEX.comment);
+  for (const [s, e] of lex.strings) insertSpan(spans, s, e, TYPE_INDEX.string);
+
+  // 2) nombres en zones de code
+  for (const m of matchAll(/\b\d(?:_?\d)*(?:\.(?:\d(?:_?\d)*)?)?(?:[eE][+-]?\d+)?\b/g, text)) {
+    if (!lex.mask[m.index]) continue;
+    insertSpan(spans, m.index, m.index + m[0].length, TYPE_INDEX.number);
+  }
+
+  // 3) mots-clés en zones de code
+  for (const m of matchAll(/\b[A-Za-z_]\w*\b/g, text)) {
+    if (!lex.mask[m.index]) continue;
+    if (!KW.has(m[0])) continue;
+    insertSpan(spans, m.index, m.index + m[0].length, TYPE_INDEX.keyword);
+  }
+
+  // 4) déclarations: colorer uniquement le nom
+  addDeclSpans(text, lex.mask, /\b(?:module|mod)\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.namespace, spans);
+  addDeclSpans(text, lex.mask, /\bstruct\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
+  addDeclSpans(text, lex.mask, /\benum\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
+  addDeclSpans(text, lex.mask, /\btype\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
+  addDeclSpans(text, lex.mask, /\bfn\s+([A-Za-z_]\w*)\s*\(/g, 1, TYPE_INDEX.function, spans);
+  addDeclSpans(text, lex.mask, /\b(?:let|const)\s+(?:mut\s+)?([A-Za-z_]\w*)/g, 1, TYPE_INDEX.variable, spans);
+
+  // 5) paramètres de fonctions
+  for (const m of matchAll(/\bfn\s+[A-Za-z_]\w*\s*\(([^)]*)\)/g, text)) {
+    if (!lex.mask[m.index]) continue; // début du fn
+    const params = (m[1] ?? "").split(",");
+    const base = m.index + m[0].indexOf("(") + 1;
+    let offset = 0;
+    for (const p of params) {
+      const mm = /\s*([A-Za-z_]\w*)/.exec(p);
+      if (!mm) { offset += p.length + 1; continue; }
+      const name = mm[1];
+      const local = p.indexOf(name);
+      const off = base + offset + (local >= 0 ? local : 0);
+      if (name && lex.mask[off]) insertSpan(spans, off, off + name.length, TYPE_INDEX.parameter);
+      offset += p.length + 1; // +1 pour la virgule
+    }
+  }
+
+  // 6) propriétés de struct
+  for (const m of matchAll(/\bstruct\s+[A-Za-z_]\w*\s*\{([\s\S]*?)\}/g, text)) {
+    const body = m[1] ?? "";
+    const bodyStart = m.index + m[0].indexOf("{") + 1;
+    for (const fm of matchAll(/(^|\s)([A-Za-z_]\w*)\s*:\n?\s*[^,\n\r\}]+/g, body)) {
+      const name = fm[2];
+      const off = bodyStart + fm.index + fm[0].lastIndexOf(name);
+      if (lex.mask[off]) insertSpan(spans, off, off + name.length, TYPE_INDEX.property);
+    }
+  }
+
+  // Tri global et émission
+  spans.sort((a, b) => a.start - b.start || a.end - b.end);
+  const builder = new SemanticTokensBuilder();
+  for (const s of spans) pushMultiline(builder, nlIdx, s.start, s.end, s.type);
+
+  const tokens = builder.build();
+  semCache.set(doc, { version: doc.version, tokens });
+  return tokens;
+}
+
+/* --------------------------------- utils ---------------------------------- */
+
 function wordAt(doc: TextDocument, pos: Position): string | null {
   const text = doc.getText();
   const off = doc.offsetAt(pos);
@@ -91,77 +187,155 @@ function wordAt(doc: TextDocument, pos: Position): string | null {
   return e > s ? text.slice(s, e) : null;
 }
 
-/* --------------------------- Semantic tokeniser --------------------------- */
+// Scan lexical: collecte commentaires/chaînes et construit un masque code
+function scanLex(text: string): { mask: Uint8Array; strings: Array<[number, number]>; comments: Array<[number, number]> } {
+  const n = text.length;
+  const mask = new Uint8Array(n); // 1 = code, 0 = non-code
+  const strings: Array<[number, number]> = [];
+  const comments: Array<[number, number]> = [];
 
-const KW = new Set([
-  "module","import","use","as","pub","const","let","mut","fn","return",
-  "if","else","match","while","for","in","break","continue",
-  "type","impl","where","struct","mod","test","true","false",
-]);
+  let i = 0;
+  const markCode = (from: number, to: number) => { for (let k = from; k < to; k++) mask[k] = 1; };
 
-export function buildSemanticTokens(doc: TextDocument): SemanticTokens {
-  const builder = new SemanticTokensBuilder();
-  const lines = doc.getText().split(/\r?\n/);
+  while (i < n) {
+    const c = text.charCodeAt(i);
+    const c2 = i + 1 < n ? text.charCodeAt(i + 1) : 0;
 
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx];
-
-    // commentaires //
-    const cmt = line.indexOf("//");
-    if (cmt >= 0) {
-      builder.push(lineIdx, cmt, line.length - cmt, TYPE_INDEX.comment, 0);
-      // continue; // on sort tôt pour la simplicité
+    // line comment //...
+    if (c === 0x2f && c2 === 0x2f) {
+      const start = i;
+      i += 2;
+      while (i < n && text.charCodeAt(i) !== 0x0a) i++;
+      comments.push([start, i]);
+      continue;
+    }
+    // block comment /* ... */
+    if (c === 0x2f && c2 === 0x2a) {
+      const start = i;
+      i += 2;
+      while (i < n) {
+        if (text.charCodeAt(i) === 0x2a && i + 1 < n && text.charCodeAt(i + 1) === 0x2f) { i += 2; break; }
+        i++;
+      }
+      comments.push([start, i]);
+      continue;
+    }
+    // raw string r#*"..."#*
+    if (c === 0x72 /* r */) {
+      let j = i + 1, hashes = 0;
+      while (j < n && text.charCodeAt(j) === 0x23 /* # */) { hashes++; j++; }
+      if (j < n && text.charCodeAt(j) === 0x22 /* " */) {
+        const start = i; j++;
+        for (; j < n; j++) {
+          if (text.charCodeAt(j) === 0x22) {
+            let k = j + 1, ok = true;
+            for (let h = 0; h < hashes; h++) { if (k >= n || text.charCodeAt(k) !== 0x23) { ok = false; break; } k++; }
+            if (ok) { j = k; break; }
+          }
+        }
+        strings.push([start, j]);
+        i = j;
+        continue;
+      }
+    }
+    // normal string "..." ou '...'
+    if (c === 0x22 || c === 0x27) {
+      const start = i;
+      const quote = c; i++;
+      while (i < n) {
+        if (text.charCodeAt(i) === 0x5c /* \\ */) { i += 2; continue; }
+        if (text.charCodeAt(i) === quote) { i++; break; }
+        i++;
+      }
+      strings.push([start, i]);
       continue;
     }
 
-    // chaînes "..."
-    for (const m of matchAll(/"([^"\\]|\\.)*"/g, line)) {
-      builder.push(lineIdx, m.index, m[0].length, TYPE_INDEX.string, 0);
+    // code chunk jusqu’au prochain début de com/str
+    const start = i;
+    while (i < n) {
+      const a = text.charCodeAt(i);
+      const b = i + 1 < n ? text.charCodeAt(i + 1) : 0;
+      if ((a === 0x2f && (b === 0x2f || b === 0x2a)) || a === 0x22 || a === 0x27 || a === 0x72) break;
+      i++;
     }
-
-    // nombres décimaux/float
-    for (const m of matchAll(/\b\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d+)?\b/g, line)) {
-      builder.push(lineIdx, m.index, m[0].length, TYPE_INDEX.number, 0);
-    }
-
-    // mots-clés
-    for (const m of matchAll(/\b[A-Za-z_]\w*\b/g, line)) {
-      if (KW.has(m[0])) {
-        builder.push(lineIdx, m.index, m[0].length, TYPE_INDEX.keyword, 0);
-      }
-    }
-
-    // déclarations: colorer uniquement le nom
-    colorDecl(builder, lineIdx, line, /^\s*(?:module|mod)\s+([A-Za-z_]\w*)/g, TYPE_INDEX.namespace, 1);
-    colorDecl(builder, lineIdx, line, /^\s*struct\s+([A-Za-z_]\w*)/g, TYPE_INDEX.type, 1);
-    colorDecl(builder, lineIdx, line, /^\s*enum\s+([A-Za-z_]\w*)/g, TYPE_INDEX.type, 1);
-    colorDecl(builder, lineIdx, line, /^\s*type\s+([A-Za-z_]\w*)/g, TYPE_INDEX.type, 1);
-    colorDecl(builder, lineIdx, line, /^\s*fn\s+([A-Za-z_]\w*)/g, TYPE_INDEX.function, 1);
-    colorDecl(builder, lineIdx, line, /^\s*(?:let|const)\s+(?:mut\s+)?([A-Za-z_]\w*)/g, TYPE_INDEX.variable, 1);
+    markCode(start, i);
   }
 
-  return builder.build();
+  return { mask, strings, comments };
 }
 
-/* --------------------------------- utils ---------------------------------- */
+// Index des débuts de lignes pour conversion rapide offset→(line, char)
+function buildLineIndex(text: string): number[] {
+  const idx: number[] = [0];
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10 /*\n*/) idx.push(i + 1);
+  return idx;
+}
 
-function colorDecl(
+function offsetToLC(nlIdx: number[], off: number): [line: number, char: number] {
+  let lo = 0, hi = nlIdx.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const v = nlIdx[mid];
+    if (v === off) return [mid, 0];
+    if (v < off) lo = mid + 1; else hi = mid - 1;
+  }
+  const line = Math.max(0, lo - 1);
+  return [line, off - nlIdx[line]];
+}
+
+function pushMultiline(
   builder: SemanticTokensBuilder,
-  lineIdx: number,
-  line: string,
+  nlIdx: number[],
+  startOff: number,
+  endOff: number,
+  tokenType: number,
+) {
+  const [sLine, sChar] = offsetToLC(nlIdx, startOff);
+  const [eLine, eChar] = offsetToLC(nlIdx, endOff);
+  if (sLine === eLine) {
+    builder.push(sLine, sChar, endOff - startOff, tokenType, 0);
+    return;
+  }
+  // première ligne
+  const lineEnd = nlIdx[sLine + 1] ?? endOff;
+  builder.push(sLine, sChar, lineEnd - startOff, tokenType, 0);
+  // lignes intermédiaires
+  for (let ln = sLine + 1; ln < eLine; ln++) {
+    const ls = nlIdx[ln];
+    const le = (nlIdx[ln + 1] ?? endOff) - 1; // exclure saut de ligne
+    if (le > ls) builder.push(ln, 0, le - ls, tokenType, 0);
+  }
+  // dernière ligne
+  builder.push(eLine, 0, eChar, tokenType, 0);
+}
+
+function addDeclSpans(
+  text: string,
+  mask: Uint8Array,
   rx: RegExp,
+  group: number,
   tokenTypeIndex: number,
-  group: number
+  spans: Array<{ start: number; end: number; type: number }>
 ) {
   rx.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = rx.exec(line))) {
+  while ((m = rx.exec(text))) {
     const name = m[group];
-    if (!name) continue;
-    const start = (m.index ?? 0) + m[0].indexOf(name);
-    builder.push(lineIdx, start, name.length, tokenTypeIndex, 0);
-    if (m[0].length === 0) rx.lastIndex++;
+    if (!name || !/^[A-Za-z_]\w*$/.test(name)) continue;
+    const nameOff = (m.index ?? 0) + m[0].indexOf(name);
+    if (!mask[nameOff]) continue;
+    insertSpan(spans, nameOff, nameOff + name.length, tokenTypeIndex);
   }
+}
+
+function insertSpan(spans: Array<{ start: number; end: number; type: number }>, start: number, end: number, type: number) {
+  if (end <= start) return;
+  // éviter les chevauchements: si recouvrement détecté, on ignore la nouvelle plage
+  for (const s of spans) {
+    if (!(end <= s.start || start >= s.end)) return;
+  }
+  spans.push({ start, end, type });
 }
 
 function* matchAll(rx: RegExp, s: string): Generator<RegExpMatchArray & { index: number }> {
