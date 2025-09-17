@@ -348,3 +348,4 @@ function* matchAll(rx: RegExp, s: string): Generator<RegExpMatchArray & { index:
     yield arr;
   }
 }
+
