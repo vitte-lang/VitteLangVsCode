@@ -5,6 +5,9 @@
   "version": "1.4.3",
   "publisher": "jclgl",
   "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/jclgl/vittelang-vscode.git" },
+  "homepage": "https://github.com/jclgl/vittelang-vscode#readme",
+  "bugs": { "url": "https://github.com/jclgl/vittelang-vscode/issues" },
   "engines": {
     "vscode": "^1.93.0"
   },
