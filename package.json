@@ -1,20 +1,15 @@
 {
-  "name": "vittelang-vscode",
-  "displayName": "VitteLang VS Code",
+  "name": "vitte-studio",
+  "displayName": "Vitte Language Support",
   "description": "Support complet pour Vitte, Vit et Vitl : grammaire, LSP, debug, snippets, icônes.",
   "version": "1.4.3",
-  "publisher": "jclgl",
+  "publisher": "VitteStudio",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/jclgl/vittelang-vscode.git" },
-  "homepage": "https://github.com/jclgl/vittelang-vscode#readme",
-  "bugs": { "url": "https://github.com/jclgl/vittelang-vscode/issues" },
-  "engines": {
-    "vscode": "^1.93.0"
-  },
-  "categories": [
-    "Programming Languages",
-    "Debuggers"
-  ],
+  "repository": { "type": "git", "url": "https://github.com/roussov/vittelang-vscode.git" },
+  "homepage": "https://github.com/roussov/vittelang-vscode#readme",
+  "bugs": { "url": "https://github.com/roussov/vittelang-vscode/issues" },
+  "engines": { "vscode": "^1.93.0" },
+  "categories": ["Programming Languages", "Debuggers"],
   "icon": "images/icon.png",
   "main": "./out/extension.js",
   "activationEvents": [
@@ -57,21 +52,9 @@
       }
     ],
     "grammars": [
-      {
-        "language": "vitte",
-        "scopeName": "source.vitte",
-        "path": "./syntaxes/vitte.tmLanguage.json"
-      },
-      {
-        "language": "vit",
-        "scopeName": "source.vitte",
-        "path": "./syntaxes/vitte.tmLanguage.json"
-      },
-      {
-        "language": "vitl",
-        "scopeName": "source.vitte",
-        "path": "./syntaxes/vitte.tmLanguage.json"
-      }
+      { "language": "vitte", "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
+      { "language": "vit",   "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
+      { "language": "vitl",  "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" }
     ],
     "debuggers": [
       {
@@ -82,25 +65,10 @@
           "launch": {
             "required": ["program"],
             "properties": {
-              "program": {
-                "type": "string",
-                "description": "Fichier à exécuter",
-                "default": "${file}"
-              },
-              "cwd": {
-                "type": "string",
-                "description": "Répertoire de travail",
-                "default": "${workspaceFolder}"
-              },
-              "args": {
-                "type": "array",
-                "description": "Arguments CLI",
-                "default": []
-              },
-              "stopOnEntry": {
-                "type": "boolean",
-                "default": true
-              }
+              "program": { "type": "string", "description": "Fichier à exécuter", "default": "${file}" },
+              "cwd": { "type": "string", "description": "Répertoire de travail", "default": "${workspaceFolder}" },
+              "args": { "type": "array", "description": "Arguments CLI", "default": [] },
+              "stopOnEntry": { "type": "boolean", "default": true }
             }
           }
         },
@@ -174,15 +142,5 @@
     "typescript": "^5.6.2",
     "vsce": "^2.15.0",
     "vscode": "^1.1.37"
-  },
-  "files": [
-    "out/**/*",
-    "syntaxes/**/*",
-    "snippets/**/*",
-    "images/**/*",
-    "language-configuration.json",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE"
-  ]
+  }
 }
