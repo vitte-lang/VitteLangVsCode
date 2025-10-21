@@ -2,14 +2,24 @@
   "name": "vitte-studio",
   "displayName": "Vitte Language Support",
   "description": "Support complet pour Vitte, Vit et Vitl : grammaire, LSP, debug, snippets, icônes.",
-  "version": "1.4.3",
+  "version": "1.6.0",
   "publisher": "VitteStudio",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/roussov/vittelang-vscode.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/roussov/vittelang-vscode.git"
+  },
   "homepage": "https://github.com/roussov/vittelang-vscode#readme",
-  "bugs": { "url": "https://github.com/roussov/vittelang-vscode/issues" },
-  "engines": { "vscode": "^1.93.0" },
-  "categories": ["Programming Languages", "Debuggers"],
+  "bugs": {
+    "url": "https://github.com/roussov/vittelang-vscode/issues"
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers"
+  ],
   "icon": "images/icon.png",
   "main": "./out/extension.js",
   "activationEvents": [
@@ -28,47 +38,124 @@
     "onCommand:vitte.applyEditSample",
     "onCommand:vitte.progressSample",
     "onCommand:vitte.showInfo",
+    "onCommand:vitte.diagnostics.refresh",
+    "onCommand:vitte.diagnostics.open",
+    "onCommand:vitte.diagnostics.filter",
+    "onCommand:vitte.diagnostics.fix",
+    "onView:vitteDiagnostics",
+    "onView:vitteModules",
     "onDebugResolve:vitl"
   ],
   "contributes": {
     "languages": [
       {
         "id": "vitte",
-        "aliases": ["Vitte", "vit", "vitl"],
-        "extensions": [".vitte", ".vit", ".vitl"],
+        "aliases": [
+          "Vitte",
+          "vit",
+          "vitl"
+        ],
+        "extensions": [
+          ".vitte",
+          ".vit",
+          ".vitl"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "vit",
-        "aliases": ["Vit"],
-        "extensions": [".vit"],
+        "aliases": [
+          "Vit"
+        ],
+        "extensions": [
+          ".vit"
+        ],
         "configuration": "./language-configuration.json"
       },
       {
         "id": "vitl",
-        "aliases": ["Vitl", "Vitte Light"],
-        "extensions": [".vitl"],
+        "aliases": [
+          "Vitl",
+          "Vitte Light"
+        ],
+        "extensions": [
+          ".vitl"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
-      { "language": "vitte", "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
-      { "language": "vit",   "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" },
-      { "language": "vitl",  "scopeName": "source.vitte", "path": "./syntaxes/vitte.tmLanguage.json" }
+      {
+        "language": "vitte",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      },
+      {
+        "language": "vit",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      },
+      {
+        "language": "vitl",
+        "scopeName": "source.vitte",
+        "path": "./syntaxes/vitte.tmLanguage.json"
+      }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "vitte",
+          "title": "Vitte",
+          "icon": "images/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "vitte": [
+        {
+          "id": "vitteDiagnostics",
+          "name": "Diagnostics Vitte"
+        },
+        {
+          "id": "vitteModules",
+          "name": "Structure Vitte"
+        }
+      ]
+    },
     "debuggers": [
       {
         "type": "vitl",
         "label": "Vitl Debug",
-        "languages": ["vitte", "vit", "vitl"],
+        "languages": [
+          "vitte",
+          "vit",
+          "vitl"
+        ],
         "configurationAttributes": {
           "launch": {
-            "required": ["program"],
+            "required": [
+              "program"
+            ],
             "properties": {
-              "program": { "type": "string", "description": "Fichier à exécuter", "default": "${file}" },
-              "cwd": { "type": "string", "description": "Répertoire de travail", "default": "${workspaceFolder}" },
-              "args": { "type": "array", "description": "Arguments CLI", "default": [] },
-              "stopOnEntry": { "type": "boolean", "default": true }
+              "program": {
+                "type": "string",
+                "description": "Fichier à exécuter",
+                "default": "${file}"
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Répertoire de travail",
+                "default": "${workspaceFolder}"
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments CLI",
+                "default": []
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": true
+              }
             }
           }
         },
@@ -86,23 +173,104 @@
       }
     ],
     "commands": [
-      { "command": "vitte.showServerLog", "title": "Vitte: Show Server Log" },
-      { "command": "vitte.restartServer", "title": "Vitte: Restart Language Server" },
-      { "command": "vitte.runAction", "title": "Vitte: Run Action" },
-      { "command": "vitte.runActionWithArgs", "title": "Vitte: Run Action (Args)" },
-      { "command": "vitte.debug.runFile", "title": "Vitte Debug: Run File" },
-      { "command": "vitte.debug.attachServer", "title": "Vitte Debug: Attach" },
-      { "command": "vitte.organizeImports", "title": "Vitte: Organize Imports" },
-      { "command": "vitte.fixAll", "title": "Vitte: Fix All" },
-      { "command": "vitte.renameSymbol", "title": "Vitte: Rename Symbol" },
-      { "command": "vitte.applyEditSample", "title": "Vitte: Apply Sample Edit" },
-      { "command": "vitte.progressSample", "title": "Vitte: Progress Sample" },
-      { "command": "vitte.showInfo", "title": "Vitte: Show Info" }
+      {
+        "command": "vitte.showServerLog",
+        "title": "Vitte: Show Server Log"
+      },
+      {
+        "command": "vitte.restartServer",
+        "title": "Vitte: Restart Language Server"
+      },
+      {
+        "command": "vitte.runAction",
+        "title": "Vitte: Run Action"
+      },
+      {
+        "command": "vitte.runActionWithArgs",
+        "title": "Vitte: Run Action (Args)"
+      },
+      {
+        "command": "vitte.debug.runFile",
+        "title": "Vitte Debug: Run File"
+      },
+      {
+        "command": "vitte.debug.attachServer",
+        "title": "Vitte Debug: Attach"
+      },
+      {
+        "command": "vitte.organizeImports",
+        "title": "Vitte: Organize Imports"
+      },
+      {
+        "command": "vitte.fixAll",
+        "title": "Vitte: Fix All"
+      },
+      {
+        "command": "vitte.renameSymbol",
+        "title": "Vitte: Rename Symbol"
+      },
+      {
+        "command": "vitte.applyEditSample",
+        "title": "Vitte: Apply Sample Edit"
+      },
+      {
+        "command": "vitte.progressSample",
+        "title": "Vitte: Progress Sample"
+      },
+      {
+        "command": "vitte.showInfo",
+        "title": "Vitte: Show Info"
+      },
+      {
+        "command": "vitte.diagnostics.refresh",
+        "title": "Vitte: Rafraîchir les diagnostics"
+      },
+      {
+        "command": "vitte.diagnostics.open",
+        "title": "Vitte: Ouvrir le diagnostic"
+      },
+      {
+        "command": "vitte.modules.refresh",
+        "title": "Vitte: Rafraîchir la structure"
+      }
     ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "vitte.diagnostics.open",
+          "when": "view == vitteDiagnostics && viewItem == vitteDiagnostic",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "vitte.diagnostics.refresh",
+          "when": "view == vitteDiagnostics",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vitte.modules.refresh",
+          "when": "view == vitteModules",
+          "group": "navigation@1"
+        }
+      ]
+    },
     "keybindings": [
-      { "command": "vitte.restartServer", "key": "ctrl+shift+r", "when": "editorLangId == vitte" },
-      { "command": "vitte.restartServer", "key": "ctrl+shift+r", "when": "editorLangId == vit" },
-      { "command": "vitte.restartServer", "key": "ctrl+shift+r", "when": "editorLangId == vitl" }
+      {
+        "command": "vitte.restartServer",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == vitte"
+      },
+      {
+        "command": "vitte.restartServer",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == vit"
+      },
+      {
+        "command": "vitte.restartServer",
+        "key": "ctrl+shift+r",
+        "when": "editorLangId == vitl"
+      }
     ],
     "configuration": {
       "type": "object",
@@ -110,7 +278,11 @@
       "properties": {
         "vitte.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Active le traçage du serveur de langage Vitte."
         },
@@ -132,12 +304,16 @@
     "test": "npm run build && node ./out/test/runTest.js"
   },
   "dependencies": {
+    "vscode-languageclient": "^9.0.1",
     "vscode-nls": "^5.0.0"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.6",
     "@types/node": "^22.5.4",
     "@types/vscode": "^1.93.0",
+    "@vscode/test-electron": "^2.3.9",
     "eslint": "^9.9.0",
+    "mocha": "^10.7.3",
     "rimraf": "^6.0.1",
     "typescript": "^5.6.2",
     "vsce": "^2.15.0",

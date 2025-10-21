@@ -54,14 +54,14 @@ const INDEX = new Map<Uri, IndexedSymbol[]>();
  * ========================================================================== */
 
 const PATTERNS: Array<{ rx: RegExp; kind: SK; nameGroup: number }> = [
-  { rx: /^\s*(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SK.Namespace, nameGroup: 1 },
-  { rx: /^\s*fn\s+([A-Za-z_]\w*)/gm,             kind: SK.Function,  nameGroup: 1 },
-  { rx: /^\s*struct\s+([A-Za-z_]\w*)/gm,         kind: SK.Struct,    nameGroup: 1 },
-  { rx: /^\s*enum\s+([A-Za-z_]\w*)/gm,           kind: SK.Enum,      nameGroup: 1 },
-  { rx: /^\s*trait\s+([A-Za-z_]\w*)/gm,          kind: SK.Interface, nameGroup: 1 },
-  { rx: /^\s*type\s+([A-Za-z_]\w*)/gm,           kind: SK.Interface, nameGroup: 1 },
-  { rx: /^\s*let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SK.Variable,  nameGroup: 1 },
-  { rx: /^\s*const\s+([A-Za-z_]\w*)/gm,          kind: SK.Constant,  nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SK.Namespace, nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+(?:"[^"]*"\s+)?)?fn\s+([A-Za-z_]\w*)/gm, kind: SK.Function, nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)/gm,         kind: SK.Struct,    nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?enum\s+([A-Za-z_]\w*)/gm,           kind: SK.Enum,      nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)/gm,          kind: SK.Interface, nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?type\s+([A-Za-z_]\w*)/gm,           kind: SK.Interface, nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SK.Variable,  nameGroup: 1 },
+  { rx: /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)/gm,          kind: SK.Constant,  nameGroup: 1 },
 ];
 
 /* ============================================================================

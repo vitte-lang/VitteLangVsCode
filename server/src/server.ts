@@ -52,6 +52,7 @@ import { provideFormattingEdits } from "./formatting.js";
 import { getSemanticTokensLegend, buildSemanticTokens, provideHover } from "./semantic.js";
 import { lintToPublishable } from "./lint.js";
 import { registerCommands } from "./commands.js";
+import { indexDocument as indexWorkspaceDocument, removeDocument as removeWorkspaceDocument, clearIndex } from "./indexer.js";
 
 /* --------------------------- Connexion + documents ------------------------ */
 const connection = createConnection(ProposedFeatures.all);
@@ -122,6 +123,7 @@ connection.onInitialized(() => {
 connection.onShutdown(() => {
   for (const t of lintTimers.values()) clearTimeout(t);
   lintTimers.clear();
+  clearIndex();
 });
 
 /* ------------------------------- Config updates --------------------------- */
@@ -244,9 +246,13 @@ function scheduleLint(doc: TextDocument): void {
 
 /* --------------------------------- Events -------------------------------- */
 
-documents.onDidOpen((e) => { scheduleLint(e.document); });
-documents.onDidChangeContent((e) => { scheduleLint(e.document); });
-documents.onDidClose((e) => { connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] }); lintTimers.delete(e.document.uri); });
+documents.onDidOpen((e) => { indexWorkspaceDocument(e.document); scheduleLint(e.document); });
+documents.onDidChangeContent((e) => { indexWorkspaceDocument(e.document); scheduleLint(e.document); });
+documents.onDidClose((e) => {
+  removeWorkspaceDocument(e.document.uri);
+  connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
+  lintTimers.delete(e.document.uri);
+});
 
 /* --------------------------------- Launch -------------------------------- */
 

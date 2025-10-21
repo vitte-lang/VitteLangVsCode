@@ -17,6 +17,7 @@ import {
   SemanticTokens,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+import { RESERVED_WORDS } from "./languageFacts.js";
 
 /* ------------------------------ Legend stable ----------------------------- */
 // Garder l’ordre en phase avec server.ts
@@ -63,7 +64,11 @@ const HOVER_DOC: Record<string, string> = {
   const: "Constante compile-time.",
   let: "Déclare une variable locale.",
   mut: "Rend la variable mutable.",
+  var: "Déclare une variable (alias let).",
+  static: "Lie une variable à durée de vie statique.",
   fn: "Déclare une fonction.",
+  async: "Marque une fonction asynchrone.",
+  await: "Suspend l’exécution jusqu’à résolution d’une future.",
   struct: "Déclare une structure.",
   enum: "Déclare une énumération.",
   impl: "Bloc d’implémentation.",
@@ -77,9 +82,29 @@ const HOVER_DOC: Record<string, string> = {
   in: "Itération sur une séquence.",
   break: "Interrompt une boucle.",
   continue: "Passe à l’itération suivante.",
+  loop: "Boucle infinie interrompue par break.",
+  switch: "Switch multi-branches.",
+  case: "Branche d’un switch.",
+  default: "Branche par défaut d’un switch.",
   return: "Retourne depuis une fonction.",
+  try: "Bloc surveillant des erreurs.",
+  catch: "Capture les erreurs d’un try.",
+  finally: "Bloc exécuté après try/catch.",
+  throw: "Lance une erreur.",
+  yield: "Produit une valeur dans un générateur.",
+  with: "Ouvre un bloc avec gestion de ressource.",
+  defer: "Planifie du code exécuté en sortie de scope.",
+  unsafe: "Bloc où les garanties de sécurité doivent être assurées manuellement.",
+  extern: "Lien vers une fonction ou donnée externe.",
+  inline: "Suggestion d’inlining au compilateur.",
+  volatile: "Empêche l’optimisation d’accès mémoire.",
   true: "Booléen vrai.",
   false: "Booléen faux.",
+  mod: "Déclare un module (alias).",
+  test: "Marque une fonction de test.",
+  null: "Valeur nulle.",
+  nil: "Valeur nulle (synonyme).",
+  none: "Valeur nulle (synonyme).",
 };
 
 export function provideHover(doc: TextDocument, position: Position): Hover | null {
@@ -92,11 +117,7 @@ export function provideHover(doc: TextDocument, position: Position): Hover | nul
 
 /* --------------------------- Semantic tokeniser --------------------------- */
 
-const KW = new Set([
-  "module","import","use","as","pub","const","let","mut","fn","return",
-  "if","else","match","while","for","in","break","continue",
-  "type","impl","where","struct","mod","test","true","false",
-]);
+const KW = RESERVED_WORDS;
 
 // Cache basique par document/version
 const semCache = new WeakMap<TextDocument, { version: number; tokens: SemanticTokens }>();

@@ -5,6 +5,28 @@ et cette extension suit le versioning [SemVer](https://semver.org/lang/fr/).
 
 ---
 
+## [1.6.0] — 2025-10-21
+### Ajouté
+- 🐞 Vue **Diagnostics Vitte** dédiée (à la Rust Analyzer) listant les erreurs/avertissements par fichier, avec navigation directe et commande *Vitte: Rafraîchir les diagnostics*.
+- 🧭 Commandes utilitaires pour Ouvrir/rafraîchir les diagnostics et panneau latéral « Vitte » dans la barre d’activité.
+
+### Modifié
+- 🧰 Activation automatique de la vue diagnostics pour aider débutants/avancés à parcourir erreurs LSP, lint et debug.
+
+---
+
+## [1.5.0] — 2025-10-21
+### Ajouté
+- ✅ Prise en charge complète des mots-clés Vitte 1.5 (`async/await`, `switch/case/default`, `try/catch/finally/throw`, `defer`, `unsafe`, `with`, etc.) dans la grammaire, les semantic tokens, la complétion et le lint.
+- ✍️ Nouvelles complétions/snippets (`async fn`, `switch`, `try/catch`, `defer`, `unsafe`, `with`) et reconnaissance des fonctions `pub async`, structs/enums publiques pour les suggestions et l’outline.
+- 👀 Surveillance automatique des fichiers de configuration (`vitte.toml`, `.vitteconfig`, `vitl.toml`, `.vitlconfig`) en plus des sources.
+
+### Modifié
+- 🔄 Le client LSP couvre désormais les documents `untitled` et les cellules de notebooks, tout en réutilisant les watchers entre redémarrages.
+- 🧠 Les indexeurs, la navigation (outline/go to symbol) et la complétion gèrent les modificateurs (`pub`, `async`, `unsafe`, `extern`) placés avant les déclarations.
+
+---
+
 ## [0.1.0] — 2025-08-21
 ### Ajouté
 - 🎨 Coloration syntaxique basique (TextMate) pour le langage **Vitte** :

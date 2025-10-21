@@ -6,6 +6,7 @@ import {
   Range,
   Position,
 } from "vscode-languageserver/node";
+import { RESERVED_WORDS } from "./languageFacts.js";
 
 /* ============================== Config ==================================== */
 
@@ -20,12 +21,6 @@ const DEFAULTS: Required<LintOptions> = {
   allowTabs: false,
   allowTrailingWhitespace: false,
 };
-
-const KEYWORDS = new Set<string>([
-  "module","import","use","as","pub","const","let","mut","fn",
-  "return","if","else","match","while","for","in","break","continue",
-  "type","impl","where","struct","mod","test","true","false"
-]);
 
 /* =============================== Regex ==================================== */
 
@@ -254,9 +249,9 @@ function checkIdentifiersAndKeywords(
       for (const m of L.matchAll(rxIdent)) {
         const tok = m[0];
         const idx = m.index ?? 0;
-        if (KEYWORDS.has(tok)) continue;
+        if (RESERVED_WORDS.has(tok)) continue;
 
-        for (const kw of KEYWORDS) {
+        for (const kw of RESERVED_WORDS) {
           if (tok === kw) continue;
           if (tok.startsWith(kw) && tok.length > kw.length && /[A-Za-z0-9_]/.test(tok[kw.length])) continue;
           if (tok.endsWith(kw) && tok.length > kw.length) {

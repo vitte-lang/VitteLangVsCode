@@ -44,6 +44,16 @@
     ],
     "description": "Définition de fonction publique"
   },
+  "Async function": {
+    "prefix": ["asyncfn", "afn"],
+    "body": [
+      "async fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
+      "  await ${5:future()}",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Définition de fonction asynchrone"
+  },
   "Generic function": {
     "prefix": ["gfn"],
     "body": [
@@ -171,6 +181,20 @@
     ],
     "description": "Expression de sélection (match)"
   },
+  "Switch": {
+    "prefix": ["switch"],
+    "body": [
+      "switch ${1:expr} {",
+      "  case ${2:pattern} => {",
+      "    ${3}",
+      "  },",
+      "  default => {",
+      "    ${0}",
+      "  }",
+      "}"
+    ],
+    "description": "Instruction switch/case"
+  },
   "Match Option": {
     "prefix": ["matchopt", "mopt"],
     "body": [
@@ -200,6 +224,44 @@
       "}$0"
     ],
     "description": "Match avec garde"
+  },
+  "Try catch": {
+    "prefix": ["trycatch", "tc"],
+    "body": [
+      "try {",
+      "  ${1}",
+      "} catch ${2:error} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Bloc try/catch d’erreurs"
+  },
+  "Defer": {
+    "prefix": ["defer"],
+    "body": [
+      "defer {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Exécute un bloc à la sortie du scope"
+  },
+  "Unsafe block": {
+    "prefix": ["unsafe"],
+    "body": [
+      "unsafe {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Bloc marquant du code non sûr"
+  },
+  "With block": {
+    "prefix": ["with"],
+    "body": [
+      "with ${1:resource} {",
+      "  ${0}",
+      "}"
+    ],
+    "description": "Bloc de gestion de ressource with"
   },
 
   "If": {
@@ -398,4 +460,3 @@
     "description": "Marqueurs de repli (folding)"
   }
 }
-

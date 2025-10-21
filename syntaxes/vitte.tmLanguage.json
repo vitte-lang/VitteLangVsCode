@@ -227,8 +227,8 @@
     },
     "keywords": {
       "patterns": [
-        { "name": "keyword.control.vitte", "match": "\\b(if|else|match|for|while|loop|break|continue|return|switch|case|default|try|catch|finally|throw|async|await|yield|with)\\b" },
-        { "name": "storage.modifier.vitte", "match": "\\b(pub|mut|static|extern|inline|volatile)\\b" },
+        { "name": "keyword.control.vitte", "match": "\\b(if|else|match|for|while|loop|break|continue|return|switch|case|default|try|catch|finally|throw|async|await|yield|with|defer)\\b" },
+        { "name": "storage.modifier.vitte", "match": "\\b(pub|mut|static|extern|inline|volatile|unsafe)\\b" },
         { "name": "storage.type.binding.vitte", "match": "\\b(let|const|type|var)\\b" },
         { "name": "constant.language.vitte", "match": "\\b(true|false|null|nil|none)\\b" }
       ]

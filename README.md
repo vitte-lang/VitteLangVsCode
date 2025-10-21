@@ -1,523 +1,155 @@
-# VitteStudio
+# Vitte Language Support for VS Code
 
-# Vitte Language Support (Vitte/Vitl) — VS Code
-
-## 🛠️ Débogage
-
-### 📦 Prérequis
-- **VS Code ≥ 1.93**
-- Toolchain installée et accessible :
-  - `vitlc` (compilateur)
-  - `vitlv` (VM / interpréteur)
-- Variables d’environnement correctement configurées (`PATH` doit contenir les binaires)
-- Projet contenant au moins un fichier `.vitte`, `.vit` ou `.vitl`
-
----
-
-### 🚀 Démarrage rapide
-
-1. Ouvrez un fichier source `.vitte`, `.vit` ou `.vitl` dans VS Code.
-2. Placez un breakpoint (F9 ou clic dans la gouttière).
-3. Appuyez sur **F5** pour exécuter la configuration par défaut *Vitl: Launch current file*.
-4. Le débogueur démarre et vous accédez à :
-   - Exécution pas à pas (Step In / Step Over / Step Out)
-   - Variables locales et globales
-   - Observateur (Watch expressions)
-   - Pile d’appels (Call Stack)
-   - Points d’arrêt conditionnels et logpoints
-
----
-
-#### Configurations de lancement courantes
-
-Créez ou ouvrez `.vscode/launch.json` (VS Code le propose à la première exécution) :
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "vitl",
-      "request": "launch",
-      "name": "Vitl: Launch current file",
-      "program": "${file}",
-      "cwd": "${workspaceFolder}",
-      "stopOnEntry": true,
-      "args": []
-    },
-    {
-      "type": "vitl",
-      "request": "launch",
-      "name": "Vitl: Launch with args",
-      "program": "${file}",
-      "cwd": "${workspaceFolder}",
-      "args": ["--flag", "value", "--verbose"],
-      "stopOnEntry": false,
-      "env": {
-        "VITTE_LOG": "debug",
-        "VITTE_FEATURES": "exp1,exp2"
-      }
-    },
-    {
-      "type": "vitl",
-      "request": "attach",
-      "name": "Vitl: Attach to running VM",
-      "host": "127.0.0.1",
-      "port": 6009,
-      "timeout": 10000
-    }
-  ],
-  "compounds": [
-    {
-      "name": "Run app + Attach tools",
-      "configurations": ["Vitl: Launch current file", "Vitl: Attach to running VM"]
-    }
-  ]
-}
-```
----
-
-### ⚙️ Commandes disponibles
-- `vitte.debug.start` — démarre une session de débogage sur le fichier courant
-- `vitte.debug.stop` — arrête la session active
-- `vitte.debug.runFile` — exécute immédiatement le fichier ouvert sans configuration avancée
-- `vitte.debug.attachServer` — se connecte à un processus Vitl/Vitte déjà en cours
-- `vitte.debug.restart` — redémarre la session en cours
-
----
-
-[![Marketplace](https://img.shields.io/badge/VS%20Code-%E2%86%92%20Marketplace-blue)](https://marketplace.visualstudio.com/manage)
+[![Marketplace](https://img.shields.io/badge/VS%20Code-Install-blue)](https://marketplace.visualstudio.com/manage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![VS Code Engine](https://img.shields.io/badge/engine-%5E1.75.0-lightgrey)
+![VS Code Engine](https://img.shields.io/badge/engine-%5E1.93.0-lightgrey)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 
-Extension **Visual Studio Code** pour le langage **Vitte** et le dialecte **Vitl**.
-Fonctionnalités incluses : coloration syntaxique, snippets, configuration de langage, **LSP** (auto-complétion, hover, navigation, symboles, diagnostics, semantic tokens) et **thème d’icônes**.
+Professional tooling for the Vitte/Vitl language family: language server, debugger, diagnostics view, snippets, and icon theme—packaged as a single Visual Studio Code extension.
 
 ---
 
-## Sommaire
-- [VitteStudio](#vittestudio)
-- [Vitte Language Support (Vitte/Vitl) — VS Code](#vitte-language-support-vittevitl--vs-code)
-  - [🛠️ Débogage](#️-débogage)
-    - [📦 Prérequis](#-prérequis)
-    - [🚀 Démarrage rapide](#-démarrage-rapide)
-      - [Configurations de lancement courantes](#configurations-de-lancement-courantes)
-    - [⚙️ Commandes disponibles](#️-commandes-disponibles)
-  - [Sommaire](#sommaire)
-  - [Fonctionnalités](#fonctionnalités)
-  - [Formats pris en charge](#formats-pris-en-charge)
-  - [Installation rapide](#installation-rapide)
-    - [Depuis un fichier `.vsix`](#depuis-un-fichier-vsix)
-  - [Paramètres](#paramètres)
-  - [Arborescence du projet](#arborescence-du-projet)
-  - [Développement](#développement)
-    - [Scripts utiles](#scripts-utiles)
-  - [Build VSIX](#build-vsix)
-    - [Unix](#unix)
-    - [Windows (PowerShell)](#windows-powershell)
-  - [Publication Marketplace](#publication-marketplace)
-  - [Exemples](#exemples)
-    - [`examples/hello.vitte`](#exampleshellovitte)
-    - [`examples/hello.vitl`](#exampleshellovitl)
-  - [Dépannage](#dépannage)
-  - [Feuille de route](#feuille-de-route)
-    - [🎯 Court terme (0.4.x → 0.5.x)](#-court-terme-04x--05x)
-    - [🚀 Moyen terme (0.6.x → 0.7.x)](#-moyen-terme-06x--07x)
-    - [Long terme (0.8.x → 1.0.0)](#long-terme-08x--100)
-    - [💡 Idées futures](#-idées-futures)
-  - [Contribuer](#contribuer)
-  - [Licence](#licence)
+## Overview
+
+- ✅ **Languages**: `vitte`, `vit`, `vitl`
+- 🎨 **Syntax & semantic highlighting** via TextMate grammar and semantic tokens
+- 🧠 **Language Server**: workspace-aware completion, hover, go to definition, document symbols, diagnostics, workspace watchers
+- 🛠️ **Debugging**: Vitl launch/attach configurations, breakpoints, watch expressions, call stack
+- 📊 **Diagnostics view**: Activity Bar panel with filter, refresh, and quick navigation
+- 🗂️ **Tooling integration**: file watchers for `vitte.toml`, `.vitteconfig`, `vitl.toml`, `.vitlconfig`
+- 🧭 **Module Explorer**: browse modules, structs, and functions with per-module diagnostics health
+- ✅ **Real-time health indicator**: status bar dot turns green when the workspace is clean and highlights warnings/errors instantly
+
+See the [Getting Started guide](docs/getting-started.md) for a hands-on walkthrough.
 
 ---
 
-## Fonctionnalités
+## Feature Highlights
 
-- **Deux langages supportés** : `vitte` et `vitl`
-- **Extensions reconnues** : `.vitte`, `.vit` et `.vitl`
-- **Coloration syntaxique** via :
-  - `syntaxes/vitte.tmLanguage.json`
-  - `syntaxes/vitl.tmLanguage.json`
-- **Snippets intégrés** :
-  - `snippets/vitte.json`
-  - `snippets/vitl.json`
-- **Configuration de langage** :
-  - `language-configuration.json` (Vitte)
-  - `language-configuration-vitl.json` (Vitl)
-- **LSP intégré (Node.js)** :
-  - Auto-complétion, hover, go to definition, document symbols
-  - **Semantic Tokens** : surlignage précis (keywords, fonctions, variables, constantes…)
-  - **Diagnostics** : `TODO` / `FIXME`, séquence `???`, espaces en fin de ligne, lignes trop longues
-  - Surveillance de fichiers de configuration :
-    `**/.vitteconfig`, `**/vitte.toml`, `**/.vitlconfig`, `**/vitl.toml`
-  - Sélecteurs de documents : `vitte`, `vitl`, fichiers et buffers non sauvegardés
-  - **Options d’exécution** :
-    - `VITTE_LSP_PATH` : pointer vers un serveur LSP externe
-    - `VITTE_LSP_INSPECT` : activer le mode debug Node (ex. `6009`)
-- **Thème d’icônes personnalisé**
-- **Compatibilité** :
-  - Visual Studio Code `^1.75.0`
-  - Node.js `>=18` recommandé
-- **Build & packaging** :
-  - Scripts `npm run build`, `watch`, `clean`
-  - Génération VSIX avec `npx vsce package`
-  - Installation locale : `code --install-extension vitte-lang-*.vsix`
+| Area | Highlights |
+| ---- | ---------- |
+| Editing | Rich language configuration, snippets for common constructs (`async fn`, `switch/case`, `try/catch/finally`, `defer`, `unsafe`, `with`) |
+| Language Server | Automatic restart, workspace completions (modules, symbols), telemetry log channel, configurable trace level, semantic diagnostics |
+| Debugging | Ready-to-use Vitl launch/attach recipes, breakpoint management, multi-config compounds |
+| Structure | Module Explorer view listing modules/structs/functions with per-entry diagnostics summaries |
+| Observability | Status bar health indicator, diagnostics dashboard, quick restart, detailed server logging |
+| Reliability | File system watchers for config changes, graceful server restarts, fallback server resolution with detailed logging |
 
 ---
 
-## Formats pris en charge
+## Installation
 
-| Langage | Extensions | Scope TextMate | Snippets |
-|---------|------------|----------------|----------|
-| Vitte   | `.vitte`, `.vit` | `source.vitte` | `snippets/vitte.json` |
-| Vitl    | `.vitl`          | `source.vitl`  | `snippets/vitl.json` |
+### Marketplace
 
----
-
-## Installation rapide
-
-### Depuis un fichier `.vsix`
-```bash
-npm ci
-npx tsc -p ./client && npx tsc -p ./server
-mkdir -p dist
-npx @vscode/vsce package -o dist/vitte-lang-$(jq -r .version package.json).vsix
-
-# installation locale
-code --install-extension dist/*.vsix
-
-### Depuis le Marketplace
-1) Créer un **Personal Access Token** (Azure DevOps → User settings → *Personal access tokens* → scope `Marketplace > Manage`).
-2) Se connecter : `npx vsce login VitteStudio` (coller le PAT).
-3) Publier : `npx vsce publish` ou `npx vsce publish 0.3.0`.
-
----
-
-## Utilisation
-
-- Ouvrir un fichier `*.vitte`, `*.vit` ou `*.vitl`.
-- Activer le LSP si désactivé par défaut : `F1 → Preferences: Open Settings (JSON)` puis :
-
-```json
-{
-  "vitte.enableLSP": true,
-  "vitte.trace.server": "off"
-}
-```
-
-> Le serveur propage aussi une section `vitl` si vous l’ajoutez dans vos settings, ex.:
-```json
-{ "vitl": { "enableSemanticTokens": true } }
-```
--	L’option "vitte.trace.server" peut être définie sur "off", "messages" ou "verbose" afin d’ajuster la quantité de journaux échangés entre le client VS Code et le serveur de langage. "messages" est utile pour observer les requêtes LSP entrantes/sortantes, tandis que "verbose" fournit un traçage complet incluant le contenu.
-
----
-
-## Paramètres
-
-Paramètres déclarés dans `package.json` (section `contributes.configuration`):
-
-- `vitte.enableLSP` (`boolean`, défaut `false`) : active le serveur de langage.
-- `vitte.trace.server` (`"off" | "messages" | "verbose"`, défaut `off`) : niveau de trace LSP.
-
-Paramètres dynamiques vus côté serveur (non déclarés dans `contributes`) :
-- `vitl.enableSemanticTokens` (`boolean`, défaut `true` si non défini).
-
-Variables d’environnement utiles :
-- `VITTE_LSP_PATH` : chemin d’un serveur LSP externe (binaire).
-- `VITTE_LSP_INSPECT` : port d’inspection Node pour le LSP, ex. `6009`.
-
----
-
-## Arborescence du projet
-
-```
-VitteLangVsCode/
-├── .vscode/
-│   ├── launch.json
-│   ├── tasks.json
-│   └── extensions.json
-├── package.json
-├── tsconfig.json
-├── README.md
-├── CHANGELOG.md
-├── icon.png
-│
-├── client/
-│   ├── src/extension.ts     # Client LSP (vitte + vitl)
-│   └── out/
-│
-├── server/
-│   ├── src/server.ts        # Serveur LSP (vitte + vitl)
-│   └── out/
-│
-├── syntaxes/
-│   ├── vitte.tmLanguage.json
-│   └── vitl.tmLanguage.json
-│
-├── snippets/
-│   ├── vitte.json
-│   └── vitl.json
-│
-├── icons/
-│   └── vitte-icon-theme.json
-│
-├── language-configuration.json
-├── language-configuration-vitl.json
-│
-└── scripts/
-    ├── build.sh
-    └── release.sh
-```
-
----
-
-## Développement
-
-Prérequis : Node 18+, npm, VS Code ≥ 1.75.
+Search for **“Vitte Language Support”** in VS Code or install via CLI:
 
 ```bash
-# installer
-npm ci
-
-# builder (TS → JS)
-npx tsc -p ./client && npx tsc -p ./server
-
-# lancer en mode extension (F5) avec .vscode/launch.json
-# option debug serveur
-export VITTE_LSP_INSPECT=6009
+code --install-extension VitteStudio.vitte-studio
 ```
 
-### Scripts utiles
-- `npm run compile` : compile `client` et `server` via `tsc`.
-- `npm run watch` : compilation incrémentale en watch.
-- `npm run build:vsix` : compile + check + package en `.vsix`.
-- `npm run publish` : compile + publication Marketplace.
-
----
-
-## Build VSIX
-
-### Unix
-```bash
-npm ci
-npx tsc -p ./client && npx tsc -p ./server
-mkdir -p dist
-VSIX="dist/vitte-lang-$(jq -r .version package.json).vsix"
-npx @vscode/vsce package -o "$VSIX"
-unzip -p "$VSIX" extension/package.json | jq -r '.name, .publisher, .version'
-code --install-extension "$VSIX"
-```
-
-### Windows (PowerShell)
-```powershell
-npm ci
-npx tsc -p ./client; npx tsc -p ./server
-if (!(Test-Path dist)) { New-Item -ItemType Directory dist | Out-Null }
-$ver = (Get-Content package.json | ConvertFrom-Json).version
-$vsix = "dist/vitte-lang-$ver.vsix"
-npx @vscode/vsce package -o $vsix
-code --install-extension $vsix
-```
-
----
-
-## Publication Marketplace
+### Manual (VSIX)
 
 ```bash
-# connexion (1ère fois)
-npx vsce login VitteStudio
-
-# publier version exacte
-npx vsce publish 0.3.0
-
-# ou bump auto
-npx vsce publish patch     # ex. 0.3.1
-npx vsce publish minor     # ex. 0.4.0
+vsce package
+code --install-extension vitte-studio-<version>.vsix
 ```
 
-Erreurs fréquentes et correction :
-- `The version 0.2.0 already exists and cannot be modified` → **incrémenter** la version (`npm version patch --no-git-tag-version`), re-packager, republier.
-- `ENOENT .vsix` lors de l’installation → vérifier le **répertoire** d’exécution et l’option `-o` de `vsce package`.
-- `tsc not found` → `npm i -D typescript` et utiliser `npx tsc` (éviter le paquet `tsc` qui n’est pas TypeScript).
+> Requires VS Code **1.93.0+**, Node.js 18+, and the Vitte/Vitl toolchain (`vitlc`, `vitlv`) accessible via `PATH`.
 
 ---
 
-## Exemples
+## Quick Start
 
-### `examples/hello.vitte`
-```vitte
-module demo
+1. Open a workspace containing `.vitte`, `.vit`, or `.vitl` files.
+2. Watch the status bar item `$(rocket) Vitte`; when it turns to `$(check)` and shows `$(pass-filled)`, the server is running and diagnostics are clean.
+3. Use `Vitte: Show Server Log` to inspect language server activity.
+4. Press **F5** to launch the default *Vitl: Launch current file* debug configuration.
+5. Open the **Vitte ▸ Diagnostics** view (Activity Bar) to triage warnings/errors.
 
-pub fn main() {
-  let msg: string = "Hello Vitte"
-  print(msg)
-}
+---
+
+## Debugging Workflows
+
+- **Launch current file**: Press **F5** or select *Vitl: Launch current file* in **Run and Debug**.
+- **Launch with arguments**: Add a configuration that passes CLI flags and environment variables.
+- **Attach to a running VM**: Use *Vitl: Attach to running VM* (default host `127.0.0.1`, port `6009`).
+- **Compound sessions**: Combine launch + attach to orchestrate tooling.
+
+View complete launch samples in [`docs/getting-started.md`](docs/getting-started.md#running-the-debugger).
+
+---
+
+## Commands & Keybindings
+
+| Command | Title | Default keybinding |
+| ------- | ----- | ------------------ |
+| `vitte.showServerLog` | Vitte: Show Server Log | — |
+| `vitte.restartServer` | Vitte: Restart Server | `Ctrl+Shift+R` (Win/Linux) / `⌃⇧R` (macOS) |
+| `vitte.runAction` | Vitte: Run Action | — |
+| `vitte.runActionWithArgs` | Vitte: Run Action (Args) | — |
+| `vitte.organizeImports` | Vitte: Organize Imports | — |
+| `vitte.fixAll` | Vitte: Fix All | — |
+| `vitte.debug.runFile` | Vitte Debug: Run File | — |
+| `vitte.debug.attachServer` | Vitte Debug: Attach | — |
+| `vitte.modules.refresh` | Vitte: Rafraîchir la structure | — |
+
+All commands are discoverable from the Command Palette (`⇧⌘P` / `Ctrl+Shift+P`).
+
+---
+
+## Settings
+
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `vitte.trace.server` | `"off"` | Controls language server trace level (`off`, `messages`, `verbose`). |
+| `vitte.serverPath` | `""` | Absolute path to a custom LSP server binary. Leave empty to use the bundled server. |
+
+---
+
+## Diagnostics & Observability
+
+- **Status bar health** reflects lifecycle states and diagnostics: starting (`$(gear)`), running (`$(check)`), stopped (`$(debug-stop)`), plus a green `$(pass-filled)` badge when the workspace is clean (warning/error icons otherwise).
+- **Output channel** (Vitte Language Server) logs telemetry, status updates, and manual restart traces.
+- **Diagnostics View** (`Vitte ▸ Diagnostics`) aggregates LSP diagnostics with filtering and quick navigation.
+
+---
+
+## Module Explorer
+
+- The **Vitte ▸ Structure** view (Activity Bar) presents modules, structs, enums, and functions grouped by module/file.
+- Each node carries a live diagnostics badge (green, warning, or error) so you can spot problematic areas instantly.
+- Selecting an item jumps directly to the symbol definition with the appropriate editor reveal.
+
+---
+
+## Documentation & Support
+
+- [Getting Started](docs/getting-started.md)
+- Examples: [`examples/`](examples)
+- Issue tracker: <https://github.com/roussov/vittelang-vscode/issues>
+
+---
+
+## Development
+
+```bash
+npm install
+npm run build
+npm test          # builds + runs VS Code integration suite
+npm run lint      # lint TypeScript sources
+npm run watch     # incremental builds
 ```
 
-### `examples/hello.vitl`
-```vitl
-module demo
+To publish a VSIX:
 
-fn main(): void {
-  let msg: string = "Hello Vitl"
-  println(msg)
-}
+```bash
+npm run package
 ```
 
----
-
-## Dépannage
-
-- **LSP ne démarre pas**
-  - Vérifiez la console des extensions (`Ctrl+Shift+U`) et le canal **Vitte/Vitl LSP**.
-  - Assurez la présence du fichier `server/out/server.js` (recompiler avec `npm run compile`).
-  - Si vous utilisez un serveur externe, définissez la variable d’environnement `VITTE_LSP_PATH` vers le binaire compilé.
-  - Si vous avez activé le mode inspection (`VITTE_LSP_INSPECT`), vérifiez que le port choisi (ex. `6009`) est libre et non bloqué par un pare-feu.
-
-- **Coloration syntaxique manquante**
-  - Contrôlez que les fichiers `syntaxes/vitte.tmLanguage.json` et `syntaxes/vitl.tmLanguage.json` existent et soient valides.
-  - Vérifiez l’association des extensions (`.vitte`, `.vit`, `.vitl`) dans `package.json` → `contributes.languages`.
-  - Rechargez la fenêtre VS Code (`F1 → Reload Window`) pour forcer la relecture des fichiers de grammaire.
-
-- **Snippets absents**
-  - Confirmez que les fichiers `snippets/vitte.json` et `snippets/vitl.json` sont bien référencés dans `package.json` → `contributes.snippets`.
-  - Assurez-vous que la structure interne du JSON respecte le format attendu (`prefix`, `body`, `description`).
-  - Si un snippet ne s’affiche pas, testez avec `F1 → Insert Snippet` et vérifiez qu’il est bien listé.
-
-- **Publisher invalide**
-  - Le champ `publisher` de `package.json` doit correspondre exactement au **publisher Marketplace** (`VitteStudio`).
-  - En cas de mismatch, mettez à jour `package.json` puis regénérez le `.vsix`.
-  - Vérifiez avec `npx vsce ls-publishers` pour lister vos publishers enregistrés.
-
-- **Erreur `The version X already exists and cannot be modified`**
-  - Il faut incrémenter la version dans `package.json` (`npm version patch --no-git-tag-version`) puis relancer `npx vsce package` et `npx vsce publish`.
-  - Exemple : `0.3.0` déjà publiée → passez en `0.3.1`.
-
-- **Erreur `ENOENT .vsix` lors de l’installation locale**
-  - Vérifiez que le fichier `.vsix` a bien été généré dans `dist/`.
-  - Commande correcte : `code --install-extension dist/vitte-lang-x.y.z.vsix`.
-  - Attention : le `-o` de `vsce package` doit pointer vers un dossier existant.
-
-- **Erreur `tsc not found` ou compilation impossible**
-  - Installez TypeScript en local :
-    ```bash
-    npm i -D typescript
-    ```
-  - Compilez avec `npx tsc -p ./client && npx tsc -p ./server`.
-  - Évitez d’utiliser le paquet `tsc` global qui n’est pas le compilateur officiel.
-
-- **Debug adapter non reconnu**
-  - Vérifiez que `client/src/extension.ts` importe et enregistre correctement `VitlDebugAdapterFactory`.
-  - Assurez-vous que la section `contributes.debuggers` est bien définie dans `package.json`.
-  - Testez la configuration par défaut dans `.vscode/launch.json` (`type: "vitl"`).
-
-- **Icônes non appliquées**
-  - Vérifiez que `icons/vitte-icon-theme.json` est bien référencé dans `package.json` → `contributes.iconThemes`.
-  - Rechargez VS Code et activez le thème d’icônes via `F1 → File Icon Theme → Vitte`.
-
-- **Performances dégradées**
-  - Si le LSP consomme trop de ressources, réduisez la verbosité du trace :
-    ```json
-    { "vitte.trace.server": "off" }
-    ```
-  - Désactivez temporairement les `semanticTokens` si vous avez un projet massif :
-    ```json
-    { "vitl": { "enableSemanticTokens": false } }
-    ```
-
-- **Tests ou compilation VSIX échouent sur CI/CD**
-  - Assurez-vous que la CI installe Node.js ≥ 18 et `vsce`.
-  - Ajoutez un cache npm (`npm ci` plutôt que `npm install`).
-  - Vérifiez que `scripts/build.sh` ou `release.sh` ont les droits d’exécution (`chmod +x`).
-
----
----
-
-## Feuille de route
-
-La feuille de route suivante décrit les fonctionnalités planifiées et les améliorations envisagées pour les prochaines versions de l’extension **VitteStudio** (support Vitte/Vitl dans VS Code).
-Les jalons sont indicatifs et sujets à ajustements selon les retours utilisateurs et la progression du langage.
-
----
-
-### 🎯 Court terme (0.4.x → 0.5.x)
-- **Formateur intégré** (`DocumentRangeFormatting` et `OnTypeFormatting`)
-  - Normalisation indentation (espaces vs tabulations)
-  - Gestion automatique des espaces autour des opérateurs, virgules et `:`
-  - Trim des espaces en fin de ligne et insertion newline final
-  - Options configurables via `settings.json`
-
-- **Renommage de symboles** (`RenameProvider`)
-  - Renommage cohérent dans tout le document et projet
-  - Support des variables locales, globales et fonctions
-
-- **Diagnostics enrichis**
-  - Détection des variables inutilisées
-  - Avertissement sur les imports non utilisés
-  - Détection des blocs vides
-
----
-
-### 🚀 Moyen terme (0.6.x → 0.7.x)
-- **Inlay hints**
-  - Affichage des types implicites (ex: paramètres, retours de fonction)
-  - Indices pour les valeurs par défaut des arguments
-
-- **Code lenses**
-  - Actions rapides au-dessus des fonctions (`Run`, `Debug`, `Test`)
-  - Informations de référence : nombre d’appels à une fonction
-
-- **Amélioration du debug**
-  - Watch expressions évoluées
-  - Support des breakpoints conditionnels
-  - Console interactive (REPL connecté au runtime Vitl/Vitte)
-
-- **Indexation avancée**
-  - Recherche de symboles multi-fichiers plus rapide
-  - Navigation croisée : *Go to Implementation* et *Find References*
-
----
-
-###  Long terme (0.8.x → 1.0.0)
-- **Tests end-to-end** via `@vscode/test-electron`
-  - Jeux de tests complets pour valider LSP, snippets, debug, formatteur
-  - CI automatisée sur Linux, macOS et Windows
-
-- **Refactorings avancés**
-  - Extraction de fonction/méthode
-  - Organisation automatique des imports
-  - Conversion automatique `let ↔ const` selon usage
-
-- **Télémétrie opt-in**
-  - Statistiques anonymes (activation manuelle par l’utilisateur)
-  - Aide à prioriser les fonctionnalités les plus utilisées
-
-- **Écosystème & packaging**
-  - Intégration avec GitHub Codespaces / VS Code Web
-  - Publication automatisée sur Marketplace + GitHub Releases
-  - Documentation intégrée interactive (tutoriels dans VS Code)
-
----
-
-### 💡 Idées futures
-- Support partiel de **Vitl FFI** (interop avec C/Rust directement dans VS Code).
-- Mode **Playground** pour exécuter des snippets `.vitl` sans projet.
-- **Visualisation graphique** (ex. graphe d’appel, diagrammes d’imports).
-- Support d’autres éditeurs via LSP (Neovim, JetBrains, etc.).
-- Intégration avec des outils d’analyse statique tiers (Clippy-like).
-
----
-
----
-
-## Contribuer
-
-Issues et PRs bienvenues : <https://github.com/vitte-lang/vscode-vitte>.
-Style : TypeScript strict, commits clairs, CI verte.
+The repository includes a full LSP implementation under `server/`, shared client utilities in `src/`, and integration tests in `src/test`.
 
 ---
 
 ## Licence
 
-MIT. Voir `LICENSE`.
+Released under the [MIT Licence](LICENSE).
