@@ -90,10 +90,26 @@ async fn fetch_demo(url: &str) -> Result<String, Error> {
 }
 
 async fn run_async() -> Result<(), Error> {
+  defer println("leaving run_async")
   let r = await fetch_demo("https://example.com")
   match r {
     Ok(body) => { p("body len {body.len()}") }
     Err(e)   => { eprintln("err: {e}") }
+  }
+  let status = if r.is_ok() { "ok" } else { "err" }
+  switch status {
+    case "ok" => { p("switch: run_async ok") },
+    case "err" => { eprintln("switch: run_async err") },
+    default => { p("switch: unknown status {status}") }
+  }
+  with log_scope("run_async") {
+    try {
+      check_health()?
+    } catch err {
+      eprintln("recoverable err: {err}")
+    } finally {
+      println("scope done")
+    }
   }
   return Ok(())
 }

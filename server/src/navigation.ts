@@ -154,16 +154,16 @@ function isValidIdent(s: string): boolean { return /^[A-Za-z_]\w*$/.test(s); }
 // Les regex sont évaluées uniquement sur les positions mask==1
 
 const RULES: Array<{ rx: RegExp; kind: SymbolKind; nameGroup: number; containerHint?: (m: RegExpExecArray)=>string|undefined }> = [
-  { rx: /\b(?:module|mod)\s+([A-Za-z_]\w*)/g,               kind: SymbolKind.Namespace, nameGroup: 1 },
-  { rx: /\b(?:use|import)\s+([A-Za-z_][\w:]*)(?=\s*;)/g,    kind: SymbolKind.Namespace, nameGroup: 1 },
-  { rx: /\bimpl\s+([A-Za-z_][\w<>:, ]*)/g,                  kind: SymbolKind.Class,     nameGroup: 1 },
-  { rx: /\bfn\s+([A-Za-z_]\w*)\s*\(/g,                      kind: SymbolKind.Function,  nameGroup: 1 },
-  { rx: /\bstruct\s+([A-Za-z_]\w*)/g,                        kind: SymbolKind.Struct,    nameGroup: 1 },
-  { rx: /\benum\s+([A-Za-z_]\w*)/g,                          kind: SymbolKind.Enum,      nameGroup: 1 },
-  { rx: /\btrait\s+([A-Za-z_]\w*)/g,                         kind: SymbolKind.Interface, nameGroup: 1 },
-  { rx: /\btype\s+([A-Za-z_]\w*)/g,                          kind: SymbolKind.TypeParameter, nameGroup: 1 },
-  { rx: /\bconst\s+([A-Za-z_]\w*)/g,                         kind: SymbolKind.Constant,  nameGroup: 1 },
-  { rx: /\blet\s+(?:mut\s+)?([A-Za-z_]\w*)/g,               kind: SymbolKind.Variable,  nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/g,                kind: SymbolKind.Namespace, nameGroup: 1 },
+  { rx: /\b(?:use|import)\s+([A-Za-z_][\w:]*)(?=\s*;)/g,               kind: SymbolKind.Namespace, nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?impl\s+([A-Za-z_][\w<>:, ]*)/g,                   kind: SymbolKind.Class,     nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+(?:"[^"]*"\s+)?)?fn\s+([A-Za-z_]\w*)\s*\(/g, kind: SymbolKind.Function,  nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?struct\s+([A-Za-z_]\w*)/g,                        kind: SymbolKind.Struct,    nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?enum\s+([A-Za-z_]\w*)/g,                          kind: SymbolKind.Enum,      nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?trait\s+([A-Za-z_]\w*)/g,                         kind: SymbolKind.Interface, nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?type\s+([A-Za-z_]\w*)/g,                          kind: SymbolKind.TypeParameter, nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?const\s+([A-Za-z_]\w*)/g,                         kind: SymbolKind.Constant,  nameGroup: 1 },
+  { rx: /\b(?:pub\s+)?let\s+(?:mut\s+)?([A-Za-z_]\w*)/g,               kind: SymbolKind.Variable,  nameGroup: 1 },
   // champs de struct: name: Type
   { rx: /(^|\s)([A-Za-z_]\w*)\s*:\s*[^;{},\n]+(?=,|\n|\r|\})/g, kind: SymbolKind.Field, nameGroup: 2 },
 ];

@@ -23,8 +23,8 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
 
-    "types": ["vscode", "node"]
+    "types": ["vscode", "node", "mocha"]
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "out", ".vscode-test", "**/*.test.ts", "**/__tests__/**"]
+  "exclude": ["node_modules", "out", ".vscode-test", "**/__tests__/**"]
 }

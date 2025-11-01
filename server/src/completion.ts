@@ -1,5 +1,7 @@
 // completion.ts — complétions LSP sans dépendance externe, robustes et contextuelles
 
+import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   CompletionItem,
   CompletionItemKind,
@@ -12,19 +14,16 @@ import {
   TextEdit
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
+import {
+  BOOL_LITERALS,
+  KEYWORDS,
+  NIL_LITERALS,
+} from "./languageFacts.js";
+import { searchWorkspaceSymbols, SK, IndexedSymbol } from "./indexer.js";
 
 /* ============================================================================
  * Tables de base
  * ========================================================================== */
-
-const KEYWORDS: readonly string[] = [
-  "module","import","use","as","pub","const","let","mut","fn",
-  "return","if","else","match","while","for","in","break","continue",
-  "type","impl","where","struct","mod","test","true","false"
-];
-
-const BOOL_LITERALS: readonly string[] = ["true", "false"];
-const NIL_LITERALS: readonly string[] = ["null", "nil", "none"];
 
 // Heuristiques de membres courants, proposées après un point.
 const COMMON_MEMBERS: readonly { recv: RegExp; members: string[] }[] = [
@@ -91,6 +90,12 @@ const SNIPPETS: CompletionItem[] = [
     "impl ${1:Type} {\n\tfn ${2:new}(${3:args}) -> Self {\n\t\t$0\n\t}\n}"),
   ciSnippet("match", "Match expression", "Expression de branchement avec motifs.",
     "match ${1:expr} {\n\t${2:Pattern} => ${3:expr},\n\t_ => ${0:default}\n}"),
+  ciSnippet("switch", "Switch / case", "Switch multi-branches avec clause default.",
+    "switch ${1:expr} {\n\tcase ${2:Pattern} => ${3:expr},\n\tdefault => ${0}\n}"),
+  ciSnippet("trycatch", "Bloc try/catch", "Gestion d’erreurs avec bloc finally optionnel.",
+    "try {\n\t${1}\n} catch ${2:error} {\n\t${3}\n}${4: finally {\n\t$0\n}}"),
+  ciSnippet("asyncfn", "Fonction async", "Déclare une fonction asynchrone avec await.",
+    "async fn ${1:name}(${2:params})${3: -> ${4:Type}} {\n\tawait ${5:future()}\n\t$0\n}"),
   ciSnippet("ifelse", "If / Else", "Structure conditionnelle complète.",
     "if ${1:cond} {\n\t${2}\n} else {\n\t${0}\n}"),
   ciSnippet("for", "Boucle for", "Boucle for-in sur un itérable.",
@@ -116,14 +121,14 @@ interface ExtractedSym { name: string; kind: SymbolKind; }
 function extractSymbols(doc: TextDocument): ExtractedSym[] {
   const text = doc.getText();
   const rules: Array<{ rx: RegExp; kind: SymbolKind; g: number }> = [
-    { rx: /^\s*(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Namespace, g: 1 },
-    { rx: /^\s*fn\s+([A-Za-z_]\w*)/gm,             kind: SymbolKind.Function,  g: 1 },
-    { rx: /^\s*struct\s+([A-Za-z_]\w*)/gm,         kind: SymbolKind.Struct,    g: 1 },
-    { rx: /^\s*enum\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Enum,      g: 1 },
-    { rx: /^\s*trait\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Interface, g: 1 },
-    { rx: /^\s*type\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Interface, g: 1 },
-    { rx: /^\s*let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SymbolKind.Variable,  g: 1 },
-    { rx: /^\s*const\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Constant,  g: 1 }
+    { rx: /^\s*(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Namespace, g: 1 },
+    { rx: /^\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+(?:"[^"]*"\s+)?)?fn\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Function, g: 1 },
+    { rx: /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)/gm,         kind: SymbolKind.Struct,    g: 1 },
+    { rx: /^\s*(?:pub\s+)?enum\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Enum,      g: 1 },
+    { rx: /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Interface, g: 1 },
+    { rx: /^\s*(?:pub\s+)?type\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Interface, g: 1 },
+    { rx: /^\s*(?:pub\s+)?let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SymbolKind.Variable,  g: 1 },
+    { rx: /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Constant,  g: 1 }
   ];
 
   const out: ExtractedSym[] = [];
@@ -270,6 +275,77 @@ function memberCompletion(leftOfCursor: string): CompletionItem[] {
   return items;
 }
 
+function workspaceSymbolCompletions(
+  doc: TextDocument,
+  token: string,
+  range: Range,
+  context: "import" | "general"
+): CompletionItem[] {
+  const normalized = token.trim();
+  if (!normalized && context === "general") return [];
+  const limit = context === "import" ? 200 : 80;
+  const results = searchWorkspaceSymbols(normalized, limit);
+  if (results.length === 0) return [];
+
+  const items: CompletionItem[] = [];
+  const seen = new Set<string>();
+
+  for (const sym of results) {
+    if (!sym?.name) continue;
+    if (sym.uri === doc.uri) continue;
+    if (context === "general" && fuzzyScore(sym.name, token) <= 0) continue;
+    if (context === "import" && !isImportableKind(sym.kind)) continue;
+
+    const key = `${sym.name}|${sym.uri}|${sym.kind}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const kind = mapSymbolKindToCompletionKind(sym.kind as unknown as SymbolKind);
+    const detailParts = [`${SYMBOL_KIND_LABEL[sym.kind] ?? "Symbole"}`];
+    if (sym.uri) {
+      const base = basenameFromUri(sym.uri);
+      if (base) detailParts.push(base);
+    }
+
+    items.push({
+      label: sym.name,
+      kind,
+      detail: detailParts.join(" — "),
+      documentation: md(`Symbole workspace \`${sym.name}\`.`),
+      sortText: tier(context === "import" ? 0 : 1, `ws:${sym.name}`),
+      filterText: sym.name,
+      textEdit: edit(range, sym.name),
+      labelDetails: context === "import"
+        ? { detail: "workspace" }
+        : { description: SYMBOL_KIND_LABEL[sym.kind] ?? "symbol" }
+    });
+    if (context === "general" && items.length >= 40) break;
+    if (context === "import" && items.length >= 60) break;
+  }
+
+  return items;
+}
+
+function isImportableKind(kind: SK): boolean {
+  return kind === SK.Module || kind === SK.Namespace;
+}
+
+function basenameFromUri(uri: string): string {
+  if (!uri) return "";
+  try {
+    if (uri.startsWith("file://")) {
+      return path.basename(fileURLToPath(uri));
+    }
+  } catch {
+    // ignore decoding issues
+  }
+  try {
+    return path.basename(new URL(uri).pathname);
+  } catch {
+    return uri;
+  }
+}
+
 /* ============================================================================
  * API
  * ========================================================================== */
@@ -343,11 +419,19 @@ export function provideCompletions(doc: TextDocument, position: Position): Compl
   items.push(...memberCompletion(linePrefix));
 
   // Contexte: import/use et autres heuristiques
+  const isImportContext = /^\s*(use|import)\s+/.test(linePrefix);
+
   items.push(...diagnosticsCompletion(linePrefix).map(ci => ({
     ...ci,
     textEdit: ci.insertText ? undefined : edit(range, ci.label),
     sortText: ci.sortText ?? tier(0, ci.label)
   })));
+
+  if (isImportContext) {
+    items.push(...workspaceSymbolCompletions(doc, token, range, "import"));
+  } else if (token.length >= 2) {
+    items.push(...workspaceSymbolCompletions(doc, token, range, "general"));
+  }
 
   return dedupe(items, it => `${it.label}|${it.kind}|${it.sortText ?? ""}`);
 }

@@ -9,6 +9,8 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
+import { registerDiagnosticsView } from "./diagnosticsView";
+import { registerModuleExplorerView, ModuleExplorerProvider } from "./moduleExplorerView";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -16,24 +18,145 @@ import {
   TransportKind,
   RevealOutputChannelOn,
   State as ClientState,
-  DocumentSelector
+  DocumentSelector,
+  ProvideDocumentFormattingEditsSignature,
 } from "vscode-languageclient/node";
+import {
+  summarizeWorkspaceDiagnostics,
+  diagnosticsLevel,
+  formatDiagnosticsSummary,
+  DiagnosticsSummary,
+} from "./utils/diagnostics";
 
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel;
 let statusItem: vscode.StatusBarItem;
+let moduleExplorer: ModuleExplorerProvider | undefined;
+
+let statusBaseIcon = "$(rocket)";
+const STATUS_LABEL = "Vitte";
+let statusLanguageSuffix = "";
+let statusBaseTooltip = "Vitte Language Server";
+let statusHealthIcon = "";
+let statusHealthTooltip = "";
+let statusOverrideText: string | undefined;
+let statusOverrideTooltip: string | undefined;
+
+export interface ExtensionApi {
+  getStatusText(): string;
+  getStatusTooltip(): string;
+  getClientState(): ClientState | undefined;
+  runAction(action: string): Promise<void>;
+  restart(): Promise<void>;
+  resolveServerModuleForTest(ctx: Pick<vscode.ExtensionContext, "asAbsolutePath">): string;
+}
 
 const LANGUAGES = ["vitte", "vit", "vitl"] as const;
+const WATCH_PATTERNS = [
+  "**/*.{vitte,vit,vitl}",
+  "**/vitte.toml",
+  "**/.vitteconfig",
+  "**/vitl.toml",
+  "**/.vitlconfig"
+] as const;
 
-export async function activate(context: vscode.ExtensionContext): Promise<void> {
+let fileWatchers: vscode.FileSystemWatcher[] = [];
+
+function logServerResolution(message: string): void {
+  const text = `[vitte] ${message}`;
+  output?.appendLine(text);
+  console.log(text);
+}
+
+function applyStatusBar(): void {
+  if (!statusItem) return;
+  let text: string;
+  let tooltipParts: string[];
+
+  if (statusOverrideText !== undefined) {
+    text = statusOverrideText;
+    tooltipParts = [statusOverrideTooltip ?? statusBaseTooltip];
+  } else {
+    const suffix = statusLanguageSuffix ? ` (${statusLanguageSuffix})` : "";
+    text = `${statusBaseIcon} ${STATUS_LABEL}${suffix}`;
+    tooltipParts = [statusBaseTooltip];
+    if (statusOverrideTooltip) {
+      tooltipParts.push(statusOverrideTooltip);
+    }
+  }
+
+  if (statusHealthIcon) {
+    text = `${text} ${statusHealthIcon}`;
+  }
+
+  if (statusHealthTooltip) {
+    tooltipParts.push(statusHealthTooltip);
+  }
+
+  statusItem.text = text;
+  statusItem.tooltip = tooltipParts.filter(Boolean).join("\n");
+  statusItem.accessibilityInformation = {
+    label: text.replace(/\$\([^)]+\)/g, "").trim(),
+    role: "status"
+  };
+}
+
+function setStatusBase(icon: string, tooltip: string): void {
+  statusBaseIcon = icon;
+  statusBaseTooltip = tooltip;
+  statusOverrideText = undefined;
+  statusOverrideTooltip = undefined;
+  applyStatusBar();
+}
+
+function setStatusLanguageSuffix(lang?: string): void {
+  statusLanguageSuffix = lang ?? "";
+  applyStatusBar();
+}
+
+function setStatusOverride(text?: string, tooltip?: string): void {
+  statusOverrideText = text;
+  statusOverrideTooltip = tooltip;
+  applyStatusBar();
+}
+
+function refreshDiagnosticsStatus(): void {
+  const summary = summarizeWorkspaceDiagnostics();
+  const level = diagnosticsLevel(summary);
+  switch (level) {
+    case "error":
+      statusHealthIcon = "$(error)";
+      break;
+    case "warning":
+      statusHealthIcon = "$(warning)";
+      break;
+    default:
+      statusHealthIcon = "$(pass-filled)";
+  }
+  statusHealthTooltip = formatDiagnosticsSummary(summary);
+  applyStatusBar();
+}
+
+function ensureFileWatchers(context: vscode.ExtensionContext): vscode.FileSystemWatcher[] {
+  if (fileWatchers.length === 0) {
+    fileWatchers = WATCH_PATTERNS.map((pattern) => {
+      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+      context.subscriptions.push(watcher);
+      return watcher;
+    });
+  }
+  return fileWatchers;
+}
+
+export async function activate(context: vscode.ExtensionContext): Promise<ExtensionApi | undefined> {
   output = vscode.window.createOutputChannel("Vitte Language Server", { log: true });
   statusItem = vscode.window.createStatusBarItem("vitte.status", vscode.StatusBarAlignment.Right, 100);
   statusItem.name = "Vitte LSP";
-  statusItem.text = "$(rocket) Vitte";
-  statusItem.tooltip = "Vitte Language Server";
   statusItem.command = "vitte.showServerLog";
-  statusItem.show();
   context.subscriptions.push(output, statusItem);
+  setStatusBase("$(rocket)", "Vitte Language Server");
+  refreshDiagnosticsStatus();
+  statusItem.show();
 
   await startClient(context);
 
@@ -43,14 +166,38 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       output.show(true);
     }),
     vscode.commands.registerCommand("vitte.restartServer", async () => {
-      await restartClient(context);
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: "Vitte : redémarrage du serveur de langage…",
+        },
+        async () => {
+          await restartClient(context);
+        }
+      );
+      vscode.window.setStatusBarMessage("Serveur Vitte redémarré avec succès.", 3000);
     }),
     vscode.commands.registerCommand("vitte.runAction", async () => {
       const pick = await vscode.window.showQuickPick([
-        { label: "Format document", description: "editor.action.formatDocument", action: "format" },
-        { label: "Organize imports", description: "editor.action.organizeImports", action: "organizeImports" },
-        { label: "Fix all", description: "source.fixAll", action: "fixAll" }
-      ], { title: "Vitte: Run Action" });
+        {
+          label: "Format document",
+          description: "editor.action.formatDocument",
+          detail: "Applique le formateur configuré pour le fichier actif.",
+          action: "format",
+        },
+        {
+          label: "Organize imports",
+          description: "editor.action.organizeImports",
+          detail: "Trie et nettoie les imports du document courant.",
+          action: "organizeImports",
+        },
+        {
+          label: "Fix all",
+          description: "source.fixAll",
+          detail: "Exécute les correctifs automatiques disponibles.",
+          action: "fixAll",
+        }
+      ], { title: "Vitte : exécuter une action rapide" });
       if (!pick) return;
       await runBuiltinAction(pick.action);
     }),
@@ -98,11 +245,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await restartClient(context);
     }
   }));
+
+  // Vue diagnostics dédiée (débutants/avancés)
+  registerDiagnosticsView(context);
+  moduleExplorer = registerModuleExplorerView(context);
+  context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(() => refreshDiagnosticsStatus()));
+
+  if (process.env.VSCODE_TESTING === "1") {
+    const api: ExtensionApi = {
+      getStatusText: () => statusItem?.text ?? "",
+      getStatusTooltip: () => {
+        const tip = statusItem?.tooltip;
+        if (typeof tip === "string") return tip;
+        if (tip && typeof tip !== "string") {
+          return (tip as vscode.MarkdownString).value ?? "";
+        }
+        return "";
+      },
+      getClientState: () => client?.state,
+      runAction: async (action: string) => {
+        await runBuiltinAction(action);
+      },
+      restart: async () => {
+        await restartClient(context);
+      },
+      resolveServerModuleForTest: (ctx) => resolveServerModule(ctx as vscode.ExtensionContext),
+    };
+    return api;
+  }
+
+  return undefined;
 }
 
 export async function deactivate(): Promise<void> {
   try { await client?.stop(); } catch { /* noop */ }
   client = undefined;
+  for (const watcher of fileWatchers) {
+    try { watcher.dispose(); } catch { /* noop */ }
+  }
+  fileWatchers = [];
 }
 
 /* --------------------------------- LSP ----------------------------------- */
@@ -110,9 +291,26 @@ export async function deactivate(): Promise<void> {
 function resolveServerModule(context: vscode.ExtensionContext): string {
   // Permet d’overrider via settings: vitte.serverPath
   const cfgPath = vscode.workspace.getConfiguration("vitte").get<string>("serverPath");
-  if (cfgPath && fs.existsSync(cfgPath)) return cfgPath;
+  if (cfgPath) {
+    if (fs.existsSync(cfgPath)) {
+      logServerResolution(`Utilisation du serveur personnalisé: ${cfgPath}`);
+      return cfgPath;
+    }
+    logServerResolution(`Chemin de serveur personnalisé introuvable: ${cfgPath}`);
+  }
   const bundled = context.asAbsolutePath(path.join("out", "server.js"));
-  return bundled;
+  if (fs.existsSync(bundled)) {
+    logServerResolution(`Utilisation du serveur embarqué: ${bundled}`);
+    return bundled;
+  }
+  const nested = context.asAbsolutePath(path.join("server", "out", "server.js"));
+  if (fs.existsSync(nested)) {
+    logServerResolution(`Utilisation du serveur empaqueté (server/out): ${nested}`);
+    return nested;
+  }
+  const message = "Module serveur Vitte introuvable (out/server.js ou server/out/server.js)";
+  logServerResolution(message);
+  throw new Error(message);
 }
 
 async function startClient(context: vscode.ExtensionContext): Promise<void> {
@@ -125,7 +323,12 @@ async function startClient(context: vscode.ExtensionContext): Promise<void> {
     debug: { module: serverModule, transport: TransportKind.ipc, options: debugOptions },
   };
 
-  const documentSelector: DocumentSelector = LANGUAGES.map((id) => ({ scheme: "file", language: id }));
+  const documentSelector: DocumentSelector = LANGUAGES.flatMap((id) => ([
+    { scheme: "file", language: id },
+    { scheme: "untitled", language: id },
+    { scheme: "vscode-notebook-cell", language: id }
+  ]));
+  const watchers = ensureFileWatchers(context);
 
   const clientOptions: LanguageClientOptions = {
     documentSelector,
@@ -133,10 +336,15 @@ async function startClient(context: vscode.ExtensionContext): Promise<void> {
     revealOutputChannelOn: RevealOutputChannelOn.Never,
     synchronize: {
       configurationSection: "vitte",
-      fileEvents: vscode.workspace.createFileSystemWatcher("**/*.{vitte,vit,vitl}")
+      fileEvents: watchers
     },
     middleware: {
-      provideDocumentFormattingEdits: async (doc, options, token, next) => {
+      provideDocumentFormattingEdits: async (
+        doc: vscode.TextDocument,
+        options: vscode.FormattingOptions,
+        token: vscode.CancellationToken,
+        next: ProvideDocumentFormattingEditsSignature
+      ) => {
         try { return await next(doc, options, token); } catch {
           await vscode.commands.executeCommand("editor.action.formatDocument");
           return [];
@@ -161,7 +369,7 @@ async function startClient(context: vscode.ExtensionContext): Promise<void> {
 
 async function restartClient(context: vscode.ExtensionContext): Promise<void> {
   if (client) {
-    statusItem.text = "$(sync) Vitte";
+    setStatusBase("$(sync)", "Vitte LSP : redémarrage…");
     try { await client.stop(); } catch { /* noop */ }
     client = undefined;
   }
@@ -169,22 +377,24 @@ async function restartClient(context: vscode.ExtensionContext): Promise<void> {
 }
 
 function wireClientState(c: LanguageClient): void {
-  c.onDidChangeState((e) => {
+  c.onDidChangeState((e: { oldState: ClientState; newState: ClientState }) => {
     if (e.newState === ClientState.Starting) {
-      statusItem.text = "$(gear) Vitte";
-      statusItem.tooltip = "Vitte LSP: starting";
+      setStatusBase("$(gear)", "Vitte LSP : démarrage");
     } else if (e.newState === ClientState.Running) {
-      statusItem.text = "$(check) Vitte";
-      statusItem.tooltip = "Vitte LSP: running";
+      setStatusBase("$(check)", "Vitte LSP : opérationnel");
     } else if (e.newState === ClientState.Stopped) {
-      statusItem.text = "$(debug-stop) Vitte";
-      statusItem.tooltip = "Vitte LSP: stopped";
+      setStatusBase("$(debug-stop)", "Vitte LSP : arrêté");
     }
   });
 
   c.onNotification("vitte/status", (msg: { text?: string; tooltip?: string }) => {
-    if (typeof msg?.text === "string") statusItem.text = msg.text;
-    if (typeof msg?.tooltip === "string") statusItem.tooltip = msg.tooltip;
+    const text = typeof msg?.text === "string" ? msg.text : undefined;
+    const tooltip = typeof msg?.tooltip === "string" ? msg.tooltip : undefined;
+    if (text !== undefined || tooltip !== undefined) {
+      if (text !== undefined) statusOverrideText = text;
+      if (tooltip !== undefined) statusOverrideTooltip = tooltip;
+      applyStatusBar();
+    }
   });
 
   c.onNotification("vitte/log", (msg: unknown) => {
@@ -195,7 +405,16 @@ function wireClientState(c: LanguageClient): void {
 /* ----------------------------- Actions utilitaires ------------------------ */
 
 async function runBuiltinAction(action: string): Promise<void> {
-  const editor = vscode.window.activeTextEditor; if (!editor) return;
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) {
+    void vscode.window.showWarningMessage("Ouvrez un document Vitte/Vitl avant d’exécuter cette action.");
+    return;
+  }
+  const languageId = editor.document.languageId;
+  if (!(LANGUAGES as readonly string[]).includes(languageId)) {
+    void vscode.window.showWarningMessage("Les actions Vitte ne sont disponibles que pour les fichiers Vitte/Vitl.");
+    return;
+  }
   switch (action) {
     case "format":
       await vscode.commands.executeCommand("editor.action.formatDocument");
@@ -220,10 +439,10 @@ function sleep(ms: number): Promise<void> { return new Promise(res => setTimeout
 function updateStatusText(editor?: vscode.TextEditor): void {
   const lang = editor?.document?.languageId;
   if (lang && (LANGUAGES as readonly string[]).includes(lang)) {
-    statusItem.text = `$(rocket) Vitte (${lang})`;
-  } else {
-    statusItem.text = "$(rocket) Vitte";
+    setStatusLanguageSuffix(lang);
+    return;
   }
+  setStatusLanguageSuffix("");
 }
 
 /* -------------------------------- Debug demo ------------------------------ */
