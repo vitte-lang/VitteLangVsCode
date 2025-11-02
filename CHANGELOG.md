@@ -1,7 +1,26 @@
 # Changelog
-Toutes les modifications notables de l’extension **Vitte Language Support** seront documentées ici.  
-Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),  
+Toutes les modifications notables de l’extension **Vitte Language Support** seront documentées ici.
+Le format est basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/),
 et cette extension suit le versioning [SemVer](https://semver.org/lang/fr/).
+
+---
+
+## [1.7.0] — 2025-11-02
+### Ajouté
+- ⚙️ **Commandes LSP complètes** (`vitte.formatDocument`, `vitte.organizeImports`, `vitte.fixAll`) intégrées côté client et serveur, avec application automatique des `TextEdit`.
+- 🧠 **Linter étendu** avec nouvelles règles (`mixedIndent`, `blankLines`, `nonAscii`, `finalNewline`) et génération automatique de *Quick Fixes* LSP.
+- 🪶 **Formatteur amélioré** : support du formatage de plage (`rangeFormatting`), calcul d’*edits minimaux* et normalisation d’indentation avant exécution.
+- 🔍 **Indexeur LSP** : reconnaissance des blocs `impl`, gestion robuste des commentaires et chaînes imbriquées, et ajout d’une API `reindexWorkspace()`.
+
+### Modifié
+- 🧰 `languageFacts.ts` refondu : classification complète des mots-clés, types, opérateurs et littéraux pour la complétion et les semantic tokens.
+- 💡 `commands.ts` désormais branché directement au serveur via requêtes `vitte/*` (plus de stubs manuels).
+- 🚀 Meilleure cohérence entre les diagnostics, la complétion et le formatteur (tous fondés sur le même ensemble de règles).
+
+### Corrigé
+- 🐞 Correction des erreurs TypeScript (`Thenable.catch`, `TextDocumentSyncKind` dupliqué, import manquant `languageService`).
+- 🔧 Réécriture des handlers LSP (`onCodeAction`, `onDocumentFormatting`, `onDocumentRangeFormatting`) pour éviter les remplacements globaux inutiles et améliorer les performances.
+
 
 ---
 

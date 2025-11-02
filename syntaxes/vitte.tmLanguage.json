@@ -35,14 +35,13 @@
     "comments-doc": {
       "patterns": [
         {
-          "name": "comment.block.documentation.vitte",
+          "name": "comment.block.vitte",
           "begin": "/\\*\\*",
           "end": "\\*/",
           "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitte" } },
-          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitte" } },
-          "patterns": [{ "include": "#todo" }]
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitte" } }
         },
-        { "name": "comment.line.documentation.vitte", "match": "///.*$" }
+        { "name": "comment.line.double-slash.vitte", "match": "///.*$" }
       ]
     },
     "comments": {
@@ -52,15 +51,13 @@
           "begin": "/\\*",
           "end": "\\*/",
           "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitte" } },
-          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitte" } },
-          "patterns": [{ "include": "#todo" }]
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitte" } }
         },
         {
           "name": "comment.line.double-slash.vitte",
           "begin": "//",
           "end": "$",
-          "beginCaptures": { "0": { "name": "punctuation.definition.comment.vitte" } },
-          "patterns": [{ "include": "#todo" }]
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.vitte" } }
         }
       ]
     },
@@ -270,9 +267,5 @@
   },
   "foldingStartMarker": "(\\{\\s*(//.*)?$)|(/\\*\\*)",
   "foldingStopMarker": "(^\\s*\\})|(\\*/)",
-  "injections": {
-    "source.vitte comment.block.documentation.vitte": {
-      "patterns": [{ "include": "text.html.markdown" }]
-    }
-  }
+  "injections": {}
 }

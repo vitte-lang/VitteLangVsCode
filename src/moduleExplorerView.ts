@@ -103,7 +103,7 @@ export class ModuleExplorerProvider implements vscode.TreeDataProvider<ModuleTre
       this.nodes = entries.map(entry => new ModuleNode(entry));
       this.emitter.fire(undefined);
       if (this.tree) {
-        this.tree.message = this.nodes.length === 0 ? "Aucune structure trouvée" : "";
+        this.tree.message = this.nodes.length === 0 ? "Aucun module Vitte détecté" : "";
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -117,7 +117,7 @@ export class ModuleExplorerProvider implements vscode.TreeDataProvider<ModuleTre
 
 export function registerModuleExplorerView(context: vscode.ExtensionContext): ModuleExplorerProvider {
   const provider = new ModuleExplorerProvider();
-  const tree = vscode.window.createTreeView<ModuleTreeNode>("vitteModules", {
+  const tree = vscode.window.createTreeView<ModuleTreeNode>("vitteView", {
     treeDataProvider: provider,
     showCollapseAll: true
   });
@@ -137,6 +137,9 @@ export function registerModuleExplorerView(context: vscode.ExtensionContext): Mo
     }),
     vscode.languages.onDidChangeDiagnostics(() => provider.refreshSoon()),
     vscode.commands.registerCommand("vitte.modules.refresh", async () => {
+      await provider.refresh();
+    }),
+    vscode.commands.registerCommand("vitte.refreshExplorer", async () => {
       await provider.refresh();
     }),
     vscode.commands.registerCommand("vitte.modules.openSymbol", async (symbol: vscode.SymbolInformation) => {

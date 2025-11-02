@@ -1,6 +1,65 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 
+// 🟩 Vitte: diagnostics view settings & helpers
+interface VitteDiagnosticsConfig {
+  /** Allowed severities; when empty or undefined -> show all. */
+  severities?: Array<'error' | 'warning' | 'information' | 'hint'>;
+  /** Debounce delay in ms for refresh. */
+  refreshDebounceMs?: number;
+}
+
+const DEFAULT_CFG: Required<VitteDiagnosticsConfig> = {
+  severities: [],
+  refreshDebounceMs: 150,
+};
+
+function readConfig(): Required<VitteDiagnosticsConfig> {
+  const cfg = vscode.workspace.getConfiguration('vitte').get<VitteDiagnosticsConfig>('diagnostics');
+  if (!cfg) return DEFAULT_CFG;
+  return {
+    severities: Array.isArray(cfg.severities) ? cfg.severities.slice() as any : [],
+    refreshDebounceMs: typeof cfg.refreshDebounceMs === 'number' ? Math.max(0, cfg.refreshDebounceMs) : 150,
+  };
+}
+
+function sevToName(s?: vscode.DiagnosticSeverity): 'error' | 'warning' | 'information' | 'hint' | 'unknown' {
+  switch (s) {
+    case vscode.DiagnosticSeverity.Error: return 'error';
+    case vscode.DiagnosticSeverity.Warning: return 'warning';
+    case vscode.DiagnosticSeverity.Information: return 'information';
+    case vscode.DiagnosticSeverity.Hint: return 'hint';
+    default: return 'unknown';
+  }
+}
+
+function matchesFilter(s: vscode.DiagnosticSeverity | undefined, allowed: string[]): boolean {
+  if (!allowed || allowed.length === 0) return true;
+  const name = sevToName(s);
+  return name !== 'unknown' && allowed.includes(name as any);
+}
+
+function countBySeverity(list: AggregatedDiagnostic[]) {
+  let e=0, w=0, i=0, h=0;
+  for (const d of list) {
+    switch (d.diagnostic.severity) {
+      case vscode.DiagnosticSeverity.Error: e++; break;
+      case vscode.DiagnosticSeverity.Warning: w++; break;
+      case vscode.DiagnosticSeverity.Information: i++; break;
+      case vscode.DiagnosticSeverity.Hint: h++; break;
+    }
+  }
+  return { e, w, i, h };
+}
+
+function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+  let tid: NodeJS.Timeout | undefined;
+  return function(this: any, ...args: any[]) {
+    if (tid) clearTimeout(tid);
+    tid = setTimeout(() => fn.apply(this, args), ms);
+  } as T;
+}
+
 const SUPPORTED_EXTS = new Set([".vitte", ".vit", ".vitl"]);
 
 export interface DiagnosticsView {
@@ -24,7 +83,13 @@ class FileNode extends vscode.TreeItem {
     collState: vscode.TreeItemCollapsibleState
   ) {
     super(relativeLabel(uri), collState);
-    this.description = `${entries.length} ${entries.length > 1 ? "problèmes" : "problème"}`;
+    const c = countBySeverity(entries);
+    const parts: string[] = [];
+    if (c.e) parts.push(`${c.e} erreur${c.e>1?'s':''}`);
+    if (c.w) parts.push(`${c.w} avertissement${c.w>1?'s':''}`);
+    if (c.i) parts.push(`${c.i} info${c.i>1?'s':''}`);
+    if (c.h) parts.push(`${c.h} astuce${c.h>1?'s':''}`);
+    this.description = parts.length ? parts.join(', ') : `${entries.length} ${entries.length > 1 ? 'problèmes' : 'problème'}`;
     this.contextValue = "vitteDiagnosticFile";
     this.iconPath = vscode.ThemeIcon.File;
   }
@@ -44,7 +109,10 @@ class DiagnosticNode extends vscode.TreeItem {
       `${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}`,
       entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : ""
     ].filter(Boolean);
-    this.tooltip = parts.join("\n");
+    const severityName = sevToName(entry.diagnostic.severity);
+    const code = entry.diagnostic.code ? `Code: ${String(entry.diagnostic.code)}` : '';
+    const extra = [severityName && `Niveau: ${severityName}`, code].filter(Boolean).join('\n');
+    this.tooltip = [parts.join('\n'), extra].filter(Boolean).join('\n');
     this.iconPath = iconForSeverity(entry.diagnostic.severity);
     this.command = {
       command: "vitte.diagnostics.open",
@@ -60,10 +128,20 @@ class DiagnosticsTreeDataProvider implements vscode.TreeDataProvider<TreeNode>, 
   readonly onDidChangeTreeData: vscode.Event<TreeNode | undefined> = this.onDidChangeEmitter.event;
 
   private nodes: FileNode[] = [];
+  private cfg: Required<VitteDiagnosticsConfig> = DEFAULT_CFG;
+  private schedule = debounce(() => this.refresh(), this.cfg.refreshDebounceMs);
 
   refresh(): void {
-    this.nodes = buildFileNodes();
+    this.cfg = readConfig();
+    // rebuild nodes from diagnostics with filtering
+    this.nodes = buildFileNodes(this.cfg);
     this.onDidChangeEmitter.fire(undefined);
+  }
+
+  refreshDebounced(): void {
+    // re-create debouncer if delay changed
+    this.schedule = debounce(() => this.refresh(), this.cfg.refreshDebounceMs);
+    this.schedule();
   }
 
   hasItems(): boolean {
@@ -91,10 +169,15 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
   const refresh = () => {
     provider.refresh();
     if (provider.hasItems()) {
-      tree.message = "";
+      tree.message = '';
     } else {
-      tree.message = "$(pass-filled) Aucun diagnostic Vitte détecté";
+      tree.message = '$(pass-filled) Aucun diagnostic Vitte détecté';
     }
+  };
+
+  const refreshDebounced = () => {
+    provider.refreshDebounced();
+    if (!provider.hasItems()) tree.message = '$(pass-filled) Aucun diagnostic Vitte détecté';
   };
 
   refresh();
@@ -102,10 +185,10 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
   context.subscriptions.push(
     tree,
     provider,
-    vscode.languages.onDidChangeDiagnostics(refresh),
-    vscode.workspace.onDidCloseTextDocument(refresh),
-    vscode.workspace.onDidOpenTextDocument(refresh),
-    vscode.workspace.onDidSaveTextDocument(refresh),
+    vscode.languages.onDidChangeDiagnostics(refreshDebounced),
+    vscode.workspace.onDidCloseTextDocument(refreshDebounced),
+    vscode.workspace.onDidOpenTextDocument(refreshDebounced),
+    vscode.workspace.onDidSaveTextDocument(refreshDebounced),
     vscode.commands.registerCommand("vitte.diagnostics.refresh", refresh),
     vscode.commands.registerCommand("vitte.diagnostics.open", async (entry: AggregatedDiagnostic) => {
       if (!entry?.uri) return;
@@ -114,7 +197,14 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
       const range = entry.diagnostic.range;
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
       editor.selection = new vscode.Selection(range.start, range.start);
-    })
+    }),
+    vscode.commands.registerCommand('vitte.diagnostics.copy', async (entry: AggregatedDiagnostic) => {
+      if (!entry) return;
+      const pos = entry.diagnostic.range.start;
+      const text = `${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1} — ${entry.diagnostic.message}`;
+      await vscode.env.clipboard.writeText(text);
+      void vscode.window.setStatusBarMessage('Diagnostic copié dans le presse-papiers', 2000);
+    }),
   );
 
   vscode.window.onDidChangeActiveTextEditor(refresh, undefined, context.subscriptions);
@@ -122,8 +212,8 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
   return { provider, tree, refresh };
 }
 
-function buildFileNodes(): FileNode[] {
-  const entries = collectDiagnostics();
+function buildFileNodes(cfg: Required<VitteDiagnosticsConfig>): FileNode[] {
+  const entries = collectDiagnostics(cfg);
   const byFile = new Map<string, AggregatedDiagnostic[]>();
   for (const entry of entries) {
     const key = entry.uri.toString();
@@ -141,13 +231,16 @@ function buildFileNodes(): FileNode[] {
   return perFile.map(list => new FileNode(list[0]!.uri, list, vscode.TreeItemCollapsibleState.Expanded));
 }
 
-function collectDiagnostics(): AggregatedDiagnostic[] {
+function collectDiagnostics(cfg: Required<VitteDiagnosticsConfig>): AggregatedDiagnostic[] {
   const all = vscode.languages.getDiagnostics();
   const collected: AggregatedDiagnostic[] = [];
   for (const [uri, diagnostics] of all) {
-    if (uri.scheme !== "file") continue;
+    if (uri.scheme !== 'file') continue;
     if (!SUPPORTED_EXTS.has(path.extname(uri.fsPath))) continue;
-    diagnostics.forEach((diagnostic, index) => collected.push({ uri, diagnostic, index }));
+    diagnostics.forEach((diagnostic, index) => {
+      if (!matchesFilter(diagnostic.severity, cfg.severities)) return;
+      collected.push({ uri, diagnostic, index });
+    });
   }
   return collected;
 }

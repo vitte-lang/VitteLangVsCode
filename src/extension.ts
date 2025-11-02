@@ -11,6 +11,9 @@ import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { registerDiagnosticsView } from "./diagnosticsView";
 import { registerModuleExplorerView, ModuleExplorerProvider } from "./moduleExplorerView";
+import { VitteProjectTreeProvider } from "./providers/tree/projectTree";
+import { DocsPanel } from "./providers/docsPanel";
+import { PlaygroundPanel } from "./providers/playgroundPanel";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -159,6 +162,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   statusItem.show();
 
   await startClient(context);
+
+  // Sidebar: Explorateur Vitte (activity bar)
+  const vitteTree = new VitteProjectTreeProvider(context);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('vitteView', vitteTree)
+  );
+
+  // Toolbar + palette commands for the view
+  context.subscriptions.push(
+    vscode.commands.registerCommand('vitte.refreshExplorer', () => vitteTree.refresh()),
+    vscode.commands.registerCommand('vitte.openDocs', () => {
+      const uri = vscode.Uri.file(path.join(context.extensionPath, 'media', 'docs.html'));
+      return vscode.commands.executeCommand('vscode.open', uri);
+    }),
+    vscode.commands.registerCommand('vitte.openPlayground', () => PlaygroundPanel.createOrShow(context))
+  );
 
   // Commandes
   context.subscriptions.push(
