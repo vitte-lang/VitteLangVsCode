@@ -31,26 +31,18 @@
       "patterns": [
         { "name": "comment.line.double-slash.vitl", "match": "//.*$" },
         {
-          "name": "comment.block.documentation.vitl",
+          "name": "comment.block.vitl",
           "begin": "/\\*\\*",
           "end": "\\*/",
           "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitl" } },
-          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitl" } },
-          "patterns": [
-            { "include": "#doc-tags" },
-            { "include": "#todo" }
-          ]
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitl" } }
         },
         {
           "name": "comment.block.vitl",
           "begin": "/\\*",
           "end": "\\*/",
           "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.vitl" } },
-          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitl" } },
-          "patterns": [
-            { "include": "#comments" },
-            { "include": "#todo" }
-          ]
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.vitl" } }
         }
       ]
     },
@@ -345,9 +337,5 @@
   "foldingStartMarker": "(\\{\\s*(//.*)?$)|(/\\*\\*)",
   "foldingStopMarker": "(^\\s*\\})|(\\*/)",
 
-  "injections": {
-    "source.vitl comment.block.documentation.vitl": {
-      "patterns": [{ "include": "text.html.markdown" }]
-    }
-  }
+  "injections": {}
 }

@@ -2,7 +2,8 @@
 
 [![Marketplace](https://img.shields.io/badge/VS%20Code-Install-blue)](https://marketplace.visualstudio.com/manage)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![VS Code Engine](https://img.shields.io/badge/engine-%5E1.93.0-lightgrey)
+![VS Code Engine](https://img.shields.io/badge/engine-%5E1.105.0-lightgrey)
+![VS Code Version](https://img.shields.io/visual-studio-marketplace/v/VitteStudio.vitte-studio?label=VS%20Code)
 ![Status](https://img.shields.io/badge/status-active-brightgreen)
 
 Professional tooling for the Vitte/Vitl language family: language server, debugger, diagnostics view, snippets, and icon theme—packaged as a single Visual Studio Code extension.
