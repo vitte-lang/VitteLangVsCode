@@ -6,7 +6,7 @@ import * as fs from 'fs';
 function ensureString(x: string | undefined, fallback: string): string {
   return (typeof x === 'string' && x.length > 0) ? x : fallback;
 }
-function sanitizeArgs(args: Array<string | undefined>): string[] {
+function sanitizeArgs(args: (string | undefined)[]): string[] {
   return args.filter((a): a is string => typeof a === 'string' && a.length > 0);
 }
 
@@ -18,11 +18,11 @@ function joinPathCompat(base: vscode.Uri, ...parts: string[]): vscode.Uri {
 }
 
 /** Build the shell command to run tests. */
-export async function testCommandLine(withReport: boolean): Promise<string> {
+export function testCommandLine(withReport: boolean): string {
   const cfg = vscode.workspace.getConfiguration('vitte');
 
   // Prefer explicit runtime if configured (string), else fallback to 'vitte'
-  const runtime = ensureString(cfg.get<string>('runtime.path') || cfg.get<string>('debug.program'), 'vitte');
+  const runtime = ensureString(cfg.get<string>('runtime.path') ?? cfg.get<string>('debug.program'), 'vitte');
 
   // Optional args from settings
   const extra = sanitizeArgs([
@@ -39,7 +39,7 @@ export async function testCommandLine(withReport: boolean): Promise<string> {
 }
 
 /** Directory where test reports are written (best-effort). */
-export async function testReportDir(): Promise<string | undefined> {
+export function testReportDir(): string | undefined {
   const cfg = vscode.workspace.getConfiguration('vitte');
 
   // Allow override via settings
@@ -47,7 +47,7 @@ export async function testReportDir(): Promise<string | undefined> {
   if (override && override.length > 0) return override;
 
   // Default: <first-workspace>/.vitte/reports/tests
-  const wf = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0];
+  const wf = vscode.workspace.workspaceFolders?.[0];
   if (!wf) return undefined;
   const uri = joinPathCompat(wf.uri, '.vitte', 'reports', 'tests');
   const p = uri.fsPath;

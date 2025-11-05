@@ -278,7 +278,6 @@ function buildOutline(doc: TextDocument, flat: FlatSymbol[]): DocumentSymbol[] {
       if (ch === '}') {
         if (stack.length > 1) stack.pop();
       }
-      curIdx = bracesPositions[bp] + 1;
       bp++;
     }
     pushToBestContainer(node);

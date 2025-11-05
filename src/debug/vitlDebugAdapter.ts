@@ -68,10 +68,10 @@ class VitlDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory, v
   private resolveRuntimeAndArgs(cfg: vscode.WorkspaceConfiguration, session: vscode.DebugSession): { program: string; cwd: string; extraArgs: string[] } {
     // Settings or default (accept vitl‑specific first, then vitte.debug.program, else 'vitl-runtime')
     const explicit = cfg.get<string>('vitl.debug.program')
-      || cfg.get<string>('debug.program')
-      || 'vitl-runtime';
+      ?? cfg.get<string>('debug.program')
+      ?? 'vitl-runtime';
 
-    const toolchainRoot = cfg.get<string>('toolchain.root') || cfg.get<string>('toolchainPath');
+    const toolchainRoot = cfg.get<string>('toolchain.root') ?? cfg.get<string>('toolchainPath');
     const program = toolchainRoot && explicit && !path.isAbsolute(explicit)
       ? path.join(toolchainRoot, explicit)
       : explicit;
@@ -82,11 +82,12 @@ class VitlDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory, v
 
     // Allow passing args from launch.json
     const configArgs = rawConfig.args;
-    const rawArgs = Array.isArray(configArgs)
-      ? configArgs
-      : typeof configArgs === 'string' && configArgs.length > 0
-        ? [configArgs]
-        : [];
+    let rawArgs: (string | undefined)[] = [];
+    if (Array.isArray(configArgs)) {
+      rawArgs = configArgs.map((value) => (typeof value === 'string' ? value : undefined));
+    } else if (typeof configArgs === 'string' && configArgs.length > 0) {
+      rawArgs = [configArgs];
+    }
     const extraArgs = this.sanitizeArgs(rawArgs);
 
     return { program: this.ensureString(program, 'vitl-runtime'), cwd: this.ensureString(cwdValue, process.cwd()), extraArgs };
@@ -160,28 +161,5 @@ class VitlDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory, v
     const args = base.length > 0 ? base : candidates[0];
     return { command: program, args, cwd, env: process.env };
   }
-}
-        }
-      };
 
-      proc.stdout?.on('data', sniff);
-      proc.stderr?.on('data', sniff);
-      proc.once('error', (e) => finish(e as Error));
-      proc.once('exit', (code, sig) => finish(new Error(`exited early (code=${String(code)}, sig=${String(sig ?? 'null')})`)));
-      setTimeout(() => finish(new Error('timeout waiting for dap port')), 4000);
-    });
-  }
-
-  // ---- stdio fallback ---------------------------------------------------------
-  private buildExecutable(program: string, cwd: string, extraArgs: string[]) {
-    // Try stdio flags, otherwise pass through
-    const candidates: string[][] = [
-      ['dap', '--stdio'],
-      ['--dap', '--stdio'],
-      []
-    ];
-    const base = this.sanitizeArgs(extraArgs);
-    const args = base.length > 0 ? base : candidates[0];
-    return { command: program, args, cwd, env: process.env as NodeJS.ProcessEnv };
-  }
 }

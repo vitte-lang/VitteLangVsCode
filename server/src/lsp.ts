@@ -259,6 +259,7 @@ connection.onRequest('vitte/formatDocumentOrRange', async (params: FormatRangePa
 
 connection.onRequest('vitte/expandSelectionToEnclosingBrackets', (params: ExpandSelectionParams) => {
   const uri = params?.textDocument?.uri;
+  if (!uri) return null;
   const doc = documents.get(uri);
   if (!doc) return null;
   const text = doc.getText();

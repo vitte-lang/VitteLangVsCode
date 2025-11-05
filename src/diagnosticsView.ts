@@ -11,17 +11,26 @@ interface VitteDiagnosticsConfig {
   refreshDebounceMs?: number;
 }
 
-const VALID_SEVERITIES: readonly SeverityKey[] = ['error', 'warning', 'information', 'hint'] as const;
+const VALID_SEVERITY_MAP: Record<SeverityKey, true> = {
+  error: true,
+  warning: true,
+  information: true,
+  hint: true,
+};
 
 const DEFAULT_CFG: Readonly<Required<VitteDiagnosticsConfig>> = {
   severities: [],
   refreshDebounceMs: 150,
 };
 
+function isSeverityKey(value: unknown): value is SeverityKey {
+  return typeof value === 'string' && value in VALID_SEVERITY_MAP;
+}
+
 function readConfig(): Required<VitteDiagnosticsConfig> {
   const cfg = vscode.workspace.getConfiguration('vitte').get<VitteDiagnosticsConfig>('diagnostics') ?? {};
   const severities = Array.isArray(cfg.severities)
-    ? cfg.severities.filter((value): value is SeverityKey => VALID_SEVERITIES.includes(value as SeverityKey))
+    ? cfg.severities.filter(isSeverityKey)
     : [];
   const refreshDebounceMs = typeof cfg.refreshDebounceMs === 'number'
     ? Math.max(0, cfg.refreshDebounceMs)
@@ -120,8 +129,11 @@ class DiagnosticNode extends vscode.TreeItem {
       entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : ""
     ].filter(Boolean);
     const severityName = sevToName(entry.diagnostic.severity);
-    const code = entry.diagnostic.code ? `Code: ${String(entry.diagnostic.code)}` : '';
-    const extra = [severityName && `Niveau: ${severityName}`, code].filter(Boolean).join('\n');
+    const codeValue = entry.diagnostic.code;
+    const codeText = typeof codeValue === 'string' || typeof codeValue === 'number'
+      ? `Code: ${String(codeValue)}`
+      : undefined;
+    const extra = [severityName && `Niveau: ${severityName}`, codeText].filter(Boolean).join('\n');
     this.tooltip = [parts.join('\n'), extra].filter(Boolean).join('\n');
     this.iconPath = iconForSeverity(entry.diagnostic.severity);
     this.command = {

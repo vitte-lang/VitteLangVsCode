@@ -1,17 +1,19 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-type VitteDebugJson = Partial<{
-  debug: {
-    program?: string;
-    args?: string[];
-    cwd?: string;
-    trace?: boolean;
-    sourceMaps?: boolean;
-    env?: Record<string, string>;
-  };
+interface VitteDebugSettings {
+  program?: string;
+  args?: string[];
+  cwd?: string;
+  trace?: boolean;
+  sourceMaps?: boolean;
+  env?: Record<string, string>;
+}
+
+interface VitteDebugJson {
+  debug?: VitteDebugSettings;
   toolchain?: { root?: string; runtime?: string };
-}>;
+}
 
 /** Read and parse JSON file into object. */
 async function readJsonFile<T = unknown>(uri: vscode.Uri): Promise<T | undefined> {
@@ -50,11 +52,11 @@ async function readVitteProjectConfig(): Promise<VitteDebugJson> {
     const pjson = await readJsonFile<Record<string, unknown>>(pkgUri);
     const vitteSection = pjson?.vitte;
     if (vitteSection && typeof vitteSection === 'object') {
-      const pick: VitteDebugJson = { debug: {}, toolchain: {} };
+      const pick: VitteDebugJson = {};
       const debugSection = (vitteSection as Record<string, unknown>).debug;
       const toolchainSection = (vitteSection as Record<string, unknown>).toolchain;
-      if (debugSection && typeof debugSection === 'object') pick.debug = debugSection as VitteDebugJson['debug'];
-      if (toolchainSection && typeof toolchainSection === 'object') pick.toolchain = toolchainSection as VitteDebugJson['toolchain'];
+      if (debugSection && typeof debugSection === 'object') pick.debug = { ...(debugSection as VitteDebugSettings) };
+      if (toolchainSection && typeof toolchainSection === 'object') pick.toolchain = { ...(toolchainSection as NonNullable<VitteDebugJson['toolchain']>) };
       results.push(pick);
     }
   }

@@ -63,21 +63,30 @@ export class DocsPanel implements vscode.Disposable {
   // ---- Config ----
   private loadSearchConfig(): SearchConfig {
     const cfg = vscode.workspace.getConfiguration('vitte');
-    const include = cfg.get<string>('docs.include') || '**/*.md';
-    const exclude = cfg.get<string>('docs.exclude') || '**/{node_modules,.git,dist,out,target,build}/**';
-    const limit = Math.max(100, Math.min(10000, cfg.get<number>('docs.indexLimit') || 2000));
+    const include = cfg.get<string>('docs.include') ?? '**/*.md';
+    const exclude = cfg.get<string>('docs.exclude') ?? '**/{node_modules,.git,dist,out,target,build}/**';
+    const indexLimit = cfg.get<number>('docs.indexLimit');
+    const limit = Math.max(100, Math.min(10000, indexLimit ?? 2000));
     return { include, exclude, limit };
   }
 
   // ---- Messaging ----
   private async onMessage(msg: unknown) {
-    const m = msg as { type?: string; q?: string; page?: number; pageSize?: number; href?: string; fsPath?: string };
+    if (!msg || typeof msg !== 'object') return;
+    const m = msg as Partial<{
+      type: string;
+      q: string;
+      page: number;
+      pageSize: number;
+      href: string;
+      fsPath: string;
+    }>;
     switch (m?.type) {
       case 'search': {
         await this.ensureIndex();
-        const q = String(m.q || '');
-        const page = Number.isInteger(m.page) ? (m.page as number) : 1;
-        const pageSize = Number.isInteger(m.pageSize) ? (m.pageSize as number) : 100;
+        const q = String(m.q ?? '');
+        const page = Number.isInteger(m.page) ? Number(m.page) : 1;
+        const pageSize = Number.isInteger(m.pageSize) ? Number(m.pageSize) : 100;
         const { items, total } = this.filterHits(q, page, pageSize);
         this.post({ type: 'results', items, total, page, pageSize, query: q });
         return;
@@ -99,7 +108,7 @@ export class DocsPanel implements vscode.Disposable {
   }
 
   private post(payload: unknown) {
-    this.panel.webview.postMessage(payload).then(undefined, () => {/* ignore */});
+    void this.panel.webview.postMessage(payload);
   }
 
   // ---- Render ----
@@ -142,11 +151,12 @@ export class DocsPanel implements vscode.Disposable {
       this.index = hits;
     } catch (err) {
       this.index = [];
-      void vscode.window.showWarningMessage(`Vitte Docs: indexation incomplète (${(err as Error).message || 'erreur inconnue'})`);
+      const reason = err instanceof Error ? err.message : 'erreur inconnue';
+      void vscode.window.showWarningMessage(`Vitte Docs: indexation incomplète (${reason})`);
     }
   }
 
-  private filterHits(query: string, page: number, pageSize: number): { items: Array<{ title: string; path: string; fsPath: string }>; total: number } {
+  private filterHits(query: string, page: number, pageSize: number): { items: { title: string; path: string; fsPath: string }[]; total: number } {
     if (!this.index) return { items: [], total: 0 };
     const q = query.trim().toLowerCase();
     let items: DocHit[];

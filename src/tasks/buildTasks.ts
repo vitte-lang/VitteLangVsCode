@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import * as cp from 'child_process';
 import { locateVitteRuntime } from '../debug/runtimeLocator';
 
@@ -31,26 +30,22 @@ export function registerBuildTasks(ctx: vscode.ExtensionContext) {
   );
 
   // Task provider — overload-safe, non-generic to avoid T-variance issues under strict settings
-  function provideTasks(token?: vscode.CancellationToken): vscode.ProviderResult<vscode.Task[]>;
-  function provideTasks(token: vscode.CancellationToken): vscode.ProviderResult<vscode.Task[]>;
-  function provideTasks(_token?: vscode.CancellationToken): vscode.ProviderResult<vscode.Task[]> {
-    const defs: Array<{ cmd: SubCmd; label: string }> = [
-      { cmd: 'build', label: 'Vitte Build' },
-      { cmd: 'run',   label: 'Vitte Run' },
-      { cmd: 'test',  label: 'Vitte Test' },
-      { cmd: 'clean', label: 'Vitte Clean' },
-    ];
-    return Promise.all(defs.map(async ({ cmd, label }) => {
-      const exec = new vscode.ShellExecution(await buildCommandLine(cmd));
-      const def: vscode.TaskDefinition = { type: 'vitte', command: cmd } as vscode.TaskDefinition;
-      return new vscode.Task(def, vscode.TaskScope.Workspace, label, 'vitte', exec);
-    }));
-  }
-
-  // Erase generic variance by typing via the non-generic index signatures
-  const provideTasksErased: vscode.TaskProvider['provideTasks'] = provideTasks as unknown as vscode.TaskProvider['provideTasks'];
-  const resolveTaskErased: vscode.TaskProvider['resolveTask'] = ((task: vscode.Task, _t?: vscode.CancellationToken) => task) as unknown as vscode.TaskProvider['resolveTask'];
-  const provider: vscode.TaskProvider = { provideTasks: provideTasksErased, resolveTask: resolveTaskErased };
+  const provider: vscode.TaskProvider = {
+    provideTasks: async () => {
+      const defs: { cmd: SubCmd; label: string }[] = [
+        { cmd: 'build', label: 'Vitte Build' },
+        { cmd: 'run',   label: 'Vitte Run' },
+        { cmd: 'test',  label: 'Vitte Test' },
+        { cmd: 'clean', label: 'Vitte Clean' },
+      ];
+      return Promise.all(defs.map(async ({ cmd, label }) => {
+        const exec = new vscode.ShellExecution(await buildCommandLine(cmd));
+        const definition: VitteTaskDefinition = { type: 'vitte', command: cmd };
+        return new vscode.Task(definition, vscode.TaskScope.Workspace, label, 'vitte', exec);
+      }));
+    },
+    resolveTask: (task) => task,
+  };
   ctx.subscriptions.push(vscode.tasks.registerTaskProvider('vitte', provider));
 }
 
@@ -58,13 +53,27 @@ export function registerBuildTasks(ctx: vscode.ExtensionContext) {
 
 type SubCmd = 'build' | 'clean' | 'run' | 'test';
 
-async function readProjectConfig(): Promise<any | undefined> {
+interface VitteBuildConfig {
+  build?: {
+    profile?: string;
+    distributed?: boolean;
+    incremental?: boolean;
+  };
+  targets?: (string | { triple?: string })[];
+}
+
+interface VitteTaskDefinition extends vscode.TaskDefinition {
+  type: 'vitte';
+  command: SubCmd;
+}
+
+async function readProjectConfig(): Promise<VitteBuildConfig | undefined> {
   try {
     const files = await vscode.workspace.findFiles('vitte.config.json', '**/node_modules/**', 1);
     const first = files[0];
     if (!first) return undefined;
     const doc = await vscode.workspace.openTextDocument(first);
-    return JSON.parse(doc.getText());
+    return JSON.parse(doc.getText()) as VitteBuildConfig;
   } catch {
     return undefined;
   }
@@ -72,22 +81,17 @@ async function readProjectConfig(): Promise<any | undefined> {
 
 async function buildBin(): Promise<string> {
   const located = await locateVitteRuntime();
-  return located.buildPath || 'vitte-build';
-}
-
-async function runtimeBin(): Promise<string> {
-  const located = await locateVitteRuntime();
-  return located.runtimePath || 'vitte-runtime';
+  return located.buildPath ?? 'vitte-build';
 }
 
 async function buildArgs(sub: SubCmd, extra?: { currentFile?: string }): Promise<string[]> {
   const cfg = vscode.workspace.getConfiguration('vitte');
   const project = await readProjectConfig();
 
-  const profile = (project?.build?.profile || cfg.get<string>('build.profile') || 'dev') as string;
-  const distributed = Boolean(project?.build?.distributed ?? cfg.get<boolean>('build.distributed'));
-  const incremental = Boolean(project?.build?.incremental ?? cfg.get<boolean>('build.incremental'));
-  const targets: string[] = collectTargets(project);
+  const profile = project?.build?.profile ?? cfg.get<string>('build.profile') ?? 'dev';
+  const distributed = (project?.build?.distributed ?? cfg.get<boolean>('build.distributed')) ?? false;
+  const incremental = (project?.build?.incremental ?? cfg.get<boolean>('build.incremental')) ?? false;
+  const targets = collectTargets(project);
 
   const args: string[] = [sub, '--profile', profile];
   if (distributed) args.push('--distributed');
@@ -102,13 +106,16 @@ async function buildArgs(sub: SubCmd, extra?: { currentFile?: string }): Promise
   return args;
 }
 
-function collectTargets(project?: any): string[] {
+function collectTargets(project?: VitteBuildConfig): string[] {
   const t = project?.targets;
   const out: string[] = [];
   if (Array.isArray(t)) {
     for (const x of t) {
       if (typeof x === 'string') out.push(x);
-      else if (x && typeof x.triple === 'string') out.push(x.triple);
+      else if (x && typeof x === 'object') {
+        const triple = (x as { triple?: unknown }).triple;
+        if (typeof triple === 'string') out.push(triple);
+      }
     }
   }
   return out;
@@ -153,8 +160,8 @@ async function runBuild(sub: SubCmd) {
     chan.appendLine(`[cmd] ${cmdLine}`);
     await new Promise<void>((resolve) => {
       const proc = cp.spawn(cmdLine, { cwd: root, shell: true, env: process.env });
-      proc.stdout?.on('data', (b) => chan.append(b.toString()));
-      proc.stderr?.on('data', (b) => chan.append(b.toString()));
+      proc.stdout?.on('data', (b: Buffer) => chan.append(b.toString()));
+      proc.stderr?.on('data', (b: Buffer) => chan.append(b.toString()));
       proc.on('error', (e) => { chan.appendLine(`\n[error] ${e.message}`); resolve(); });
       proc.on('close', (code) => { chan.appendLine(`\n[exit] code=${code}`); resolve(); });
     });
@@ -171,7 +178,7 @@ async function runTestCurrentFile() {
 
 async function cycleProfile() {
   const cfg = vscode.workspace.getConfiguration('vitte');
-  const current = (cfg.get<string>('build.profile') || 'dev').toLowerCase();
+  const current = (cfg.get<string>('build.profile') ?? 'dev').toLowerCase();
   const order = ['dev', 'test', 'release', 'bench'];
   const idx = order.indexOf(current);
   const next = order[(idx + 1) % order.length];

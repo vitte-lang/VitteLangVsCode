@@ -30,44 +30,55 @@ export function registerBenchTasks(ctx: vscode.ExtensionContext) {
     }),
   );
 
-  // Task provider — define a function with explicit overloads, then attach it
-  function provideTasks(token?: vscode.CancellationToken): vscode.ProviderResult<vscode.Task[]>;
-  function provideTasks(token: vscode.CancellationToken): vscode.ProviderResult<vscode.Task[]>;
-  function provideTasks(_token?: vscode.CancellationToken): vscode.ProviderResult<vscode.Task[]> {
-    return Promise.resolve().then(async () => {
+  const provider: vscode.TaskProvider = {
+    provideTasks: async () => {
       const cmd = await benchCommandLine();
-      const def: vscode.TaskDefinition = { type: 'vitte', command: 'bench' } as any;
+      const definition: VitteBenchTaskDefinition = { type: 'vitte', command: 'bench' };
       const task = new vscode.Task(
-        def,
+        definition,
         vscode.TaskScope.Workspace,
         'Vitte Bench',
         'vitte',
         new vscode.ShellExecution(cmd)
       );
       return [task];
-    });
-  }
-
-  // Anchor to non-generic TaskProvider to avoid T variance under exactOptionalPropertyTypes
-  const provideTasksErased: vscode.TaskProvider['provideTasks'] = provideTasks as unknown as vscode.TaskProvider['provideTasks'];
-  const resolveTaskErased: vscode.TaskProvider['resolveTask'] = ((task: vscode.Task, _token?: vscode.CancellationToken) => task) as unknown as vscode.TaskProvider['resolveTask'];
-  const provider: vscode.TaskProvider = { provideTasks: provideTasksErased, resolveTask: resolveTaskErased };
+    },
+    resolveTask: (task) => task,
+  };
   ctx.subscriptions.push(vscode.tasks.registerTaskProvider('vitte', provider));
+}
+
+interface VitteConfig {
+  build?: {
+    profile?: string;
+    distributed?: boolean;
+    incremental?: boolean;
+  };
+  bench?: {
+    reportDir?: string;
+    export?: unknown;
+    regressionThreshold?: number;
+  };
+}
+
+interface VitteBenchTaskDefinition extends vscode.TaskDefinition {
+  type: 'vitte';
+  command: 'bench';
 }
 
 // ---- Helpers ----
 async function benchBin(): Promise<string> {
   const located = await locateVitteRuntime();
-  return located.benchPath || 'vitte-bench';
+  return located.benchPath ?? 'vitte-bench';
 }
 
-async function readProjectConfig(): Promise<any | undefined> {
+async function readProjectConfig(): Promise<VitteConfig | undefined> {
   try {
     const files = await vscode.workspace.findFiles('vitte.config.json', '**/node_modules/**', 1);
     const uri = files[0];
     if (!uri) return undefined;
     const doc = await vscode.workspace.openTextDocument(uri);
-    return JSON.parse(doc.getText());
+    return JSON.parse(doc.getText()) as VitteConfig;
   } catch {
     return undefined;
   }
@@ -78,7 +89,7 @@ async function benchReportDir(): Promise<string | undefined> {
   const project = await readProjectConfig();
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) return undefined;
-  const reportDir = project?.bench?.reportDir || cfg.get<string>('bench.reportDir') || '.vitte/bench';
+  const reportDir = (project?.bench?.reportDir ?? cfg.get<string>('bench.reportDir')) ?? '.vitte/bench';
   return path.isAbsolute(reportDir) ? reportDir : path.join(root, reportDir);
 }
 
@@ -86,9 +97,9 @@ async function benchArgs(): Promise<string[]> {
   const cfg = vscode.workspace.getConfiguration('vitte');
   const project = await readProjectConfig();
 
-  const profile = (project?.build?.profile || cfg.get<string>('build.profile') || 'bench') as string;
-  const distributed = Boolean(project?.build?.distributed ?? cfg.get<boolean>('build.distributed'));
-  const incremental = Boolean(project?.build?.incremental ?? cfg.get<boolean>('build.incremental'));
+  const profile = project?.build?.profile ?? cfg.get<string>('build.profile') ?? 'bench';
+  const distributed = (project?.build?.distributed ?? cfg.get<boolean>('build.distributed')) ?? false;
+  const incremental = (project?.build?.incremental ?? cfg.get<boolean>('build.incremental')) ?? false;
   const reportDir = await benchReportDir();
 
   const args: string[] = ['--profile', profile];
@@ -97,9 +108,13 @@ async function benchArgs(): Promise<string[]> {
   if (reportDir) args.push('--out', reportDir);
 
   // Export formats from config
-  const exportKinds: string[] | undefined = project?.bench?.export;
-  if (Array.isArray(exportKinds) && exportKinds.length > 0) {
-    for (const k of exportKinds) args.push('--export', String(k));
+  const exportKinds = project?.bench?.export;
+  if (Array.isArray(exportKinds)) {
+    for (const kind of exportKinds) {
+      if (typeof kind === 'string') {
+        args.push('--export', kind);
+      }
+    }
   }
 
   // Regression threshold
@@ -138,8 +153,8 @@ async function runBench(openAfter: boolean) {
 
     await new Promise<void>((resolve) => {
       const proc = cp.spawn(cmd, { cwd: root, shell: true, env: process.env });
-      proc.stdout?.on('data', (b) => outChan.append(b.toString()));
-      proc.stderr?.on('data', (b) => outChan.append(b.toString()));
+      proc.stdout?.on('data', (b: Buffer) => outChan.append(b.toString()));
+      proc.stderr?.on('data', (b: Buffer) => outChan.append(b.toString()));
       proc.on('error', (e) => {
         outChan.appendLine(`\n[error] ${e.message}`);
         resolve();
@@ -181,7 +196,8 @@ async function openLatestReport() {
     }
     void vscode.commands.executeCommand('vscode.open', first.uri);
   } catch (e) {
-    void vscode.window.showWarningMessage(`Vitte Bench: échec d'ouverture du rapport (${(e as Error).message})`);
+    const message = e instanceof Error ? e.message : String(e);
+    void vscode.window.showWarningMessage(`Vitte Bench: échec d'ouverture du rapport (${message})`);
   }
 }
 

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as os from 'os';
 
 /** Lightweight FS helpers over vscode.workspace.fs (portable, no Node fs dependency). */
 export type MaybeUri = vscode.Uri | string;
@@ -74,7 +75,7 @@ export async function rmrf(target: MaybeUri): Promise<void> {
 }
 
 /** Read directory entries. */
-export async function listDir(dir: MaybeUri): Promise<Array<{ name: string; uri: vscode.Uri; type: vscode.FileType }>> {
+export async function listDir(dir: MaybeUri): Promise<{ name: string; uri: vscode.Uri; type: vscode.FileType }[]> {
   const uri = asUri(dir);
   try {
     const entries = await vscode.workspace.fs.readDirectory(uri);
@@ -110,7 +111,7 @@ export async function writeFileIfChanged(file: MaybeUri, text: string): Promise<
 }
 
 /** JSON helpers */
-export async function readJson<T = any>(file: MaybeUri): Promise<T | undefined> {
+export async function readJson<T = unknown>(file: MaybeUri): Promise<T | undefined> {
   try { return JSON.parse(await readFileText(file)) as T; } catch { return undefined; }
 }
 
@@ -131,8 +132,14 @@ export async function move(src: MaybeUri, dst: MaybeUri, overwrite = true): Prom
 }
 
 /** Find up: search for any of `names` from start → up to workspace root. */
-export async function findUp(names: string | string[], start?: MaybeUri): Promise<vscode.Uri | undefined> {
-  const list = Array.isArray(names) ? names : [names];
+export async function findUp(names: string | readonly string[], start?: MaybeUri): Promise<vscode.Uri | undefined> {
+  let list: string[];
+  if (Array.isArray(names)) {
+    const arr = names as readonly string[];
+    list = [...arr];
+  } else {
+    list = [names as string];
+  }
   const root = workspaceRoot()?.fsPath;
   let cur = asUri(start ?? workspaceRoot() ?? vscode.Uri.file(process.cwd())).fsPath;
   while (true) {
@@ -151,7 +158,7 @@ export async function findUp(names: string | string[], start?: MaybeUri): Promis
 /** Temp files under ${workspace}/.vitte/tmp or OS temp if no workspace. */
 export async function ensureTmpDir(): Promise<vscode.Uri> {
   const base = workspaceRoot()?.fsPath;
-  const dir = base ? path.join(base, '.vitte', 'tmp') : path.join(require('os').tmpdir(), 'vitte');
+  const dir = base ? path.join(base, '.vitte', 'tmp') : path.join(os.tmpdir(), 'vitte');
   await ensureDir(dir);
   return vscode.Uri.file(dir);
 }

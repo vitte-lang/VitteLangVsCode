@@ -287,7 +287,7 @@ function readStringArg(args: unknown[] | undefined, index: number): string | und
   return typeof v === "string" ? v : undefined;
 }
 
-function readObjectArg<T extends Record<string, unknown>>(args: unknown[] | undefined, index: number): T | undefined {
+function readObjectArg<T>(args: unknown[] | undefined, index: number): T | undefined {
   const v = args?.[index];
   return isRecord(v) ? (v as T) : undefined;
 }
