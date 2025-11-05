@@ -1,25 +1,34 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
 
+type SeverityKey = 'error' | 'warning' | 'information' | 'hint';
+
 // 🟩 Vitte: diagnostics view settings & helpers
 interface VitteDiagnosticsConfig {
   /** Allowed severities; when empty or undefined -> show all. */
-  severities?: Array<'error' | 'warning' | 'information' | 'hint'>;
+  severities?: SeverityKey[];
   /** Debounce delay in ms for refresh. */
   refreshDebounceMs?: number;
 }
 
-const DEFAULT_CFG: Required<VitteDiagnosticsConfig> = {
+const VALID_SEVERITIES: readonly SeverityKey[] = ['error', 'warning', 'information', 'hint'] as const;
+
+const DEFAULT_CFG: Readonly<Required<VitteDiagnosticsConfig>> = {
   severities: [],
   refreshDebounceMs: 150,
 };
 
 function readConfig(): Required<VitteDiagnosticsConfig> {
-  const cfg = vscode.workspace.getConfiguration('vitte').get<VitteDiagnosticsConfig>('diagnostics');
-  if (!cfg) return DEFAULT_CFG;
+  const cfg = vscode.workspace.getConfiguration('vitte').get<VitteDiagnosticsConfig>('diagnostics') ?? {};
+  const severities = Array.isArray(cfg.severities)
+    ? cfg.severities.filter((value): value is SeverityKey => VALID_SEVERITIES.includes(value as SeverityKey))
+    : [];
+  const refreshDebounceMs = typeof cfg.refreshDebounceMs === 'number'
+    ? Math.max(0, cfg.refreshDebounceMs)
+    : DEFAULT_CFG.refreshDebounceMs;
   return {
-    severities: Array.isArray(cfg.severities) ? cfg.severities.slice() as any : [],
-    refreshDebounceMs: typeof cfg.refreshDebounceMs === 'number' ? Math.max(0, cfg.refreshDebounceMs) : 150,
+    severities,
+    refreshDebounceMs,
   };
 }
 
@@ -33,10 +42,10 @@ function sevToName(s?: vscode.DiagnosticSeverity): 'error' | 'warning' | 'inform
   }
 }
 
-function matchesFilter(s: vscode.DiagnosticSeverity | undefined, allowed: string[]): boolean {
-  if (!allowed || allowed.length === 0) return true;
+function matchesFilter(s: vscode.DiagnosticSeverity | undefined, allowed: SeverityKey[]): boolean {
+  if (allowed.length === 0) return true;
   const name = sevToName(s);
-  return name !== 'unknown' && allowed.includes(name as any);
+  return name !== 'unknown' && allowed.includes(name);
 }
 
 function countBySeverity(list: AggregatedDiagnostic[]) {
@@ -52,12 +61,13 @@ function countBySeverity(list: AggregatedDiagnostic[]) {
   return { e, w, i, h };
 }
 
-function debounce<T extends (...args: any[]) => void>(fn: T, ms: number): T {
+function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T {
   let tid: NodeJS.Timeout | undefined;
-  return function(this: any, ...args: any[]) {
+  const debounced = function(this: ThisParameterType<T>, ...args: Parameters<T>) {
     if (tid) clearTimeout(tid);
     tid = setTimeout(() => fn.apply(this, args), ms);
-  } as T;
+  };
+  return debounced as T;
 }
 
 const SUPPORTED_EXTS = new Set([".vitte", ".vit", ".vitl"]);
@@ -157,6 +167,7 @@ class DiagnosticsTreeDataProvider implements vscode.TreeDataProvider<TreeNode>, 
     if (element instanceof FileNode) return element.children;
     return [];
   }
+
   dispose(): void {
     this.onDidChangeEmitter.dispose();
   }
@@ -223,12 +234,18 @@ function buildFileNodes(cfg: Required<VitteDiagnosticsConfig>): FileNode[] {
   }
 
   const perFile = Array.from(byFile.values())
-    .map(list => list.sort(compareDiagnostics))
+    .map(list => list.slice().sort(compareDiagnostics))
     .filter(list => list.length > 0);
 
   perFile.sort(compareFiles);
 
-  return perFile.map(list => new FileNode(list[0]!.uri, list, vscode.TreeItemCollapsibleState.Expanded));
+  return perFile.map(list => {
+    const [head] = list;
+    if (!head) {
+      throw new Error('Invariant: diagnostics list is empty');
+    }
+    return new FileNode(head.uri, list, vscode.TreeItemCollapsibleState.Expanded);
+  });
 }
 
 function collectDiagnostics(cfg: Required<VitteDiagnosticsConfig>): AggregatedDiagnostic[] {
@@ -267,17 +284,16 @@ function relativeLabel(uri: vscode.Uri | undefined): string {
 }
 
 function iconForSeverity(severity: vscode.DiagnosticSeverity | undefined): vscode.ThemeIcon {
-  const ctor = (vscode.ThemeIcon as unknown as { new(id: string): vscode.ThemeIcon });
   switch (severity) {
     case vscode.DiagnosticSeverity.Error:
-      return new ctor("error");
+      return new vscode.ThemeIcon("error");
     case vscode.DiagnosticSeverity.Warning:
-      return new ctor("warning");
+      return new vscode.ThemeIcon("warning");
     case vscode.DiagnosticSeverity.Information:
-      return new ctor("info");
+      return new vscode.ThemeIcon("info");
     case vscode.DiagnosticSeverity.Hint:
-      return new ctor("lightbulb");
+      return new vscode.ThemeIcon("lightbulb");
     default:
-      return new ctor("question");
+      return new vscode.ThemeIcon("question");
   }
 }

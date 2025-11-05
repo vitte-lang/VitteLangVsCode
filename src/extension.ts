@@ -317,15 +317,15 @@ function resolveServerModule(context: vscode.ExtensionContext): string {
     }
     logServerResolution(`Chemin de serveur personnalisé introuvable: ${cfgPath}`);
   }
-  const bundled = context.asAbsolutePath(path.join("out", "server.js"));
-  if (fs.existsSync(bundled)) {
-    logServerResolution(`Utilisation du serveur embarqué: ${bundled}`);
-    return bundled;
-  }
   const nested = context.asAbsolutePath(path.join("server", "out", "server.js"));
   if (fs.existsSync(nested)) {
     logServerResolution(`Utilisation du serveur empaqueté (server/out): ${nested}`);
     return nested;
+  }
+  const bundled = context.asAbsolutePath(path.join("out", "server.js"));
+  if (fs.existsSync(bundled)) {
+    logServerResolution(`Utilisation du serveur embarqué: ${bundled}`);
+    return bundled;
   }
   const message = "Module serveur Vitte introuvable (out/server.js ou server/out/server.js)";
   logServerResolution(message);

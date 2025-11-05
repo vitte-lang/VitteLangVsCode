@@ -2,16 +2,16 @@
   "name": "vitte-studio",
   "displayName": "Vitte Language Support",
   "description": "Support complet pour Vitte, Vit et Vitl : grammaire, LSP, debug, tasks, tests, explorer, docs, bench & playground.",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "publisher": "VitteStudio",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/roussov/vittelang-vscode.git"
+    "url": "https://github.com/roussov/VitteLangVsCode.git"
   },
-  "homepage": "https://github.com/roussov/vittelang-vscode#readme",
+  "homepage": "https://github.com/roussov/VitteLangVsCode#readme",
   "bugs": {
-    "url": "https://github.com/roussov/vittelang-vscode/issues"
+    "url": "https://github.com/roussov/VitteLangVsCode/issues"
   },
   "engines": {
     "vscode": "^1.105.0"
@@ -696,7 +696,7 @@
     "build:servercopy": "mkdir -p out && (cp server/out/server.js out/server.js || true)",
     "watch": "tsc -w -p ./",
     "compile": "npm run build",
-    "lint": "eslint src --ext ts",
+    "lint": "eslint .",
     "package": "vsce package",
     "vsix": "vsce package -o dist/vitte-studio.vsix",
     "vsix:verify": "vsce verify dist/vitte-studio.vsix",
@@ -708,11 +708,15 @@
     "test": "npm run build && node ./out/test/runTest.js"
   },
   "dependencies": {
-    "tough-cookie": "^6.0.0",
-    "vscode-languageclient": "^9.0.1",
-    "vscode-nls": "^5.2.0",
     "azure-devops-node-api": "^11.2.0",
-    "typed-rest-client": "^2.1.0"
+    "tough-cookie": "^6.0.0",
+    "typed-rest-client": "^2.1.0",
+    "vscode-jsonrpc": "^8.2.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-nls": "^5.2.0",
+    "vscode-uri": "^3.0.8"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -726,6 +730,7 @@
     "mocha": "^11.7.4",
     "prettier": "^3.6.2",
     "rimraf": "^6.0.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.3"
   }
 }

@@ -9,14 +9,16 @@
 // - Hover concis sur mots-clés
 
 import {
+  MarkupKind,
+  SemanticTokensBuilder,
+} from "vscode-languageserver/node";
+import type {
   Position,
   Hover,
-  MarkupKind,
   SemanticTokensLegend,
-  SemanticTokensBuilder,
   SemanticTokens,
 } from "vscode-languageserver/node";
-import { TextDocument } from "vscode-languageserver-textdocument";
+import type { TextDocument } from "vscode-languageserver-textdocument";
 import { RESERVED_WORDS } from "./languageFacts.js";
 
 /* ------------------------------ Legend stable ----------------------------- */
@@ -131,7 +133,7 @@ export function buildSemanticTokens(doc: TextDocument): SemanticTokens {
   const nlIdx = buildLineIndex(text);
 
   // On collecte d’abord tous les spans, puis on trie, puis on émet
-  type Span = { start: number; end: number; type: number };
+  interface Span { start: number; end: number; type: number; }
   const spans: Span[] = [];
 
   // 1) commentaires et chaînes (priorité forte)
@@ -209,11 +211,11 @@ function wordAt(doc: TextDocument, pos: Position): string | null {
 }
 
 // Scan lexical: collecte commentaires/chaînes et construit un masque code
-function scanLex(text: string): { mask: Uint8Array; strings: Array<[number, number]>; comments: Array<[number, number]> } {
+function scanLex(text: string): { mask: Uint8Array; strings: [number, number][]; comments: [number, number][] } {
   const n = text.length;
   const mask = new Uint8Array(n); // 1 = code, 0 = non-code
-  const strings: Array<[number, number]> = [];
-  const comments: Array<[number, number]> = [];
+  const strings: [number, number][] = [];
+  const comments: [number, number][] = [];
 
   let i = 0;
   const markCode = (from: number, to: number) => { for (let k = from; k < to; k++) mask[k] = 1; };
@@ -337,7 +339,7 @@ function addDeclSpans(
   rx: RegExp,
   group: number,
   tokenTypeIndex: number,
-  spans: Array<{ start: number; end: number; type: number }>
+  spans: { start: number; end: number; type: number }[]
 ) {
   rx.lastIndex = 0;
   let m: RegExpExecArray | null;
@@ -350,7 +352,7 @@ function addDeclSpans(
   }
 }
 
-function insertSpan(spans: Array<{ start: number; end: number; type: number }>, start: number, end: number, type: number) {
+function insertSpan(spans: { start: number; end: number; type: number }[], start: number, end: number, type: number) {
   if (end <= start) return;
   // éviter les chevauchements: si recouvrement détecté, on ignore la nouvelle plage
   for (const s of spans) {

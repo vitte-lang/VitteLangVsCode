@@ -35,7 +35,7 @@ export function measureEol(text: string): EolStats {
   let cr = 0;
 
   // Fast path: short‑circuit when there is no CR at all.
-  if (text.indexOf('\r') === -1) {
+  if (!text.includes('\r')) {
     for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) lf++;
     return { lf, crlf, cr, lastLineHasTerminator: text.endsWith('\n') };
   }
@@ -117,7 +117,7 @@ export function isTerminated(text: string): boolean {
  */
 export function normalizeEol(text: string, eol: EolKind): string {
   if (eol === 'auto') return text;
-  let work = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const work = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   if (eol === 'lf') return work;
   return work.replace(/\n/g, CRLF);
 }
@@ -326,8 +326,8 @@ export function normalizeRange(a: Range): Range {
 // ---------------------------------------------------------------------------
 
 /** Splits text and returns pairs [line, delimiter] where delimiter is one of "\n", "\r\n", "\r" or "" for the last line. */
-export function splitLinesWithDelimiters(text: string): Array<{ line: string; delim: '' | typeof LF | typeof CRLF | typeof CR }>{
-  const out: Array<{ line: string; delim: '' | typeof LF | typeof CRLF | typeof CR }> = [];
+export function splitLinesWithDelimiters(text: string): { line: string; delim: '' | typeof LF | typeof CRLF | typeof CR }[] {
+  const out: { line: string; delim: '' | typeof LF | typeof CRLF | typeof CR }[] = [];
   let buf = '';
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
@@ -345,11 +345,11 @@ export function splitLinesWithDelimiters(text: string): Array<{ line: string; de
 }
 
 /** Joins result of splitLinesWithDelimiters, optionally overriding delimiter kind. */
-export function joinLinesPreserveLastTerminator(parts: Array<{ line: string; delim: '' | typeof LF | typeof CRLF | typeof CR }>, eol: EolKind): string {
+export function joinLinesPreserveLastTerminator(parts: { line: string; delim: '' | typeof LF | typeof CRLF | typeof CR }[], eol: EolKind): string {
   const sep = eol === 'crlf' ? CRLF : LF; // auto → LF
   let out = '';
-  for (let i = 0; i < parts.length; i++) {
-    const { line, delim } = parts[i];
+  for (const part of parts) {
+    const { line, delim } = part;
     const useDelim = delim === '' ? '' : sep; // Preserve presence of last terminator, but convert kind.
     out += line + useDelim;
   }

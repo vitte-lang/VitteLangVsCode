@@ -139,9 +139,6 @@ export function registerModuleExplorerView(context: vscode.ExtensionContext): Mo
     vscode.commands.registerCommand("vitte.modules.refresh", async () => {
       await provider.refresh();
     }),
-    vscode.commands.registerCommand("vitte.refreshExplorer", async () => {
-      await provider.refresh();
-    }),
     vscode.commands.registerCommand("vitte.modules.openSymbol", async (symbol: vscode.SymbolInformation) => {
       if (!symbol?.location) return;
       const doc = await vscode.workspace.openTextDocument(symbol.location.uri);

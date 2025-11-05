@@ -8,9 +8,16 @@
 import {
   createConnection,
   ProposedFeatures,
+  TextDocumentSyncKind,
+  TextDocuments,
+  TextEdit,
+  DidChangeConfigurationNotification,
+  FileChangeType,
+} from "vscode-languageserver/node";
+import type {
+  Connection,
   InitializeParams,
   InitializeResult,
-  TextDocumentSyncKind,
   CompletionParams,
   CompletionItem,
   HoverParams,
@@ -18,8 +25,6 @@ import {
   DocumentSymbolParams,
   DocumentSymbol,
   DocumentFormattingParams,
-  Diagnostic,
-  TextDocuments,
   SemanticTokensParams,
   SemanticTokensLegend,
   WorkspaceSymbolParams,
@@ -30,11 +35,9 @@ import {
   RenameParams,
   PrepareRenameParams,
   Range,
-  TextEdit,
   WorkspaceEdit,
-  DidChangeConfigurationNotification,
   CancellationToken,
-  FileChangeType,
+  RemoteWorkspace,
 } from "vscode-languageserver/node";
 import { TextDocument } from "vscode-languageserver-textdocument";
 
@@ -54,9 +57,14 @@ import { lintToPublishable } from "./lint.js";
 import { registerCommands } from "./commands.js";
 import { indexDocument as indexWorkspaceDocument, removeDocument as removeWorkspaceDocument, clearIndex } from "./indexer.js";
 
+const createSemanticTokens: (doc: TextDocument) => SemanticTokens = buildSemanticTokens;
+
 /* --------------------------- Connexion + documents ------------------------ */
-const connection = createConnection(ProposedFeatures.all);
-const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
+const connection: Connection = createConnection(ProposedFeatures.all);
+const documents = new TextDocuments<TextDocument>(TextDocument);
+function emptySemanticTokens(): SemanticTokens {
+  return { data: [] };
+}
 
 /* ------------------------------- Configuration --------------------------- */
 interface ServerSettings {
@@ -100,7 +108,7 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
   };
 
   if (hasWorkspaceFoldersCapability) {
-    (result.capabilities as any).workspace = { workspaceFolders: { supported: true } };
+    result.capabilities.workspace = { workspaceFolders: { supported: true } };
   }
   return result;
 });
@@ -108,13 +116,13 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 connection.onInitialized(() => {
   registerCommands(connection);
   if (hasConfigurationCapability) {
-    connection.client.register(DidChangeConfigurationNotification.type, undefined);
+    void connection.client.register(DidChangeConfigurationNotification.type, undefined);
   }
   // Watch classiques pour compat large versions du client
   connection.onDidChangeWatchedFiles((change) => {
     for (const ev of change.changes) {
       if (ev.type === FileChangeType.Deleted) {
-        connection.sendDiagnostics({ uri: ev.uri, diagnostics: [] });
+        void connection.sendDiagnostics({ uri: ev.uri, diagnostics: [] });
       }
     }
   });
@@ -127,11 +135,12 @@ connection.onShutdown(() => {
 });
 
 /* ------------------------------- Config updates --------------------------- */
-connection.onDidChangeConfiguration(async () => {
-  if (hasConfigurationCapability) {
+async function applyConfiguration(): Promise<void> {
+  const workspace = Reflect.get(connection, "workspace") as RemoteWorkspace | undefined;
+  if (hasConfigurationCapability && workspace) {
     try {
-      const cfg = await connection.workspace.getConfiguration({ section: "vitte" });
-      globalSettings = { ...DEFAULT_SETTINGS, ...(cfg as Partial<ServerSettings>) };
+      const cfg = await workspace.getConfiguration({ section: "vitte" }) as Partial<ServerSettings> | null | undefined;
+      globalSettings = { ...DEFAULT_SETTINGS, ...(cfg ?? {}) };
     } catch {
       globalSettings = { ...DEFAULT_SETTINGS };
     }
@@ -139,6 +148,10 @@ connection.onDidChangeConfiguration(async () => {
     globalSettings = { ...DEFAULT_SETTINGS };
   }
   for (const doc of documents.all()) scheduleLint(doc);
+}
+
+connection.onDidChangeConfiguration(() => {
+  void applyConfiguration();
 });
 
 /* --------------------------------- Guards -------------------------------- */
@@ -214,22 +227,27 @@ connection.onWorkspaceSymbol((params: WorkspaceSymbolParams, token?: Cancellatio
 
 connection.languages.semanticTokens.on((params: SemanticTokensParams, token?: CancellationToken) => {
   const doc = documents.get(params.textDocument.uri);
-  if (!doc || cancelled(token)) return { data: [] } as any;
-  if (tooLarge(doc)) return { data: [] } as any;
-  try { return buildSemanticTokens(doc); } catch (e) { logErr("semanticTokens", e); return { data: [] } as any; }
+  if (!doc || cancelled(token)) return Promise.resolve(emptySemanticTokens());
+  if (tooLarge(doc)) return Promise.resolve(emptySemanticTokens());
+  try {
+    return Promise.resolve(createSemanticTokens(doc));
+  } catch (e) {
+    logErr("semanticTokens", e);
+    return Promise.resolve(emptySemanticTokens());
+  }
 });
 
 /* -------------------------------- Diagnostics ----------------------------- */
 const lintTimers = new Map<string, NodeJS.Timeout>();
 
-async function runLint(doc: TextDocument): Promise<void> {
+function runLint(doc: TextDocument): void {
   try {
-    if (tooLarge(doc)) { connection.sendDiagnostics({ uri: doc.uri, diagnostics: [] }); return; }
+    if (tooLarge(doc)) { void connection.sendDiagnostics({ uri: doc.uri, diagnostics: [] }); return; }
     const text = doc.getText();
     const uri = doc.uri;
     const t0 = now();
-    const diags = (lintToPublishable(text, uri) ?? []) as Diagnostic[];
-    connection.sendDiagnostics({ uri, diagnostics: diags });
+    const diags = lintToPublishable(text, uri) ?? [];
+    void connection.sendDiagnostics({ uri, diagnostics: diags });
     metric("lint", t0, uri, diags.length);
   } catch (e) {
     logErr("lint", e);
@@ -241,7 +259,7 @@ function scheduleLint(doc: TextDocument): void {
   const delay = Math.max(0, globalSettings.lintDebounceMs | 0);
   const prev = lintTimers.get(key);
   if (prev) clearTimeout(prev);
-  lintTimers.set(key, setTimeout(() => void runLint(doc), delay));
+  lintTimers.set(key, setTimeout(() => runLint(doc), delay));
 }
 
 /* --------------------------------- Events -------------------------------- */
@@ -250,7 +268,7 @@ documents.onDidOpen((e) => { indexWorkspaceDocument(e.document); scheduleLint(e.
 documents.onDidChangeContent((e) => { indexWorkspaceDocument(e.document); scheduleLint(e.document); });
 documents.onDidClose((e) => {
   removeWorkspaceDocument(e.document.uri);
-  connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
+  void connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
   lintTimers.delete(e.document.uri);
 });
 
@@ -261,14 +279,18 @@ connection.listen();
 
 /* --------------------------------- Utils --------------------------------- */
 
-function now(): bigint | number { return typeof process !== "undefined" && (process as any).hrtime?.bigint ? (process as any).hrtime.bigint() : Date.now(); }
+function now(): number {
+  if (typeof process !== "undefined" && typeof process.hrtime === "function") {
+    const [sec, nanosec] = process.hrtime();
+    return sec * 1000 + nanosec / 1e6;
+  }
+  return Date.now();
+}
 
-function metric(what: string, t0: bigint | number, uri: string, n?: number) {
-  const end = now();
-  let ms: number;
-  if (typeof t0 === "bigint" && typeof end === "bigint") ms = Number(end - t0) / 1e6; else ms = (end as number) - (t0 as number);
+function metric(what: string, startMs: number, uri: string, n?: number) {
   if (globalSettings.trace !== "verbose") return;
-  connection.console.log(`[metric] ${what} ${ms.toFixed(1)}ms uri=${uri}${typeof n === "number" ? ` n=${n}` : ""}`);
+  const elapsed = now() - startMs;
+  connection.console.log(`[metric] ${what} ${elapsed.toFixed(1)}ms uri=${uri}${typeof n === "number" ? ` n=${n}` : ""}`);
 }
 
 function logErr(ctx: string, err: unknown) {

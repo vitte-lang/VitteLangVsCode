@@ -55,8 +55,8 @@ const state: ConfigState = {
 
 export function initConfigFromInitialize(params: InitializeParams): ConfigState {
   const capabilities = params.capabilities;
-  state.hasConfigurationCapability = !!(capabilities.workspace && capabilities.workspace.configuration);
-  state.hasWorkspaceFolderCapability = !!(capabilities.workspace && capabilities.workspace.workspaceFolders);
+  state.hasConfigurationCapability = Boolean(capabilities.workspace?.configuration);
+  state.hasWorkspaceFolderCapability = Boolean(capabilities.workspace?.workspaceFolders);
   return { ...state };
 }
 
@@ -78,12 +78,12 @@ export function getFormattingSettings(connection: Connection, resourceUri: strin
   }
   let result = documentSettings.get(resourceUri);
   if (!result) {
-    result = connection.workspace.getConfiguration({
+    const request = connection.workspace.getConfiguration({
       scopeUri: resourceUri,
       section: 'vitte.formatting',
-    }) as Thenable<FormattingSettings>;
+    }) as Thenable<Partial<FormattingSettings> | null | undefined>;
     // Wrap with validation/normalization before caching result to callers.
-    result = result.then((raw) => validateAndNormalizeFormatting(raw));
+    result = request.then(raw => validateAndNormalizeFormatting(raw ?? undefined));
     documentSettings.set(resourceUri, result);
   }
   return result;
@@ -103,21 +103,21 @@ export function validateAndNormalizeFormatting(raw: Partial<FormattingSettings> 
   if (!raw || typeof raw !== 'object') return out;
 
   // tabSize
-  if (Number.isFinite((raw as any).tabSize)) {
-    const v = Math.max(1, Math.min(16, Math.floor((raw as any).tabSize)));
+  if (typeof raw.tabSize === 'number' && Number.isFinite(raw.tabSize)) {
+    const v = Math.max(1, Math.min(16, Math.floor(raw.tabSize)));
     out.tabSize = v;
   }
   // insertSpaces
-  if (typeof (raw as any).insertSpaces === 'boolean') out.insertSpaces = !!(raw as any).insertSpaces;
+  if (typeof raw.insertSpaces === 'boolean') out.insertSpaces = raw.insertSpaces;
   // trimTrailingWhitespace
-  if (typeof (raw as any).trimTrailingWhitespace === 'boolean') out.trimTrailingWhitespace = !!(raw as any).trimTrailingWhitespace;
+  if (typeof raw.trimTrailingWhitespace === 'boolean') out.trimTrailingWhitespace = raw.trimTrailingWhitespace;
   // insertFinalNewline
-  if (typeof (raw as any).insertFinalNewline === 'boolean') out.insertFinalNewline = !!(raw as any).insertFinalNewline;
+  if (typeof raw.insertFinalNewline === 'boolean') out.insertFinalNewline = raw.insertFinalNewline;
   // eol
-  const eol = (raw as any).eol;
+  const eol = raw.eol;
   if (eol === 'lf' || eol === 'crlf' || eol === 'auto') out.eol = eol;
   // detectMixedIndentation
-  if (typeof (raw as any).detectMixedIndentation === 'boolean') out.detectMixedIndentation = !!(raw as any).detectMixedIndentation;
+  if (typeof raw.detectMixedIndentation === 'boolean') out.detectMixedIndentation = raw.detectMixedIndentation;
 
   return out;
 }
