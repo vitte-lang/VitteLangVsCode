@@ -1,20 +1,20 @@
 // lint.ts — Linter minimal pour Vitte/Vitl (LSP), robuste, configurable, directives inline
 
 import {
-  Diagnostic,
   DiagnosticSeverity,
   Range,
   Position,
 } from "vscode-languageserver/node";
+import type { Diagnostic } from "vscode-languageserver/node";
 import { RESERVED_WORDS } from "./languageFacts.js";
 
 /* ============================== Config ==================================== */
 
-export type LintOptions = {
+export interface LintOptions {
   maxLineLength?: number;                // 120 par défaut
   allowTabs?: boolean;                   // false par défaut
   allowTrailingWhitespace?: boolean;     // false par défaut
-};
+}
 
 const DEFAULTS: Required<LintOptions> = {
   maxLineLength: 120,
@@ -69,7 +69,7 @@ function isRuleId(x: string): x is RuleId {
 }
 
 type DisableMap = Map<number, Set<RuleId>>;
-interface DisableRanges { byRule: Map<RuleId, Array<{ start: number; end: number }>>; }
+interface DisableRanges { byRule: Map<RuleId, { start: number; end: number }[]>; }
 
 interface Pragmas {
   overrides: Partial<LintOptions>;
@@ -103,9 +103,9 @@ export function lintText(
     }
 
     if (!isDisabled(i, RULES.TrailingWhitespace, lineDisables, blockDisables)) {
-      if (!cfg.allowTrailingWhitespace && rxTrailingWS.test(line)) {
-        const m = line.match(rxTrailingWS)!;
-        const start = m.index ?? (line.length - m[0].length);
+      const trailing = rxTrailingWS.exec(line);
+      if (!cfg.allowTrailingWhitespace && trailing) {
+        const start = trailing.index ?? (line.length - trailing[0].length);
         diags.push(diag(i, start, i, line.length,
           "Espaces en fin de ligne.",
           DiagnosticSeverity.Hint, uri, RULES.TrailingWhitespace));
@@ -121,7 +121,7 @@ export function lintText(
     }
 
     if (!isDisabled(i, RULES.Todo, lineDisables, blockDisables)) {
-      const todo = line.match(rxTodo);
+      const todo = rxTodo.exec(line);
       if (todo) {
         const idx = todo.index ?? 0;
         diags.push(diag(i, idx, i, idx + todo[0].length,
@@ -236,7 +236,7 @@ function checkIdentifiersAndKeywords(
     if (!isDisabled(i, RULES.Number, lineDisables, blockDisables)) {
       for (const m of L.matchAll(rxNumber)) {
         const tok = m[0];
-        if (/__/.test(tok) || /^_/.test(tok) || /_$/.test(tok)) {
+        if (tok.includes("__") || tok.startsWith("_") || tok.endsWith("_")) {
           const s = m.index ?? 0;
           diags.push(diag(i, s, i, s + tok.length,
             "Littéral numérique invalide (underscore mal placé).",
@@ -346,7 +346,7 @@ function collectDisables(text: string): { lineDisables: DisableMap; blockDisable
 
   // Bloc: /* vitte-lint:disable rule */ ... /* vitte-lint:enable */
   const blockRx = /\/\*\s*vitte-lint:(disable|enable)\s*([^*]*)\*\//gi;
-  const events: Array<{ line: number; kind: "disable" | "enable"; rules: string[] }> = [];
+  const events: { line: number; kind: "disable" | "enable"; rules: string[] }[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     let m: RegExpExecArray | null;

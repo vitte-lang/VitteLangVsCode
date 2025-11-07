@@ -36,7 +36,7 @@ suite("Vitte extension", () => {
     api = extension.exports as ExtensionTestApi;
   });
 
-  test("Extension s’active sans erreur", async () => {
+  test("Extension s’active sans erreur", () => {
     assert.ok(extension, "Extension non initialisée");
     assert.ok(extension.isActive, "Extension non active après activation");
     assert.ok(api, "API de test non exposée par l’extension");
@@ -57,10 +57,11 @@ suite("Vitte extension", () => {
   });
 
   test("La commande restart redémarre le client", async () => {
-    assert.ok(api, "API de test non disponible");
+    const testApi = api;
+    assert.ok(testApi, "API de test non disponible");
     await vscode.commands.executeCommand("vitte.restartServer");
-    await waitUntil(() => api!.getStatusText().startsWith("$(check)"), 8000);
-    const tooltip = api!.getStatusTooltip().toLowerCase();
+    await waitUntil(() => testApi.getStatusText().startsWith("$(check)"), 8000);
+    const tooltip = testApi.getStatusTooltip().toLowerCase();
     assert.ok(
       tooltip.includes("opérationnel") || tooltip.includes("running"),
       "Le statut du client n’indique pas qu’il est démarré"
@@ -72,20 +73,21 @@ suite("Vitte extension", () => {
   });
 
   test("La commande runAction déclenche l’action sélectionnée", async () => {
-    assert.ok(api, "API de test non disponible");
+    const testApi = api;
+    assert.ok(testApi, "API de test non disponible");
 
     const disposables: vscode.Disposable[] = [];
     let formatCalled = false;
 
     disposables.push(
-      vscode.commands.registerCommand("editor.action.formatDocument", async () => {
+      vscode.commands.registerCommand("editor.action.formatDocument", () => {
         formatCalled = true;
       })
     );
 
     const windowAny = vscode.window as unknown as { showQuickPick: (...args: unknown[]) => Thenable<unknown> };
     const originalQuickPick = windowAny.showQuickPick;
-    windowAny.showQuickPick = async () => ({
+    windowAny.showQuickPick = () => Promise.resolve({
       label: "Format document",
       description: "editor.action.formatDocument",
       action: "format",
@@ -108,23 +110,14 @@ suite("Vitte extension", () => {
     assert.ok(formatCalled, "La commande de formatage n’a pas été appelée");
   });
 
-  test("Une résolution sans serveur signale une erreur explicite", async () => {
-    assert.ok(extension, "Extension non initialisée");
-    assert.ok(api, "API de test non disponible");
-
-    const capturedLogs: string[] = [];
-
-    const logDescriptor = Object.getOwnPropertyDescriptor(console, "log");
-    const stubbedLog: typeof console.log = (...args: unknown[]) => {
-      capturedLogs.push(args.map(String).join(" "));
-      if (typeof logDescriptor?.value === "function") {
-        logDescriptor.value.apply(console, args as []);
-      }
-    };
-    Object.defineProperty(console, "log", { value: stubbedLog, configurable: true });
+  test("Une résolution sans serveur signale une erreur explicite", () => {
+    const ext = extension;
+    assert.ok(ext, "Extension non initialisée");
+    const testApi = api;
+    assert.ok(testApi, "API de test non disponible");
 
     const fakeRoot = path.join(
-      extension!.extensionPath,
+      ext.extensionPath,
       ".test-missing-server",
       Date.now().toString(36)
     );
@@ -133,20 +126,9 @@ suite("Vitte extension", () => {
       asAbsolutePath: (relPath: string) => path.join(fakeRoot, relPath),
     } as Pick<vscode.ExtensionContext, "asAbsolutePath">;
 
-    try {
-      assert.throws(
-        () => api!.resolveServerModuleForTest(fakeContext),
-        /Module serveur Vitte introuvable/
-      );
-    } finally {
-      if (logDescriptor) {
-        Object.defineProperty(console, "log", logDescriptor);
-      }
-    }
-
-    assert.ok(
-      capturedLogs.some((msg) => msg.includes("Module serveur Vitte introuvable")),
-      "Le journal ne contient pas le message d’erreur attendu"
+    assert.throws(
+      () => testApi.resolveServerModuleForTest(fakeContext),
+      /Module serveur Vitte introuvable/
     );
   });
 });

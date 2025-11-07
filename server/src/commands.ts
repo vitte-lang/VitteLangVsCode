@@ -3,13 +3,11 @@
  * Inspiré de C/C++, rust-analyzer, TypeScript
  * -------------------------------------------------------------------------- */
 
-import {
+import { TextEdit, Range, Position } from "vscode-languageserver/node";
+import type {
   Connection,
   ExecuteCommandParams,
   WorkspaceEdit,
-  TextEdit,
-  Range,
-  Position,
   InitializeParams,
   ClientCapabilities
 } from "vscode-languageserver/node";
@@ -67,13 +65,18 @@ interface ApplyEditSampleArgs {
  * API d’enregistrement + capabilities
  * ========================================= */
 
+interface CommandResult {
+  ok: boolean;
+}
+
 export function registerCommands(connection: Connection): CommandId[] {
   connection.onExecuteCommand(async (params: ExecuteCommandParams) => {
     try {
       return await handleCommand(connection, params);
-    } catch (err: any) {
-      connection.console.error(`Erreur commande ${params.command}: ${err?.message ?? String(err)}`);
-      await connection.window.showErrorMessage(`Commande "${params.command}": ${err?.message ?? String(err)}`);
+    } catch (err: unknown) {
+      const message = formatError(err);
+      connection.console.error(`Erreur commande ${params.command}: ${message}`);
+      connection.window.showErrorMessage(`Commande "${params.command}": ${message}`);
       return null;
     }
   });
@@ -96,8 +99,9 @@ export function logClientCaps(params: InitializeParams, connection: Connection) 
  * Dispatcher central
  * ========================================= */
 
-async function handleCommand(connection: Connection, params: ExecuteCommandParams): Promise<any> {
-  const { command, arguments: args } = params;
+async function handleCommand(connection: Connection, params: ExecuteCommandParams): Promise<CommandResult | null> {
+  const { command, arguments: rawArgs } = params;
+  const args = Array.isArray(rawArgs) ? (rawArgs as unknown[]) : undefined;
 
   switch (command) {
     case VITTE_COMMANDS.SHOW_SERVER_LOG:
@@ -160,7 +164,7 @@ async function handleCommand(connection: Connection, params: ExecuteCommandParam
 
     case VITTE_COMMANDS.SHOW_INFO: {
       const msg = readStringArg(args, 0) ?? "Vitte: message d'information.";
-      await connection.window.showInformationMessage(msg);
+      connection.window.showInformationMessage(msg);
       return ok();
     }
 
@@ -174,7 +178,7 @@ async function handleCommand(connection: Connection, params: ExecuteCommandParam
  * Implémentations (stubs réalistes)
  * ========================================= */
 
-function debugRunFile(connection: Connection, uri?: string) {
+function debugRunFile(connection: Connection, uri?: string): CommandResult {
   if (!uri) {
     connection.console.error("🐞 debug.runFile: aucun fichier fourni.");
     return fail();
@@ -183,7 +187,7 @@ function debugRunFile(connection: Connection, uri?: string) {
   return ok();
 }
 
-function debugAttach(connection: Connection, a: DebugAttachArgs) {
+function debugAttach(connection: Connection, a: DebugAttachArgs): CommandResult {
   const host = a.host ?? "127.0.0.1";
   const port = a.port ?? 6009;
   const timeout = a.timeoutMs ?? 10_000;
@@ -192,7 +196,7 @@ function debugAttach(connection: Connection, a: DebugAttachArgs) {
 }
 
 /** Formatage: exemple d’édition — insère un header au début du fichier ou de la plage */
-async function formatDocument(connection: Connection, arg?: FormatArgs) {
+async function formatDocument(connection: Connection, arg?: FormatArgs): Promise<CommandResult> {
   if (!arg) return ok();
   const { uri, range } = normalizeFormatArgs(arg);
   const where = range ? range.start : Position.create(0, 0);
@@ -207,7 +211,7 @@ async function formatDocument(connection: Connection, arg?: FormatArgs) {
 }
 
 /** Organize imports: squelette — à remplacer par analyse réelle */
-async function organizeImports(connection: Connection, uri?: string) {
+async function organizeImports(connection: Connection, uri?: string): Promise<CommandResult> {
   if (!uri) return ok();
   connection.console.log(`📦 Organize imports sur ${uri}`);
 
@@ -226,7 +230,7 @@ async function organizeImports(connection: Connection, uri?: string) {
 }
 
 /** Fix all: correctif générique d’exemple */
-async function fixAllProblems(connection: Connection, uri?: string) {
+async function fixAllProblems(connection: Connection, uri?: string): Promise<CommandResult> {
   if (!uri) return ok();
   connection.console.log(`🛠 Fix all sur ${uri}`);
 
@@ -238,7 +242,7 @@ async function fixAllProblems(connection: Connection, uri?: string) {
 }
 
 /** Rename: démo — remplacer par une indexation et documentChanges réels */
-async function renameSymbol(connection: Connection, uri: string, newName: string) {
+async function renameSymbol(connection: Connection, uri: string, newName: string): Promise<CommandResult> {
   connection.console.log(`✏️ Rename dans ${uri} → ${newName}`);
 
   const edit: WorkspaceEdit = {
@@ -249,7 +253,7 @@ async function renameSymbol(connection: Connection, uri: string, newName: string
 }
 
 /** Exemple d’édition paramétrable via settings (headerText) */
-async function applyEditSample(connection: Connection, uri: string, headerText?: string) {
+async function applyEditSample(connection: Connection, uri: string, headerText?: string): Promise<CommandResult> {
   const text = headerText ?? "// edited by Vitte LSP\n";
   const edit: WorkspaceEdit = {
     changes: { [uri]: [TextEdit.insert(Position.create(0, 0), text)] }
@@ -259,7 +263,7 @@ async function applyEditSample(connection: Connection, uri: string, headerText?:
 }
 
 /** Démo de progression serveur → client */
-async function progressSample(connection: Connection) {
+async function progressSample(connection: Connection): Promise<CommandResult> {
   const progress = await connection.window.createWorkDoneProgress();
   progress.begin("Vitte: préparation", 0, "initialisation…", true);
   await delay(300);
@@ -270,7 +274,7 @@ async function progressSample(connection: Connection) {
   progress.report(90, "presque terminé…");
   await delay(200);
   progress.done();
-  await connection.window.showInformationMessage("Vitte: tâche terminée.");
+  connection.window.showInformationMessage("Vitte: tâche terminée.");
   return ok();
 }
 
@@ -278,27 +282,31 @@ async function progressSample(connection: Connection) {
  * Utilitaires génériques
  * ========================================= */
 
-function readStringArg(args: any[] | undefined, index: number): string | undefined {
+function readStringArg(args: unknown[] | undefined, index: number): string | undefined {
   const v = args?.[index];
   return typeof v === "string" ? v : undefined;
 }
 
-function readObjectArg<T>(args: any[] | undefined, index: number): T | undefined {
+function readObjectArg<T>(args: unknown[] | undefined, index: number): T | undefined {
   const v = args?.[index];
-  return v && typeof v === "object" ? (v as T) : undefined;
+  return isRecord(v) ? (v as T) : undefined;
 }
 
-function readUri(args: any[] | undefined, index: number): string | undefined {
+function readUri(args: unknown[] | undefined, index: number): string | undefined {
   const uri = readStringArg(args, index);
   if (!uri) return undefined;
   if (uri.startsWith("file://") || uri.includes("://")) return uri;
   return "file://" + uri;
 }
 
-function readFormatArgs(args: any[] | undefined, index: number): FormatArgs | undefined {
+function readFormatArgs(args: unknown[] | undefined, index: number): FormatArgs | undefined {
   const v = args?.[index];
   if (typeof v === "string") return v;
-  if (v && typeof v === "object" && typeof (v as any).uri === "string") return v as FormatArgs;
+  if (isRecord(v) && typeof v.uri === "string") {
+    const candidateRange = (v as { range?: unknown }).range;
+    const range = isRangeLike(candidateRange) ? candidateRange : undefined;
+    return { uri: v.uri, range };
+  }
   return undefined;
 }
 
@@ -315,12 +323,48 @@ function normalizeFormatArgs(arg: FormatArgs): { uri: string; range?: Range } {
 }
 
 function safeJson(v: unknown): string {
-  try { return JSON.stringify(v); } catch { return String(v); }
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
 }
 
-function delay(ms: number) {
+function formatError(err: unknown): string {
+  if (err instanceof Error && typeof err.message === "string") {
+    return err.message;
+  }
+  return String(err);
+}
+
+function delay(ms: number): Promise<void> {
   return new Promise<void>(r => setTimeout(r, ms));
 }
 
-function ok() { return { ok: true }; }
-function fail() { return { ok: false }; }
+function ok(): CommandResult {
+  return { ok: true };
+}
+
+function fail(): CommandResult {
+  return { ok: false };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isPosLike(value: unknown): value is PosLike {
+  return (
+    isRecord(value) &&
+    typeof value.line === "number" &&
+    typeof value.character === "number"
+  );
+}
+
+function isRangeLike(value: unknown): value is RangeLike {
+  return (
+    isRecord(value) &&
+    isPosLike(value.start) &&
+    isPosLike(value.end)
+  );
+}

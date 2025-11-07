@@ -2,7 +2,7 @@
 
 // Import minimal côté serveur LSP.
 import { TextDocument } from "vscode-languageserver-textdocument";
-import {
+import type {
   DocumentSymbol as LspDocumentSymbol,
   Location as LspLocation,
   Position as LspPosition,
@@ -49,98 +49,463 @@ type Uri = string;
 /** Index global: uri -> liste de symboles */
 const INDEX = new Map<Uri, IndexedSymbol[]>();
 
-/* ============================================================================
- * Règles d’extraction (regex heuristiques)
- * ========================================================================== */
+interface DeclarationInfo {
+  kind: SK;
+  expectBody: boolean;
+  allowBodyless?: boolean;
+}
 
-const PATTERNS: Array<{ rx: RegExp; kind: SK; nameGroup: number }> = [
-  { rx: /^\s*(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SK.Namespace, nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+(?:"[^"]*"\s+)?)?fn\s+([A-Za-z_]\w*)/gm, kind: SK.Function, nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)/gm,         kind: SK.Struct,    nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?enum\s+([A-Za-z_]\w*)/gm,           kind: SK.Enum,      nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)/gm,          kind: SK.Interface, nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?type\s+([A-Za-z_]\w*)/gm,           kind: SK.Interface, nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SK.Variable,  nameGroup: 1 },
-  { rx: /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)/gm,          kind: SK.Constant,  nameGroup: 1 },
-];
+interface PendingBody {
+  symbolIndex: number;
+  allowBodyless: boolean;
+  startOffset: number;
+  bodyOffset?: number;
+}
 
-/* ============================================================================
- * Extraction principale
- * ========================================================================== */
+type BodyExpectation =
+  | { kind: "body"; offset: number }
+  | { kind: "none" }
+  | { kind: "unknown" };
 
-/**
- * Extrait des symboles et approxime leur portée par analyse d’accolades.
- * Robuste aux chaînes et commentaires simples `//`.
- */
-function extract(doc: TextDocument): IndexedSymbol[] {
-  const text = doc.getText();
-  const syms: IndexedSymbol[] = [];
+const DECLARATIONS = new Map<string, DeclarationInfo>([
+  ["module", { kind: SK.Namespace, expectBody: true, allowBodyless: true }],
+  ["mod", { kind: SK.Namespace, expectBody: true, allowBodyless: true }],
+  ["struct", { kind: SK.Struct, expectBody: true }],
+  ["enum", { kind: SK.Enum, expectBody: true }],
+  ["trait", { kind: SK.Interface, expectBody: true }],
+  ["type", { kind: SK.Interface, expectBody: false }],
+  ["impl", { kind: SK.Class, expectBody: true }],
+  ["fn", { kind: SK.Function, expectBody: true, allowBodyless: true }],
+  ["let", { kind: SK.Variable, expectBody: false }],
+  ["const", { kind: SK.Constant, expectBody: false }],
+]);
 
-  // 1) Déclarations
-  for (const { rx, kind, nameGroup } of PATTERNS) {
-    rx.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = rx.exec(text))) {
-      const name = m[nameGroup];
-      if (!name) continue;
-      const pos = doc.positionAt(m.index);
-      syms.push({
-        name,
-        kind,
-        uri: doc.uri,
-        line: pos.line,
-        character: pos.character,
-      });
-      if (m[0].length === 0) rx.lastIndex++;
+const MODIFIERS = new Set([
+  "pub",
+  "async",
+  "unsafe",
+  "extern",
+  "default",
+  "export",
+  "final",
+  "abstract",
+  "virtual",
+  "override",
+  "static",
+]);
+
+class SymbolParser {
+  private readonly text: string;
+  private readonly masked: string;
+  private readonly length: number;
+  private readonly symbols: IndexedSymbol[] = [];
+  private readonly braceStack: { symbolIndex: number | null; offset: number }[] = [];
+  private readonly pendingBodies: PendingBody[] = [];
+  private readonly activeSymbols: number[] = [];
+  private pos = 0;
+
+  constructor(private readonly doc: TextDocument) {
+    this.text = doc.getText();
+    this.masked = maskNonCode(this.text);
+    this.length = this.masked.length;
+  }
+
+  parse(): IndexedSymbol[] {
+    while (this.pos < this.length) {
+      const ch = this.masked[this.pos];
+
+      if (isWhitespace(ch)) {
+        this.pos++;
+        continue;
+      }
+
+      if (ch === "#") {
+        this.skipAttribute();
+        continue;
+      }
+
+      if (ch === "{") {
+        this.handleOpenBrace();
+        this.pos++;
+        continue;
+      }
+
+      if (ch === "}") {
+        this.handleCloseBrace();
+        this.pos++;
+        continue;
+      }
+
+      if (ch === ";") {
+        this.handleSemicolon();
+        this.pos++;
+        continue;
+      }
+
+      if (isIdentifierStart(ch)) {
+        const keywordStart = this.pos;
+        const word = this.readWord();
+        if (!word) {
+          this.pos++;
+          continue;
+        }
+
+        const lower = word.toLowerCase();
+
+        if (MODIFIERS.has(lower)) {
+          this.skipModifierTail(lower);
+          continue;
+        }
+
+        const decl = DECLARATIONS.get(lower);
+        if (decl) {
+          this.handleDeclaration(lower, keywordStart, decl);
+          continue;
+        }
+
+        continue;
+      }
+
+      this.pos++;
+    }
+
+    return this.symbols;
+  }
+
+  private handleDeclaration(keyword: string, startOffset: number, info: DeclarationInfo): void {
+    const name = this.readSymbolName(keyword);
+    if (!name) return;
+
+    const startPos = this.doc.positionAt(startOffset);
+    const sym: IndexedSymbol = {
+      name,
+      kind: info.kind,
+      uri: this.doc.uri,
+      line: startPos.line,
+      character: startPos.character,
+    };
+
+    const container = this.currentContainer();
+    if (container) {
+      sym.containerName = container.name;
+    }
+
+    const index = this.symbols.push(sym) - 1;
+
+    if (info.expectBody) {
+      const expectation = this.probeBodyOffset(info, this.pos);
+      if (expectation.kind === "body") {
+        this.pendingBodies.push({
+          symbolIndex: index,
+          allowBodyless: !!info.allowBodyless,
+          startOffset,
+          bodyOffset: expectation.offset,
+        });
+      } else if (expectation.kind === "unknown") {
+        this.pendingBodies.push({
+          symbolIndex: index,
+          allowBodyless: !!info.allowBodyless,
+          startOffset,
+        });
+      }
     }
   }
 
-  // 2) Approximation de fin de portée via pile d’accolades, en ignorant les chaînes et // commentaires.
-  const lines = text.split(/\r?\n/);
-  const openStack: Array<{ line: number; ch: number; symIdx: number | null }> = [];
-  const startsByLine = mapStartsByLine(syms);
+  private readSymbolName(keyword: string): string | undefined {
+    switch (keyword) {
+      case "module":
+      case "mod":
+        return this.readQualifiedName();
+      case "struct":
+      case "enum":
+      case "trait":
+      case "type":
+        this.skipTrivia();
+        return this.readIdentifierToken();
+      case "impl":
+        return this.readImplSignature();
+      case "fn":
+        this.skipTrivia();
+        return this.readFunctionName();
+      case "let":
+        return this.readLetName();
+      case "const":
+        return this.readConstName();
+      default:
+        return undefined;
+    }
+  }
 
-  for (let ln = 0; ln < lines.length; ln++) {
-    const raw = lines[ln];
-    const code = stripLineComment(raw);
+  private readQualifiedName(): string | undefined {
+    const segments: string[] = [];
+    while (true) {
+      this.skipTrivia();
+      const segment = this.readIdentifierToken();
+      if (!segment) break;
+      segments.push(segment);
 
-    // Associer les symboles qui commencent sur ln au conteneur courant
-    if (startsByLine.has(ln)) {
-      const containerName = topContainer(openStack, syms);
-      for (const idx of startsByLine.get(ln)!) {
-        if (containerName) syms[idx].containerName = containerName;
+      const saved = this.pos;
+      this.skipTrivia();
+      if (this.masked[this.pos] === ":" && this.masked[this.pos + 1] === ":") {
+        this.pos += 2;
+        continue;
       }
+      this.pos = saved;
+      break;
+    }
+    return segments.length ? segments.join("::") : undefined;
+  }
+
+  private readFunctionName(): string | undefined {
+    return this.readIdentifierToken();
+  }
+
+  private readLetName(): string | undefined {
+    this.skipTrivia();
+    this.consumeKeyword("mut");
+    this.skipTrivia();
+    return this.readIdentifierToken();
+  }
+
+  private readConstName(): string | undefined {
+    this.skipTrivia();
+    return this.readIdentifierToken();
+  }
+
+  private readImplSignature(): string | undefined {
+    this.skipTrivia();
+    const start = this.pos;
+
+    let depthAngle = 0;
+    let depthParen = 0;
+    let lastNonWs = start;
+
+    while (this.pos < this.length) {
+      const ch = this.masked[this.pos];
+      if (ch === "{") break;
+      if (ch === ";") break;
+
+      if (ch === "<") depthAngle++;
+      else if (ch === ">") depthAngle = Math.max(0, depthAngle - 1);
+      else if (ch === "(") depthParen++;
+      else if (ch === ")") depthParen = Math.max(0, depthParen - 1);
+      else if (!depthAngle && !depthParen && this.matchKeywordAt(this.pos, "where")) {
+        break;
+      }
+
+      if (!isWhitespace(ch)) lastNonWs = this.pos;
+      this.pos++;
     }
 
-    // Scanner accolades en ignorant les chaînes
-    let i = 0;
-    let inStr: "'" | '"' | null = null;
-    while (i < code.length) {
-      const ch = code[i];
-      if (inStr) {
-        if (ch === "\\") { i += 2; continue; }
-        if (ch === inStr) inStr = null;
-        i++; continue;
-      }
-      if (ch === "'" || ch === '"') { inStr = ch; i++; continue; }
+    const end = Math.min(lastNonWs + 1, this.pos);
+    const raw = this.text.slice(start, end).trim();
+    const normalized = raw.replace(/\s+/g, " ");
+    return normalized ? `impl ${normalized}` : "impl";
+  }
 
-      if (ch === "{") {
-        openStack.push({ line: ln, ch: i, symIdx: nearestSymbolBeforeLine(syms, ln) });
-      } else if (ch === "}") {
-        const top = openStack.pop();
-        if (top && top.symIdx != null) {
-          const s = syms[top.symIdx];
-          // Conserver la plus grande étendue rencontrée
-          s.endLine = s.endLine !== undefined ? Math.max(s.endLine, ln) : ln;
-          s.endCharacter = i;
+  private readIdentifierToken(): string | undefined {
+    if (!isIdentifierStart(this.masked[this.pos])) return undefined;
+    const start = this.pos;
+    this.pos++;
+    while (this.pos < this.length && isIdentifierPart(this.masked[this.pos])) {
+      this.pos++;
+    }
+    const raw = this.text.slice(start, this.pos);
+    const trimmed = raw.trim();
+    return trimmed ? trimmed : undefined;
+  }
+
+  private consumeKeyword(word: string): boolean {
+    const saved = this.pos;
+    const token = this.readWord();
+    if (token && token.toLowerCase() === word) {
+      this.skipTrivia();
+      return true;
+    }
+    this.pos = saved;
+    return false;
+  }
+
+  private readWord(): string {
+    const start = this.pos;
+    while (this.pos < this.length && isIdentifierPart(this.masked[this.pos])) {
+      this.pos++;
+    }
+    return this.masked.slice(start, this.pos);
+  }
+
+  private skipModifierTail(word: string): void {
+    if (word === "pub") {
+      this.skipTrivia();
+      if (this.masked[this.pos] === "(") {
+        this.pos = this.skipBalancedFrom(this.pos, "(", ")");
+        this.skipTrivia();
+      }
+    }
+  }
+
+  private skipBalancedFrom(index: number, open: string, close: string): number {
+    let depth = 0;
+    let i = index;
+    while (i < this.length) {
+      const ch = this.masked[i];
+      if (ch === open) depth++;
+      else if (ch === close) {
+        depth--;
+        if (depth === 0) return i + 1;
+      }
+      i++;
+    }
+    return this.length;
+  }
+
+  private skipAttribute(): void {
+    let i = this.pos + 1;
+    if (i < this.length && this.masked[i] === "!") {
+      i++;
+    }
+    while (i < this.length && isWhitespace(this.masked[i])) i++;
+    if (i >= this.length || this.masked[i] !== "[") {
+      this.pos++;
+      return;
+    }
+    const end = this.skipBalancedFrom(i, "[", "]");
+    this.pos = Math.max(end, i + 1);
+  }
+
+  private skipTrivia(): void {
+    while (this.pos < this.length && isWhitespace(this.masked[this.pos])) {
+      this.pos++;
+    }
+  }
+
+  private currentContainer(): IndexedSymbol | undefined {
+    if (!this.activeSymbols.length) return undefined;
+    return this.symbols[this.activeSymbols[this.activeSymbols.length - 1]];
+  }
+
+  private handleOpenBrace(): void {
+    const currentOffset = this.pos;
+    let matchedIndex = -1;
+    for (let i = this.pendingBodies.length - 1; i >= 0; i--) {
+      const pending = this.pendingBodies[i];
+      if (pending.bodyOffset !== undefined && pending.bodyOffset !== currentOffset) {
+        continue;
+      }
+      matchedIndex = i;
+      break;
+    }
+
+    let symbolIndex: number | null = null;
+    if (matchedIndex >= 0) {
+      const [pending] = this.pendingBodies.splice(matchedIndex, 1);
+      symbolIndex = pending.symbolIndex;
+      this.activeSymbols.push(symbolIndex);
+    }
+
+    this.braceStack.push({ symbolIndex, offset: currentOffset });
+  }
+
+  private handleCloseBrace(): void {
+    const frame = this.braceStack.pop();
+    if (!frame) return;
+    if (frame.symbolIndex != null) {
+      const pos = this.doc.positionAt(this.pos);
+      const sym = this.symbols[frame.symbolIndex];
+      sym.endLine = pos.line;
+      sym.endCharacter = pos.character + 1;
+
+      const idx = this.activeSymbols.lastIndexOf(frame.symbolIndex);
+      if (idx >= 0) this.activeSymbols.splice(idx, 1);
+    }
+  }
+
+  private handleSemicolon(): void {
+    const current = this.pos;
+    for (let i = this.pendingBodies.length - 1; i >= 0; i--) {
+      const pending = this.pendingBodies[i];
+      if (!pending.allowBodyless) continue;
+      if (pending.bodyOffset !== undefined && pending.bodyOffset <= current) continue;
+      this.pendingBodies.splice(i, 1);
+      break;
+    }
+  }
+
+  private matchKeywordAt(pos: number, keyword: string): boolean {
+    if (pos + keyword.length > this.length) return false;
+    const slice = this.masked.slice(pos, pos + keyword.length).toLowerCase();
+    if (slice !== keyword) return false;
+
+    const before = pos > 0 ? this.masked[pos - 1] : "";
+    const after = pos + keyword.length < this.length ? this.masked[pos + keyword.length] : "";
+    if ((before && isIdentifierPart(before)) || (after && isIdentifierPart(after))) {
+      return false;
+    }
+    return true;
+  }
+
+  private probeBodyOffset(info: DeclarationInfo, start: number): BodyExpectation {
+    let i = start;
+    let depthParen = 0;
+    let depthAngle = 0;
+    let depthBracket = 0;
+
+    while (i < this.length) {
+      const ch = this.masked[i];
+      if (ch === "(") {
+        depthParen++;
+        i++;
+        continue;
+      }
+      if (ch === ")") {
+        if (depthParen > 0) depthParen--;
+        i++;
+        continue;
+      }
+      if (ch === "<") {
+        depthAngle++;
+        i++;
+        continue;
+      }
+      if (ch === ">") {
+        if (depthAngle > 0) depthAngle--;
+        i++;
+        continue;
+      }
+      if (ch === "[") {
+        depthBracket++;
+        i++;
+        continue;
+      }
+      if (ch === "]") {
+        if (depthBracket > 0) depthBracket--;
+        i++;
+        continue;
+      }
+      if (isWhitespace(ch)) {
+        i++;
+        continue;
+      }
+      if (!depthParen && !depthAngle && !depthBracket) {
+        if (ch === "{") return { kind: "body", offset: i };
+        if (ch === ";") {
+          return info.allowBodyless ? { kind: "none" } : { kind: "unknown" };
+        }
+        if (ch === "=") {
+          return { kind: "none" };
         }
       }
       i++;
     }
-  }
 
-  // 3) Déduplication
-  return dedupe(syms, (s) => `${s.kind}:${s.name}:${s.line}:${s.character}`);
+    return { kind: "unknown" };
+  }
+}
+
+function extract(doc: TextDocument): IndexedSymbol[] {
+  const parser = new SymbolParser(doc);
+  const symbols = parser.parse();
+  return dedupe(symbols, (s) => `${s.kind}:${s.name}:${s.line}:${s.character}`);
 }
 
 /* ============================================================================
@@ -280,57 +645,6 @@ export function findReferences(_uri: string, name: string, limit = 500): Indexed
  * Utilitaires internes
  * ========================================================================== */
 
-function mapStartsByLine(syms: IndexedSymbol[]): Map<number, number[]> {
-  const m = new Map<number, number[]>();
-  syms.forEach((s, i) => {
-    const arr = m.get(s.line) ?? [];
-    arr.push(i);
-    m.set(s.line, arr);
-  });
-  return m;
-}
-
-function topContainer(stack: Array<{ symIdx: number | null }>, syms: IndexedSymbol[]): string | undefined {
-  for (let i = stack.length - 1; i >= 0; i--) {
-    const idx = stack[i].symIdx;
-    if (idx != null) return syms[idx].name;
-  }
-  return undefined;
-}
-
-function nearestSymbolBeforeLine(list: IndexedSymbol[], line: number): number | null {
-  let bestIdx: number | null = null;
-  let bestDelta = Infinity;
-  for (let i = 0; i < list.length; i++) {
-    const d = line - list[i].line;
-    if (d >= 0 && d < bestDelta) {
-      bestDelta = d;
-      bestIdx = i;
-    }
-  }
-  return bestIdx;
-}
-
-function stripLineComment(line: string): string {
-  // Retire "//..." hors chaînes pour ne pas fausser le comptage d’accolades
-  let i = 0;
-  let inStr: "'" | '"' | null = null;
-  while (i < line.length) {
-    const ch = line[i];
-    if (inStr) {
-      if (ch === "\\") { i += 2; continue; }
-      if (ch === inStr) inStr = null;
-      i++; continue;
-    }
-    if (ch === "'" || ch === '"') { inStr = ch; i++; continue; }
-    if (ch === "/" && i + 1 < line.length && line[i + 1] === "/") {
-      return line.slice(0, i);
-    }
-    i++;
-  }
-  return line;
-}
-
 function inRange(pos: { line: number; character: number }, s: IndexedSymbol): boolean {
   const startOk =
     pos.line > s.line || (pos.line === s.line && pos.character >= s.character);
@@ -406,4 +720,117 @@ function dedupe<T>(arr: T[], key: (t: T) => string): T[] {
     out.push(x);
   }
   return out;
+}
+
+function maskNonCode(src: string): string {
+  const chars = Array.from(src);
+  const len = chars.length;
+  let i = 0;
+
+  const blank = (idx: number) => {
+    if (idx >= 0 && idx < len && chars[idx] !== "\n") {
+      chars[idx] = " ";
+    }
+  };
+
+  while (i < len) {
+    const ch = chars[i];
+
+    if (ch === "/" && i + 1 < len && chars[i + 1] === "/") {
+      blank(i);
+      blank(i + 1);
+      i += 2;
+      while (i < len && chars[i] !== "\n") {
+        blank(i);
+        i++;
+      }
+      continue;
+    }
+
+    if (ch === "/" && i + 1 < len && chars[i + 1] === "*") {
+      blank(i);
+      blank(i + 1);
+      i += 2;
+      while (i + 1 < len && !(chars[i] === "*" && chars[i + 1] === "/")) {
+        if (chars[i] !== "\n") chars[i] = " ";
+        i++;
+      }
+      if (i < len) {
+        blank(i);
+        i++;
+      }
+      if (i < len) {
+        blank(i);
+        i++;
+      }
+      continue;
+    }
+
+    if (ch === "'" || ch === "\"") {
+      const quote = ch;
+      blank(i);
+      i++;
+      while (i < len) {
+        const current = chars[i];
+        if (current === "\n") {
+          i++;
+          break;
+        }
+        blank(i);
+        if (current === quote && chars[i - 1] !== "\\") {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    if (ch === "r") {
+      let j = i + 1;
+      while (j < len && chars[j] === "#") j++;
+      if (j < len && chars[j] === "\"") {
+        const hashCount = j - (i + 1);
+        const terminator = "\"" + "#".repeat(hashCount);
+        blank(i);
+        for (let t = i + 1; t <= j; t++) blank(t);
+        let k = j + 1;
+        while (k < len) {
+          if (chars[k] === "\n") {
+            k++;
+            continue;
+          }
+          if (src.startsWith(terminator, k)) {
+            for (let t = 0; t < terminator.length; t++) {
+              blank(k + t);
+            }
+            k += terminator.length;
+            break;
+          }
+          blank(k);
+          k++;
+        }
+        i = k;
+        continue;
+      }
+    }
+
+    i++;
+  }
+
+  return chars.join("");
+}
+
+function isWhitespace(ch: string | undefined): boolean {
+  return ch === " " || ch === "\t" || ch === "\r" || ch === "\n" || ch === "\f";
+}
+
+function isIdentifierStart(ch: string | undefined): boolean {
+  if (!ch) return false;
+  return /[A-Za-z_]/.test(ch);
+}
+
+function isIdentifierPart(ch: string | undefined): boolean {
+  if (!ch) return false;
+  return /[A-Za-z0-9_]/.test(ch);
 }

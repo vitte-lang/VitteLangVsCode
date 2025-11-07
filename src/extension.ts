@@ -10,9 +10,8 @@ import * as path from "node:path";
 import * as fs from "node:fs";
 import * as vscode from "vscode";
 import { registerDiagnosticsView } from "./diagnosticsView";
-import { registerModuleExplorerView, ModuleExplorerProvider } from "./moduleExplorerView";
+import { registerModuleExplorerView } from "./moduleExplorerView";
 import { VitteProjectTreeProvider } from "./providers/tree/projectTree";
-import { DocsPanel } from "./providers/docsPanel";
 import { PlaygroundPanel } from "./providers/playgroundPanel";
 import { registerBuildTasks } from "./tasks/buildTasks";
 import { registerBenchTasks } from "./tasks/benchTasks";
@@ -22,11 +21,13 @@ import { registerDebugConfigurationProvider } from "./debug/configurationProvide
 import { registerTelemetry } from "./utils/telemetry";
 import {
   LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
   TransportKind,
   RevealOutputChannelOn,
   State as ClientState,
+} from "vscode-languageclient/node";
+import type {
+  LanguageClientOptions,
+  ServerOptions,
   DocumentSelector,
   ProvideDocumentFormattingEditsSignature,
 } from "vscode-languageclient/node";
@@ -34,13 +35,11 @@ import {
   summarizeWorkspaceDiagnostics,
   diagnosticsLevel,
   formatDiagnosticsSummary,
-  DiagnosticsSummary,
 } from "./utils/diagnostics";
 
 let client: LanguageClient | undefined;
 let output: vscode.OutputChannel;
 let statusItem: vscode.StatusBarItem;
-let moduleExplorer: ModuleExplorerProvider | undefined;
 
 let statusBaseIcon = "$(rocket)";
 const STATUS_LABEL = "Vitte";
@@ -68,13 +67,13 @@ const WATCH_PATTERNS = [
   "**/vitl.toml",
   "**/.vitlconfig"
 ] as const;
+const LANGUAGE_SET = new Set<string>(LANGUAGES);
 
 let fileWatchers: vscode.FileSystemWatcher[] = [];
 
 function logServerResolution(message: string): void {
   const text = `[vitte] ${message}`;
   output?.appendLine(text);
-  console.log(text);
 }
 
 function applyStatusBar(): void {
@@ -262,10 +261,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     vscode.commands.registerCommand("vitte.showInfo", async () => {
       const cfg = vscode.workspace.getConfiguration("vitte");
       const trace = cfg.get<string>("trace.server", "off");
-      void vscode.window.showInformationMessage(`Vitte LSP — trace: ${trace}`);
+      await vscode.window.showInformationMessage(`Vitte LSP — trace: ${trace}`);
     }),
-    vscode.commands.registerCommand("vitte.debug.runFile", async () => runDebugCurrentFile()),
-    vscode.commands.registerCommand("vitte.debug.attachServer", async () => attachDebugServer()),
+    vscode.commands.registerCommand("vitte.debug.runFile", async () => { await runDebugCurrentFile(); }),
+    vscode.commands.registerCommand("vitte.debug.attachServer", async () => { await attachDebugServer(); }),
   );
 
   // Mise à jour du statut selon l’éditeur actif
@@ -281,7 +280,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 
   // Vue diagnostics dédiée (débutants/avancés)
   registerDiagnosticsView(context);
-  moduleExplorer = registerModuleExplorerView(context);
+  registerModuleExplorerView(context);
   context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(() => refreshDiagnosticsStatus()));
 
   if (process.env.VSCODE_TESTING === "1") {
@@ -290,8 +289,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       getStatusTooltip: () => {
         const tip = statusItem?.tooltip;
         if (typeof tip === "string") return tip;
-        if (tip && typeof tip !== "string") {
-          return (tip as vscode.MarkdownString).value ?? "";
+        if (tip instanceof vscode.MarkdownString) {
+          return tip.value ?? "";
         }
         return "";
       },
@@ -331,15 +330,15 @@ function resolveServerModule(context: vscode.ExtensionContext): string {
     }
     logServerResolution(`Chemin de serveur personnalisé introuvable: ${cfgPath}`);
   }
-  const bundled = context.asAbsolutePath(path.join("out", "server.js"));
-  if (fs.existsSync(bundled)) {
-    logServerResolution(`Utilisation du serveur embarqué: ${bundled}`);
-    return bundled;
-  }
   const nested = context.asAbsolutePath(path.join("server", "out", "server.js"));
   if (fs.existsSync(nested)) {
     logServerResolution(`Utilisation du serveur empaqueté (server/out): ${nested}`);
     return nested;
+  }
+  const bundled = context.asAbsolutePath(path.join("out", "server.js"));
+  if (fs.existsSync(bundled)) {
+    logServerResolution(`Utilisation du serveur embarqué: ${bundled}`);
+    return bundled;
   }
   const message = "Module serveur Vitte introuvable (out/server.js ou server/out/server.js)";
   logServerResolution(message);
@@ -424,9 +423,7 @@ function wireClientState(c: LanguageClient): void {
     const text = typeof msg?.text === "string" ? msg.text : undefined;
     const tooltip = typeof msg?.tooltip === "string" ? msg.tooltip : undefined;
     if (text !== undefined || tooltip !== undefined) {
-      if (text !== undefined) statusOverrideText = text;
-      if (tooltip !== undefined) statusOverrideTooltip = tooltip;
-      applyStatusBar();
+      setStatusOverride(text, tooltip);
     }
   });
 
@@ -444,7 +441,7 @@ async function runBuiltinAction(action: string): Promise<void> {
     return;
   }
   const languageId = editor.document.languageId;
-  if (!(LANGUAGES as readonly string[]).includes(languageId)) {
+  if (!LANGUAGE_SET.has(languageId)) {
     void vscode.window.showWarningMessage("Les actions Vitte ne sont disponibles que pour les fichiers Vitte/Vitl.");
     return;
   }
@@ -471,7 +468,7 @@ function sleep(ms: number): Promise<void> { return new Promise(res => setTimeout
 
 function updateStatusText(editor?: vscode.TextEditor): void {
   const lang = editor?.document?.languageId;
-  if (lang && (LANGUAGES as readonly string[]).includes(lang)) {
+  if (lang && LANGUAGE_SET.has(lang)) {
     setStatusLanguageSuffix(lang);
     return;
   }
@@ -503,7 +500,11 @@ async function attachDebugServer(): Promise<void> {
     type: "vitl",
     name: "Vitl: Attach",
     request: "attach",
-    port: Number(portStr) | 0
-  } as vscode.DebugConfiguration;
+    port: Number.parseInt(portStr, 10),
+  };
+  if (!Number.isInteger(cfg.port) || (cfg.port as number) <= 0) {
+    void vscode.window.showErrorMessage("Port Vitl invalide.");
+    return;
+  }
   await vscode.debug.startDebugging(folder, cfg);
 }

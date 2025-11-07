@@ -161,7 +161,7 @@ export function wordAtPosition(
   text: string,
   pos: Position,
   lineStarts = indexLineStarts(text),
-  re: RegExp = /[A-Za-z0-9_]+/g
+  re = /[A-Za-z0-9_]+/g
 ): WordAtResult | null {
   const line = clamp(pos.line, 0, indexLineStarts(text).length - 1);
   const lineStart = lineStarts[line];
@@ -349,8 +349,7 @@ export function isBlankLine(text: string, line: number, starts = indexLineStarts
 }
 export function indentationLevelOf(lineText: string, tabSize = 2): number {
   let col = 0;
-  for (let i = 0; i < lineText.length; i++) {
-    const ch = lineText[i];
+  for (const ch of lineText) {
     if (ch === ' ') col += 1; else if (ch === '\t') col += tabSize; else break;
   }
   return col;
@@ -361,17 +360,18 @@ export function normalizeIndentation(text: string, insertSpaces: boolean, tabSiz
   const unit = insertSpaces ? ' '.repeat(Math.max(1, tabSize)) : '\t';
   const lines = fastSplitLines(text);
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^(\s*)/);
+    const m = /^(\s*)/.exec(lines[i]);
     if (!m) continue;
     const lead = m[1];
     if (insertSpaces) {
       // Tabs → spaces
-      const tabs = lead.match(/^\t+/)?.[0] ?? '';
+      const tabMatch = /^\t+/.exec(lead);
+      const tabs = tabMatch?.[0] ?? '';
       if (tabs) lines[i] = tabs.split('').map(() => unit).join('') + lines[i].slice(tabs.length);
     } else {
       // Spaces → tabs (groups of tabSize)
       const re = new RegExp(`^(?: {${Math.max(1, tabSize)}})+`);
-      const mm = lead.match(re);
+      const mm = re.exec(lead);
       if (mm) {
         const spaces = mm[0].length; const tabs = Math.floor(spaces / Math.max(1, tabSize));
         lines[i] = '\t'.repeat(tabs) + lines[i].slice(spaces);
@@ -392,7 +392,7 @@ export function prevNonWhitespaceColumn(lineText: string, from: number): number 
 }
 
 /** Word boundaries on a line. */
-export function wordBoundaries(lineText: string, col: number, re: RegExp = /[A-Za-z0-9_]+/g): [number, number] | null {
+export function wordBoundaries(lineText: string, col: number, re = /[A-Za-z0-9_]+/g): [number, number] | null {
   const c = Math.max(0, Math.min(col, lineText.length));
   let m: RegExpExecArray | null; re.lastIndex = 0;
   while ((m = re.exec(lineText))) {

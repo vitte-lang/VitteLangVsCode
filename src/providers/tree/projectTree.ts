@@ -10,33 +10,16 @@ function joinPathCompat(base: vscode.Uri, ...parts: string[]): vscode.Uri {
   return vscode.Uri.file(path.join(base.fsPath, ...parts));
 }
 
-// Normalize custom icon ids to valid Codicon ids
-function toCodicon(id: string): string {
-  switch (id) {
-    case 'settings':
-      return 'gear';
-    case 'graph':
-      return 'graph-line';
-    case 'rocket':
-    case 'beaker':
-    case 'source-control':
-    case 'gear':
-      return id; // valid codicons
-    default:
-      return 'circle-large-outline'; // safe fallback
-  }
-}
-
 // ---- Types ----
 interface NodeBase { id: string; label: string; contextValue: string; collapsible: vscode.TreeItemCollapsibleState }
 interface FileNode extends NodeBase { kind: 'file'; uri: vscode.Uri }
 interface DirNode extends NodeBase { kind: 'dir'; uri: vscode.Uri }
 interface GroupNode extends NodeBase { kind: 'group'; icon?: string; children: Node[] }
-interface TargetNode extends NodeBase { kind: 'target'; triple: string }
-export type Node = FileNode | DirNode | GroupNode | TargetNode
+interface TargetNode extends NodeBase { kind: 'target'; triple: string; icon?: string }
+export type Node = FileNode | DirNode | GroupNode | TargetNode;
 
 // ---- Utils ----
-async function readWorkspaceRoot(): Promise<vscode.Uri | undefined> {
+function readWorkspaceRoot(): vscode.Uri | undefined {
   return vscode.workspace.workspaceFolders?.[0]?.uri;
 }
 
@@ -60,20 +43,30 @@ function mkDir(uri: vscode.Uri, label?: string): DirNode {
 }
 
 function mkGroup(id: string, label: string, icon?: string, children: Node[] = []): GroupNode {
-  const base = {
+  const group: GroupNode = {
     id,
     label,
     contextValue: 'vitte:group',
-    kind: 'group' as const,
+    kind: 'group',
     collapsible: vscode.TreeItemCollapsibleState.Collapsed,
     children,
-  } as Omit<GroupNode, 'icon'> & Partial<Pick<GroupNode, 'icon'>>;
-  if (icon !== undefined) (base as any).icon = icon;
-  return base as GroupNode;
+  };
+  if (icon !== undefined) {
+    group.icon = icon;
+  }
+  return group;
 }
 
 function mkTarget(triple: string): TargetNode {
-  return { id: mkId('target', triple), label: triple, contextValue: 'vitte:target', kind: 'target', collapsible: vscode.TreeItemCollapsibleState.None, triple };
+  return {
+    id: mkId('target', triple),
+    label: triple,
+    contextValue: 'vitte:target',
+    kind: 'target',
+    collapsible: vscode.TreeItemCollapsibleState.None,
+    triple,
+    icon: 'rocket',
+  };
 }
 
 // ---- Provider ----
@@ -107,12 +100,11 @@ readonly onDidChangeTreeData: vscode.Event<Node | null | undefined> = this._onDi
         item.iconPath = vscode.ThemeIcon.Folder;
         break;
       case 'group':
-        // Use packaged SVG (media/icons/vitte-logo.svg).
-        item.iconPath = this.iconAsset('vitte-logo');
+        // Use packaged SVG (media/icons/vitte.svg or other). Fallback to 'vitte'.
+        item.iconPath = this.iconAsset(element.icon ?? 'vitte');
         break;
       case 'target':
-        // Reuse the same SVG; change to 'gear' if you add media/icons/gear.svg later
-        item.iconPath = this.iconAsset('vitte-logo');
+        item.iconPath = this.iconAsset(element.icon ?? 'vitte');
         break;
     }
     return item;
@@ -127,7 +119,7 @@ readonly onDidChangeTreeData: vscode.Event<Node | null | undefined> = this._onDi
 
   // ---- Builders ----
   private async buildRoot(): Promise<Node[]> {
-    const root = await readWorkspaceRoot();
+    const root = readWorkspaceRoot();
     if (!root) return [];
 
     const nodes: Node[] = [];
@@ -160,10 +152,10 @@ readonly onDidChangeTreeData: vscode.Event<Node | null | undefined> = this._onDi
       byDir.set(dir, arr);
     }
     for (const [dir, files] of byDir) {
-      const dirNode = mkDir(vscode.Uri.file(dir));
-      dirNode.collapsible = vscode.TreeItemCollapsibleState.Collapsed;
-      (dirNode as any).children = files.map(f => mkFile(f));
-      srcGroup.children.push(dirNode as unknown as Node);
+      const children = files.map(f => mkFile(f));
+      const label = path.basename(dir);
+      const dirGroup = mkGroup(`group:src:${dir}`, label, 'source-control', children);
+      srcGroup.children.push(dirGroup);
     }
     nodes.push(srcGroup);
 
@@ -201,13 +193,17 @@ readonly onDidChangeTreeData: vscode.Event<Node | null | undefined> = this._onDi
     if (!configUri) return [];
     try {
       const doc = await vscode.workspace.openTextDocument(configUri);
-      const json = JSON.parse(doc.getText());
-      const raw = json.targets;
-      if (Array.isArray(raw)) {
+      const json = JSON.parse(doc.getText()) as unknown;
+      const rawTargets = (json as { targets?: unknown }).targets;
+      if (Array.isArray(rawTargets)) {
         const list: string[] = [];
-        for (const t of raw) {
-          if (typeof t === 'string') list.push(t);
-          else if (t && typeof t.triple === 'string') list.push(t.triple);
+        for (const entry of rawTargets as unknown[]) {
+          if (typeof entry === 'string') {
+            list.push(entry);
+          } else if (entry && typeof entry === 'object') {
+            const triple = (entry as { triple?: unknown }).triple;
+            if (typeof triple === 'string') list.push(triple);
+          }
         }
         return list;
       }

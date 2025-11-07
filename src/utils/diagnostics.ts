@@ -3,6 +3,13 @@ import * as vscode from "vscode";
 
 export const VITTE_FILE_EXTS = new Set([".vitte", ".vit", ".vitl"]);
 
+type SeverityKey = 'error' | 'warning' | 'information' | 'hint';
+const VALID_SEVERITIES: readonly SeverityKey[] = ['error', 'warning', 'information', 'hint'] as const;
+
+function isSeverityKey(value: unknown): value is SeverityKey {
+  return typeof value === 'string' && VALID_SEVERITIES.includes(value as SeverityKey);
+}
+
 export interface DiagnosticsSummary {
   errors: number;
   warnings: number;
@@ -26,7 +33,7 @@ export interface WorkspaceDiagnosticsReport {
 }
 
 export interface VitteDiagnosticsConfig {
-  severities?: Array<'error' | 'warning' | 'information' | 'hint'>;
+  severities?: SeverityKey[];
   /** Sorting for per-file lists: by most errors, warnings, total, or alphabetical path. */
   order?: 'errors' | 'warnings' | 'total' | 'path';
   /** Limit number of rows in summaries (0 = unlimited). */
@@ -34,11 +41,14 @@ export interface VitteDiagnosticsConfig {
 }
 
 function getConfig(): Required<VitteDiagnosticsConfig> {
-  const cfg = vscode.workspace.getConfiguration('vitte').get<VitteDiagnosticsConfig>('diagnostics');
+  const cfg = vscode.workspace.getConfiguration('vitte').get<VitteDiagnosticsConfig>('diagnostics') ?? {};
+  const severities = Array.isArray(cfg.severities) ? cfg.severities.filter(isSeverityKey) : [];
+  const order = cfg.order === 'warnings' || cfg.order === 'total' || cfg.order === 'path' ? cfg.order : 'errors';
+  const maxPerFile = typeof cfg.maxPerFile === 'number' && cfg.maxPerFile >= 0 ? cfg.maxPerFile : 0;
   return {
-    severities: Array.isArray(cfg?.severities) ? cfg!.severities : [],
-    order: (cfg?.order === 'warnings' || cfg?.order === 'total' || cfg?.order === 'path') ? cfg.order : 'errors',
-    maxPerFile: typeof cfg?.maxPerFile === 'number' && cfg!.maxPerFile >= 0 ? cfg!.maxPerFile : 0,
+    severities,
+    order,
+    maxPerFile,
   };
 }
 
@@ -133,10 +143,9 @@ export function summarizeDiagnosticsPerFile(): FileDiagnosticsSummary[] {
   }
 
   const list = Array.from(map.values());
-  const cfg2 = getConfig();
-  list.sort(fileSummaryComparator(cfg2.order));
-  if (cfg2.maxPerFile > 0 && list.length > cfg2.maxPerFile) {
-    return list.slice(0, cfg2.maxPerFile);
+  list.sort(fileSummaryComparator(cfg.order));
+  if (cfg.maxPerFile > 0 && list.length > cfg.maxPerFile) {
+    return list.slice(0, cfg.maxPerFile);
   }
   return list;
 }
@@ -169,19 +178,19 @@ export function formatDiagnosticsBadge(summary: DiagnosticsSummary): string {
 }
 
 /** Choose a comparator for FileDiagnosticsSummary based on config.order */
-export function fileSummaryComparator(order: 'errors'|'warnings'|'total'|'path') {
+export function fileSummaryComparator(order: 'errors'|'warnings'|'total'|'path'): (a: FileDiagnosticsSummary, b: FileDiagnosticsSummary) => number {
   switch (order) {
     case 'warnings':
-      return (a: FileDiagnosticsSummary, b: FileDiagnosticsSummary) =>
+      return (a, b) =>
         b.warnings - a.warnings || b.errors - a.errors || b.total - a.total || a.filePath.localeCompare(b.filePath);
     case 'total':
-      return (a: FileDiagnosticsSummary, b: FileDiagnosticsSummary) =>
+      return (a, b) =>
         b.total - a.total || b.errors - a.errors || b.warnings - a.warnings || a.filePath.localeCompare(b.filePath);
     case 'path':
-      return (a: FileDiagnosticsSummary, b: FileDiagnosticsSummary) => a.filePath.localeCompare(b.filePath);
+      return (a, b) => a.filePath.localeCompare(b.filePath);
     case 'errors':
     default:
-      return (a: FileDiagnosticsSummary, b: FileDiagnosticsSummary) =>
+      return (a, b) =>
         b.errors - a.errors || b.warnings - a.warnings || b.total - a.total || a.filePath.localeCompare(b.filePath);
   }
 }
@@ -199,32 +208,32 @@ export function summarizeDiagnosticsByDirectory(): DirectoryDiagnosticsSummary[]
   const map = new Map<string, DirectoryDiagnosticsSummary & { _set: Set<string> }>();
 
   const rel = (uri: vscode.Uri): string => {
-  for (const f of folders) {
-    const root = f.uri.fsPath;
-    if (uri.fsPath.startsWith(root)) {
-      const p = path.relative(root, uri.fsPath);
-      const d = path.dirname(p);
-      return d === '.' ? '' : (d.split(path.sep)[0] ?? '');
+    for (const f of folders) {
+      const root = f.uri.fsPath;
+      if (uri.fsPath.startsWith(root)) {
+        const p = path.relative(root, uri.fsPath);
+        const d = path.dirname(p);
+        return d === '.' ? '' : (d.split(path.sep)[0] ?? '');
+      }
     }
-  }
-  return '';
-};
+    return '';
+  };
 
   for (const [uri, diagnostics] of vscode.languages.getDiagnostics()) {
     if (!isVitteFile(uri)) continue;
     const top = rel(uri);
     let rec = map.get(top);
-    if (!rec) {
-      rec = { dir: top, errors: 0, warnings: 0, info: 0, hints: 0, files: 0, _set: new Set<string>() };
-      map.set(top, rec);
-    }
-    for (const d of diagnostics) {
-      if (allowed.size) {
-        const ok = (
-          (d.severity === vscode.DiagnosticSeverity.Error && allowed.has('error')) ||
-          (d.severity === vscode.DiagnosticSeverity.Warning && allowed.has('warning')) ||
-          (d.severity === vscode.DiagnosticSeverity.Information && allowed.has('information')) ||
-          (d.severity === vscode.DiagnosticSeverity.Hint && allowed.has('hint'))
+	  if (!rec) {
+	    rec = { dir: top, errors: 0, warnings: 0, info: 0, hints: 0, files: 0, _set: new Set<string>() };
+	    map.set(top, rec);
+	  }
+	  for (const d of diagnostics) {
+	    if (allowed.size > 0) {
+	      const ok = (
+	        (d.severity === vscode.DiagnosticSeverity.Error && allowed.has('error')) ||
+	        (d.severity === vscode.DiagnosticSeverity.Warning && allowed.has('warning')) ||
+	        (d.severity === vscode.DiagnosticSeverity.Information && allowed.has('information')) ||
+	        (d.severity === vscode.DiagnosticSeverity.Hint && allowed.has('hint'))
         );
         if (!ok) continue;
       }
@@ -240,18 +249,21 @@ export function summarizeDiagnosticsByDirectory(): DirectoryDiagnosticsSummary[]
 
   const out: DirectoryDiagnosticsSummary[] = [];
   for (const r of map.values()) {
-    out.push({ dir: r.dir || '/', errors: r.errors, warnings: r.warnings, info: r.info, hints: r.hints, files: r._set.size });
+    out.push({ dir: r.dir ?? '/', errors: r.errors, warnings: r.warnings, info: r.info, hints: r.hints, files: r._set.size });
   }
   out.sort((a, b) => b.errors - a.errors || b.warnings - a.warnings || b.files - a.files || a.dir.localeCompare(b.dir));
   return out;
 }
 
 /** Open first diagnostic of given severity preference (errors→warnings→info→hints). */
-export async function openFirstDiagnostic(prefer: Array<'error'|'warning'|'information'|'hint'> = ['error','warning','information','hint']): Promise<boolean> {
+export async function openFirstDiagnostic(prefer: SeverityKey[] = ['error','warning','information','hint']): Promise<boolean> {
   let best: { uri: vscode.Uri; index: number } | undefined;
   for (const [uri, list] of vscode.languages.getDiagnostics()) {
     if (!isVitteFile(uri)) continue;
-    const idx = list.findIndex(d => prefer.includes(severityToName(d.severity) as any));
+    const idx = list.findIndex((d) => {
+      const sev = severityToName(d.severity);
+      return sev !== 'unknown' && prefer.includes(sev);
+    });
     if (idx >= 0) { best = { uri, index: idx }; break; }
   }
   if (!best) return false;

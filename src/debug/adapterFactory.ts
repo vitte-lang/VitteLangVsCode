@@ -10,14 +10,13 @@ import * as path from 'path';
  */
 export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory, vscode.Disposable {
   private _subscriptions: vscode.Disposable[] = [];
-  private _sessions = new Map<string, { proc: cp.ChildProcess, port?: number }>();
+  private _sessions = new Map<string, { proc: cp.ChildProcess; port?: number }>();
 
-  private toVscodeEnv(env: NodeJS.ProcessEnv | undefined): { [key: string]: string } | undefined {
+  private toVscodeEnv(env: NodeJS.ProcessEnv | undefined): Record<string, string> | undefined {
     if (!env) return undefined;
-    const out: { [key: string]: string } = {};
-    for (const key of Object.keys(env)) {
-      const v = env[key];
-      if (typeof v === 'string') out[key] = v;
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(env)) {
+      if (typeof value === 'string') out[key] = value;
     }
     return out;
   }
@@ -26,7 +25,7 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
     return (typeof x === 'string' && x.length > 0) ? x : fallback;
   }
 
-  private sanitizeArgs(args: Array<string | undefined>): string[] {
+  private sanitizeArgs(args: unknown[]): string[] {
     return args.filter((a): a is string => typeof a === 'string' && a.length > 0);
   }
 
@@ -41,7 +40,8 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
   async createDebugAdapterDescriptor(session: vscode.DebugSession): Promise<vscode.DebugAdapterDescriptor> {
     const cfg = vscode.workspace.getConfiguration('vitte');
     const program = this.resolveRuntimePath(cfg);
-    const extraArgs = this.sanitizeArgs(Array.isArray(session.configuration.args) ? session.configuration.args : []);
+    const rawArgs = Array.isArray(session.configuration.args) ? session.configuration.args : [];
+    const extraArgs = this.sanitizeArgs(rawArgs);
     const cwd = typeof session.configuration.cwd === 'string' && session.configuration.cwd.length > 0
       ? session.configuration.cwd
       : (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd());
@@ -51,14 +51,14 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
     if (serverTry.ok) {
       const { proc, port } = serverTry;
       this._sessions.set(session.id, { proc, port });
-      return new vscode.DebugAdapterServer(port!, '127.0.0.1');
+      return new vscode.DebugAdapterServer(port, '127.0.0.1');
     }
 
     // Fallback to stdio executable.
     const exec = this.buildExecutable(program, cwd, extraArgs);
     const opts: vscode.DebugAdapterExecutableOptions = { cwd: exec.cwd };
     const envMap = this.toVscodeEnv(exec.env);
-    if (envMap) { (opts as any).env = envMap; }
+    if (envMap) { opts.env = envMap; }
     const desc = new vscode.DebugAdapterExecutable(exec.command, exec.args, opts);
     return desc;
   }
@@ -66,10 +66,10 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
   private resolveRuntimePath(cfg: vscode.WorkspaceConfiguration): string {
     // Prefer project setting `vitte.debug.program`, then `vitte.runtime` or `vitte.build.path`, then default.
     const direct = cfg.get<string>('debug.program');
-    if (direct && direct.trim().length) return direct;
+    if (direct?.trim().length) return direct;
 
-    const toolchainRoot = cfg.get<string>('toolchainPath') || cfg.get<string>('toolchain.root');
-    const candidate = cfg.get<string>('runtime.path') || cfg.get<string>('runtime') || 'vitte-runtime';
+    const toolchainRoot = cfg.get<string>('toolchainPath') ?? cfg.get<string>('toolchain.root');
+    const candidate = cfg.get<string>('runtime.path') ?? cfg.get<string>('runtime') ?? 'vitte-runtime';
 
     if (toolchainRoot && !path.isAbsolute(candidate)) {
       return path.join(toolchainRoot, candidate);
@@ -99,9 +99,9 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
   private spawnAndDetectPort(program: string, args: string[], cwd: string): Promise<{ ok: true, proc: cp.ChildProcess, port: number } | { ok: false, error: Error }> {
     return new Promise((resolve) => {
       let resolved = false;
-      const cmd = this.ensureString(program as unknown as string, 'vitte-runtime');
-      const argv = this.sanitizeArgs(args as unknown as Array<string | undefined>);
-      const proc = cp.spawn(cmd, argv, { cwd: this.ensureString(cwd as unknown as string, process.cwd()), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const cmd = this.ensureString(program, 'vitte-runtime');
+      const argv = this.sanitizeArgs(args);
+      const proc = cp.spawn(cmd, argv, { cwd: this.ensureString(cwd, process.cwd()), env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
 
       const cleanup = (err?: Error) => {
         if (!resolved) {
@@ -118,9 +118,10 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
         //  - DAP listening on 127.0.0.1:51234
         //  - debug-adapter: port=51234
         //  - DAP_PORT=51234
-        const m = text.match(/(?:listening\s+on\s+[^:]+:|port\s*=|DAP_PORT=)(\d{3,5})/i);
-        if (m) {
-          const g = m[1];
+        const portMatch = /(?:listening\s+on\s+[^:]+:|port\s*=|DAP_PORT=)(\d{3,5})/i;
+        const match = portMatch.exec(text);
+        if (match) {
+          const g = match[1];
           if (!g) return; // group may be undefined in TS types
           const port = Number.parseInt(g, 10);
           if (Number.isInteger(port) && port > 0 && port < 65536) {
@@ -167,7 +168,7 @@ export class VitteDebugAdapterDescriptorFactory implements vscode.DebugAdapterDe
       args = stdioArgsCandidates.find(a => a.length > 0) ?? [];
     }
 
-    return { command: program, args: this.sanitizeArgs(args as Array<string | undefined>), cwd, env: process.env as NodeJS.ProcessEnv };
+    return { command: program, args: this.sanitizeArgs(args), cwd, env: process.env };
   }
 }
 

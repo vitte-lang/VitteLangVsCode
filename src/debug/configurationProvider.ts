@@ -1,20 +1,22 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 
-type VitteDebugJson = Partial<{
-  debug: {
-    program?: string;
-    args?: string[];
-    cwd?: string;
-    trace?: boolean;
-    sourceMaps?: boolean;
-    env?: Record<string, string>;
-  };
+interface VitteDebugSettings {
+  program?: string;
+  args?: string[];
+  cwd?: string;
+  trace?: boolean;
+  sourceMaps?: boolean;
+  env?: Record<string, string>;
+}
+
+interface VitteDebugJson {
+  debug?: VitteDebugSettings;
   toolchain?: { root?: string; runtime?: string };
-}>;
+}
 
 /** Read and parse JSON file into object. */
-async function readJsonFile<T = any>(uri: vscode.Uri): Promise<T | undefined> {
+async function readJsonFile<T = unknown>(uri: vscode.Uri): Promise<T | undefined> {
   try {
     const doc = await vscode.workspace.openTextDocument(uri);
     return JSON.parse(doc.getText()) as T;
@@ -47,12 +49,14 @@ async function readVitteProjectConfig(): Promise<VitteDebugJson> {
   const pkg = await vscode.workspace.findFiles('package.json', '**/node_modules/**', 1);
   const pkgUri = pkg[0];
   if (pkgUri) {
-    const pjson = await readJsonFile<any>(pkgUri);
-    if (pjson && typeof pjson.vitte === 'object') {
-      const v: any = pjson.vitte;
-      const pick: VitteDebugJson = { debug: {}, toolchain: {} };
-      if (v.debug && typeof v.debug === 'object') pick.debug = v.debug;
-      if (v.toolchain && typeof v.toolchain === 'object') pick.toolchain = v.toolchain;
+    const pjson = await readJsonFile<Record<string, unknown>>(pkgUri);
+    const vitteSection = pjson?.vitte;
+    if (vitteSection && typeof vitteSection === 'object') {
+      const pick: VitteDebugJson = {};
+      const debugSection = (vitteSection as Record<string, unknown>).debug;
+      const toolchainSection = (vitteSection as Record<string, unknown>).toolchain;
+      if (debugSection && typeof debugSection === 'object') pick.debug = { ...(debugSection as VitteDebugSettings) };
+      if (toolchainSection && typeof toolchainSection === 'object') pick.toolchain = { ...(toolchainSection as NonNullable<VitteDebugJson['toolchain']>) };
       results.push(pick);
     }
   }
@@ -90,7 +94,7 @@ function expand(str: string, fileUri?: vscode.Uri): string {
 }
 
 function coerceArgs(v: unknown): string[] | undefined {
-  if (Array.isArray(v)) return v.filter((x) => typeof x === 'string') as string[];
+  if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && x.length > 0);
   if (typeof v === 'string' && v.length) return [v];
   return undefined;
 }
@@ -108,13 +112,13 @@ function sanitizeEnv(obj: unknown): Record<string, string> {
 function resolveRuntimePath(cfg: vscode.WorkspaceConfiguration, project: VitteDebugJson): string {
   // Priority: launch.json > vitte.debug.program (settings) > project.debug.program > toolchain.runtime > default
   const setProgram = cfg.get<string>('debug.program');
-  if (setProgram && setProgram.trim()) return setProgram;
+  if (setProgram?.trim()) return setProgram;
 
-  const projectProg = project.debug?.program || project.toolchain?.runtime;
-  let candidate = projectProg || 'vitte-runtime';
+  const projectProg = project.debug?.program ?? project.toolchain?.runtime;
+  let candidate = projectProg ?? 'vitte-runtime';
 
   // Prepend toolchain.root when relative
-  const toolchainRoot = cfg.get<string>('toolchain.root') || project.toolchain?.root || cfg.get<string>('toolchainPath');
+  const toolchainRoot = cfg.get<string>('toolchain.root') ?? project.toolchain?.root ?? cfg.get<string>('toolchainPath');
   if (toolchainRoot && candidate && !path.isAbsolute(candidate)) {
     candidate = path.join(toolchainRoot, candidate);
   }
@@ -162,35 +166,56 @@ class VitteDebugConfigurationProvider implements vscode.DebugConfigurationProvid
     const workspaceFolder = folder?.uri.fsPath ?? ensureWorkspaceFolder() ?? process.cwd();
     const activeUri = vscode.window.activeTextEditor?.document.uri;
 
-    // Merge and sanitize environment maps (ensure values are strings)
-    const mergedEnvRaw = {
+    const configRecord = config as Record<string, unknown>;
+    const configEnvValue = configRecord.env;
+    const configEnvObject = (typeof configEnvValue === 'object' && configEnvValue) ? configEnvValue : undefined;
+
+    const mergedEnvRaw: unknown = {
       ...(project.debug?.env ?? {}),
-      ...(typeof (config as any).env === 'object' && (config as any).env ? (config as any).env : {}),
-    } as unknown;
+      ...(configEnvObject as Record<string, unknown> | undefined ?? {}),
+    };
     const mergedEnv = sanitizeEnv(mergedEnvRaw);
 
     const base: vscode.DebugConfiguration = {
       type: 'vitte',
       request: 'launch',
-      name: config.name || 'Vitte: Launch',
+      name: typeof configRecord.name === 'string' && configRecord.name.length > 0 ? configRecord.name : 'Vitte: Launch',
       program: resolveRuntimePath(settings, project),
-      args: coerceArgs((config as any).args) ?? coerceArgs(project.debug?.args) ?? ['run'],
-      cwd: typeof (config as any).cwd === 'string' && (config as any).cwd.length > 0 ? (config as any).cwd : (project.debug?.cwd || workspaceFolder),
+      args: coerceArgs(configRecord.args) ?? coerceArgs(project.debug?.args) ?? ['run'],
+      cwd: (() => {
+        const cfgCwd = configRecord.cwd;
+        if (typeof cfgCwd === 'string' && cfgCwd.length > 0) return cfgCwd;
+        if (typeof project.debug?.cwd === 'string' && project.debug.cwd.length > 0) return project.debug.cwd;
+        return workspaceFolder;
+      })(),
       env: mergedEnv,
     };
 
     // Optional flags
-    if (typeof project.debug?.trace === 'boolean' && typeof (config as any).trace !== 'boolean') (base as any).trace = project.debug?.trace;
-    if (typeof project.debug?.sourceMaps === 'boolean' && typeof (config as any).sourceMaps !== 'boolean') (base as any).sourceMaps = project.debug?.sourceMaps;
+    const configTraceRaw = configRecord.trace;
+    if (typeof project.debug?.trace === 'boolean' && typeof configTraceRaw !== 'boolean') {
+      base.trace = project.debug.trace;
+    }
+    const configSourceMapsRaw = configRecord.sourceMaps;
+    if (typeof project.debug?.sourceMaps === 'boolean' && typeof configSourceMapsRaw !== 'boolean') {
+      base.sourceMaps = project.debug.sourceMaps;
+    }
 
     // VS Code variable expansion
-    base.program = expand(base.program, activeUri);
-    base.cwd = expand(base.cwd, activeUri);
-    base.args = (base.args as string[]).map((s) => expand(s, activeUri));
-    if (base.env) {
+    const programValue = typeof base.program === 'string' ? base.program : String(base.program ?? '');
+    base.program = expand(programValue, activeUri);
+
+    const cwdValue = typeof base.cwd === 'string' ? base.cwd : String(base.cwd ?? workspaceFolder);
+    base.cwd = expand(cwdValue, activeUri);
+
+    const argsValue = Array.isArray(base.args) ? base.args : [];
+    base.args = argsValue.map((s) => expand(String(s), activeUri));
+
+    if (base.env && typeof base.env === 'object') {
       const env: Record<string, string> = {};
-      const entries = Object.entries(base.env as Record<string, string>);
-      for (const [k, v] of entries) env[k] = expand(String(v), activeUri);
+      for (const [k, v] of Object.entries(base.env as Record<string, unknown>)) {
+        if (typeof v === 'string') env[k] = expand(v, activeUri);
+      }
       base.env = env;
     }
 

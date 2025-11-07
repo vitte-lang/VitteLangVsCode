@@ -8,13 +8,15 @@
 // - Workspace symbols avec fuzzy match et scoring stable
 // - API additionnelle: prepareRename, indexDocument
 
-import { TextDocument } from "vscode-languageserver-textdocument";
+import type { TextDocument } from "vscode-languageserver-textdocument";
 import {
-  DocumentSymbol,
   Location,
   Position,
   Range,
   SymbolKind,
+} from "vscode-languageserver/node";
+import type {
+  DocumentSymbol,
   WorkspaceSymbol,
 } from "vscode-languageserver/node";
 
@@ -153,7 +155,7 @@ function isValidIdent(s: string): boolean { return /^[A-Za-z_]\w*$/.test(s); }
 /* ------------------------------ Règles symboles ---------------------------- */
 // Les regex sont évaluées uniquement sur les positions mask==1
 
-const RULES: Array<{ rx: RegExp; kind: SymbolKind; nameGroup: number; containerHint?: (m: RegExpExecArray)=>string|undefined }> = [
+const RULES: { rx: RegExp; kind: SymbolKind; nameGroup: number; containerHint?: (m: RegExpExecArray) => string | undefined }[] = [
   { rx: /\b(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/g,                kind: SymbolKind.Namespace, nameGroup: 1 },
   { rx: /\b(?:use|import)\s+([A-Za-z_][\w:]*)(?=\s*;)/g,               kind: SymbolKind.Namespace, nameGroup: 1 },
   { rx: /\b(?:pub\s+)?impl\s+([A-Za-z_][\w<>:, ]*)/g,                   kind: SymbolKind.Class,     nameGroup: 1 },
@@ -246,15 +248,13 @@ function buildOutline(doc: TextDocument, flat: FlatSymbol[]): DocumentSymbol[] {
   // Index rapide: map startOffset->depth at that point
   // Simplification: nous utilisons l’ordre croissant + heuristique par proximité
 
-  let curIdx = 0;
   function pushToBestContainer(node: Node) {
     // Heuristique: rattacher au dernier symbole dont la position est avant node et qui n’est pas clos avant.
     for (let j = stack.length - 1; j >= 0; j--) {
       const top = stack[j];
       const topStart = doc.offsetAt(top.range.start);
-      const topEnd   = doc.offsetAt(top.range.end);
       const nodeStart = doc.offsetAt(node.range.start);
-      if (nodeStart >= topStart && nodeStart >= curIdx) {
+      if (nodeStart >= topStart) {
         top.children.push(node);
         stack.push(node);
         return;
@@ -278,7 +278,6 @@ function buildOutline(doc: TextDocument, flat: FlatSymbol[]): DocumentSymbol[] {
       if (ch === '}') {
         if (stack.length > 1) stack.pop();
       }
-      curIdx = bracesPositions[bp] + 1;
       bp++;
     }
     pushToBestContainer(node);
@@ -368,12 +367,12 @@ export function prepareRename(doc: TextDocument, pos: Position): { range: Range;
   return { range: Range.create(start, end), placeholder: name };
 }
 
-export function renameSymbol(doc: TextDocument, pos: Position, newName: string): Array<{ range: Range; newText: string }> {
+export function renameSymbol(doc: TextDocument, pos: Position, newName: string): { range: Range; newText: string }[] {
   const old = wordAt(doc, pos);
   if (!old || !isValidIdent(newName)) return [];
   const text = doc.getText();
   const mask = buildCodeMask(text);
-  const edits: Array<{ range: Range; newText: string }> = [];
+  const edits: { range: Range; newText: string }[] = [];
   const re = new RegExp(`(?<![A-Za-z0-9_])${escapeRx(old)}(?![A-Za-z0-9_])`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
@@ -391,11 +390,11 @@ export function renameSymbol(doc: TextDocument, pos: Position, newName: string):
 
 export function workspaceSymbols(
   query: string,
-  openDocs: Array<{ uri: string; doc: TextDocument }>,
+  openDocs: { uri: string; doc: TextDocument }[],
   limit = 200
 ): WorkspaceSymbol[] {
   const q = query.trim();
-  const result: Array<{ ws: WorkspaceSymbol; score: number; idx: number }> = [];
+  const result: { ws: WorkspaceSymbol; score: number; idx: number }[] = [];
   let seq = 0;
   for (const { uri, doc } of openDocs) {
     const { flat } = indexDocument(doc);

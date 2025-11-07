@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 // Process identity
-try { (process as any).title = 'vitte-lsp-server'; } catch { /* noop */ }
+try { process.title = 'vitte-lsp-server'; } catch { /* noop */ }
 
 // ---------------------------------------------------------------------------
 // Time origin and environment diagnostics
@@ -43,7 +43,7 @@ function logEnvInfo() {
 
 process.on('uncaughtException', (err) => {
   try {
-    const msg = err && err.stack ? err.stack : String(err);
+    const msg = err instanceof Error ? err.stack ?? err.message ?? String(err) : String(err);
     console.error(`[vitte-lsp] uncaughtException: ${msg}`);
   } catch { /* ignore */ }
 });

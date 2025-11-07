@@ -3,23 +3,25 @@
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CompletionItem,
   CompletionItemKind,
   InsertTextFormat,
-  Position,
   Range,
   SymbolKind,
-  MarkupKind,
-  MarkupContent,
-  TextEdit
+  MarkupKind
 } from "vscode-languageserver/node";
-import { TextDocument } from "vscode-languageserver-textdocument";
+import type {
+  CompletionItem,
+  Position,
+  MarkupContent
+} from "vscode-languageserver/node";
+import type { TextEdit } from "vscode-languageserver-types";
+import type { TextDocument } from "vscode-languageserver-textdocument";
 import {
   BOOL_LITERALS,
   KEYWORDS,
   NIL_LITERALS,
 } from "./languageFacts.js";
-import { searchWorkspaceSymbols, SK, IndexedSymbol } from "./indexer.js";
+import { searchWorkspaceSymbols, SK } from "./indexer.js";
 
 /* ============================================================================
  * Tables de base
@@ -120,7 +122,7 @@ interface ExtractedSym { name: string; kind: SymbolKind; }
 
 function extractSymbols(doc: TextDocument): ExtractedSym[] {
   const text = doc.getText();
-  const rules: Array<{ rx: RegExp; kind: SymbolKind; g: number }> = [
+  const rules: { rx: RegExp; kind: SymbolKind; g: number }[] = [
     { rx: /^\s*(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Namespace, g: 1 },
     { rx: /^\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+(?:"[^"]*"\s+)?)?fn\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Function, g: 1 },
     { rx: /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)/gm,         kind: SymbolKind.Struct,    g: 1 },

@@ -5,6 +5,22 @@ et cette extension suit le versioning [SemVer](https://semver.org/lang/fr/).
 
 ---
 
+## [1.7.1] — 2025-11-05
+### Ajouté
+- 🧹 **Configuration ESLint unifiée** (`eslint.config.mjs`) basée sur `typescript-eslint`, activée à la racine du projet pour couvrir client, serveur et outils.
+- 🔧 **Dépendances de linting** mises à jour (`typescript-eslint`) et script `npm run lint` modernisé pour analyser l’intégralité du dépôt.
+
+### Modifié
+- 🛡️ **Serveur LSP** : durcissement massif des modules (`commands`, `lsp`, `server`, `config`, `logger`, `navigation`, `semantic`, etc.) avec imports typés, contrôle d’erreurs explicite et suppression des accès non sûrs.
+- 🪄 **Utilitaires** (`formatting`, `utils/eol`, `utils/text`) nettoyés : promesses correctement gérées, normalisation des regex, adoption systématique de l’opérateur `??` et des chaînes optionnelles.
+- 🧭 **Outillage debug** (`adapterFactory`, `configurationProvider`, `runtimeLocator`) rafraîchi pour fiabiliser la résolution du runtime, la gestion d’`env` et la détection multi-plateforme.
+
+### Corrigé
+- ✅ Élimination de la plupart des avertissements ESLint (imports de type, `any` implicites, promesses non attendues, index signatures obsolètes).
+- 🪛 Messages d’erreur et journaux du serveur clarifiés afin d’éviter les `await` hors promesse et les retours `any`.
+
+---
+
 ## [1.7.0] — 2025-11-02
 ### Ajouté
 - ⚙️ **Commandes LSP complètes** (`vitte.formatDocument`, `vitte.organizeImports`, `vitte.fixAll`) intégrées côté client et serveur, avec application automatique des `TextEdit`.
