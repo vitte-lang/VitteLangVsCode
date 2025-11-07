@@ -7,11 +7,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/roussov/vittelang-vscode.git"
+    "url": "https://github.com/roussov/VitteLangVsCode.git"
   },
-  "homepage": "https://github.com/roussov/vittelang-vscode#readme",
+  "homepage": "https://github.com/roussov/VitteLangVsCode#readme",
   "bugs": {
-    "url": "https://github.com/roussov/vittelang-vscode/issues"
+    "url": "https://github.com/roussov/VitteLangVsCode/issues"
   },
   "engines": {
     "vscode": "^1.105.0"
@@ -20,7 +20,7 @@
     "Programming Languages",
     "Debuggers"
   ],
-  "icon": "images/icon.png",
+  "icon": "media/icons/vitte-logo.svg",
   "extensionKind": [
     "workspace",
     "ui"
@@ -30,6 +30,7 @@
     "out/**",
     "server/out/**",
     "syntaxes/**",
+    "icons/**",
     "media/**",
     "schemas/**",
     "language-configuration.json",
@@ -44,7 +45,6 @@
     "onView:vitteDiagnostics",
     "onView:vitteModules",
     "onView:vitteExplorer",
-    "onView:vitteView",
     "onCommand:vitte.showServerLog",
     "onCommand:vitte.restartServer",
     "onCommand:vitte.runAction",
@@ -133,8 +133,8 @@
       },
       {
         "language": "vitl",
-        "scopeName": "source.vitte",
-        "path": "./syntaxes/vitte.tmLanguage.json"
+        "scopeName": "source.vitl",
+        "path": "./syntaxes/vitl.tmLanguage.json"
       }
     ],
     "jsonValidation": [
@@ -159,16 +159,24 @@
     "views": {
       "vitte-sidebar": [
         {
-          "id": "vitteView",
+          "id": "vitteExplorer",
           "name": "Explorateur Vitte"
+        },
+        {
+          "id": "vitteModules",
+          "name": "Modules Vitte"
+        },
+        {
+          "id": "vitteDiagnostics",
+          "name": "Diagnostics Vitte"
         }
       ]
     },
     "viewsWelcome": [
       {
-        "view": "vitteView",
+        "view": "vitteExplorer",
         "contents": "# Bienvenue dans Vitte\n\nAucun projet détecté.\n\n- $(refresh) **Rafraîchir** pour rescanner le workspace → `vscode:command:vitte.refreshExplorer`\n- $(book) **Docs** → `vscode:command:vitte.openDocs`\n- $(beaker) **Playground** → `vscode:command:vitte.openPlayground`\n",
-        "when": "view == vitteView && !workspaceFolderCount"
+        "when": "view == vitteExplorer && !workspaceFolderCount"
       }
     ],
     "debuggers": [
@@ -456,11 +464,6 @@
           "command": "vitte.refreshExplorer",
           "when": "view == vitteExplorer",
           "group": "navigation@1"
-        },
-        {
-          "command": "vitte.refreshExplorer",
-          "when": "view == vitteView",
-          "group": "navigation@1"
         }
       ],
       "commandPalette": [
@@ -530,6 +533,13 @@
         }
       ]
     },
+    "iconThemes": [
+      {
+        "id": "vitte-icons",
+        "label": "Vitte Icons",
+        "path": "./icons/vitte-icon-theme.json"
+      }
+    ],
     "keybindings": [
       {
         "command": "vitte.restartServer",
@@ -571,6 +581,45 @@
       "type": "object",
       "title": "Vitte Language",
       "properties": {
+        "vitte.formatting": {
+          "type": "object",
+          "description": "Paramètres de formatage Vitte (utilisés par le serveur de langage).",
+          "properties": {
+            "tabSize": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16,
+              "default": 2,
+              "description": "Taille de tabulation en espaces."
+            },
+            "insertSpaces": {
+              "type": "boolean",
+              "default": true,
+              "description": "Utiliser des espaces pour l’indentation (sinon tabulations)."
+            },
+            "trimTrailingWhitespace": {
+              "type": "boolean",
+              "default": true,
+              "description": "Supprimer les espaces de fin de ligne."
+            },
+            "insertFinalNewline": {
+              "type": "boolean",
+              "default": true,
+              "description": "Ajouter un saut de ligne final à la fin du document."
+            },
+            "eol": {
+              "type": "string",
+              "enum": ["lf", "crlf", "auto"],
+              "default": "lf",
+              "description": "Style de fin de ligne à appliquer."
+            },
+            "detectMixedIndentation": {
+              "type": "boolean",
+              "default": true,
+              "description": "Détecter l’indentation mixte et choisir le style dominant."
+            }
+          }
+        },
         "vitte.trace.server": {
           "type": "string",
           "enum": [
@@ -708,11 +757,8 @@
     "test": "npm run build && node ./out/test/runTest.js"
   },
   "dependencies": {
-    "tough-cookie": "^6.0.0",
     "vscode-languageclient": "^9.0.1",
-    "vscode-nls": "^5.2.0",
-    "azure-devops-node-api": "^11.2.0",
-    "typed-rest-client": "^2.1.0"
+    "vscode-nls": "^5.2.0"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",

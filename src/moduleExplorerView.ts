@@ -117,7 +117,7 @@ export class ModuleExplorerProvider implements vscode.TreeDataProvider<ModuleTre
 
 export function registerModuleExplorerView(context: vscode.ExtensionContext): ModuleExplorerProvider {
   const provider = new ModuleExplorerProvider();
-  const tree = vscode.window.createTreeView<ModuleTreeNode>("vitteView", {
+  const tree = vscode.window.createTreeView<ModuleTreeNode>("vitteModules", {
     treeDataProvider: provider,
     showCollapseAll: true
   });

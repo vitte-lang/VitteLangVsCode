@@ -39,7 +39,7 @@ import {
 import { TextDocument } from "vscode-languageserver-textdocument";
 
 /* Modules internes */
-import { provideCompletions } from "./completion.js";
+import { provideCompletions, resolveCompletion, triggerCharacters } from "./completion.js";
 import {
   documentSymbols,
   definitionAtPosition,
@@ -87,7 +87,8 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
   const result: InitializeResult = {
     capabilities: {
       textDocumentSync: TextDocumentSyncKind.Incremental,
-      completionProvider: { resolveProvider: false, triggerCharacters: [".", ":"] },
+      // Enable resolve to enrich completion items lazily and use centralized trigger characters
+      completionProvider: { resolveProvider: true, triggerCharacters: triggerCharacters() },
       hoverProvider: true,
       documentSymbolProvider: true,
       documentFormattingProvider: true,
@@ -155,6 +156,11 @@ connection.onCompletion((params: CompletionParams, token?: CancellationToken): C
   const doc = documents.get(params.textDocument.uri);
   if (!doc || cancelled(token)) return [];
   try { return provideCompletions(doc, params.position); } catch (e) { logErr("completion", e); return []; }
+});
+
+// Allow the client to resolve/enrich completion items on demand (details, docs)
+connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
+  try { return resolveCompletion(item); } catch (e) { logErr("completionResolve", e); return item; }
 });
 
 connection.onHover((params: HoverParams, token?: CancellationToken): Hover | null => {

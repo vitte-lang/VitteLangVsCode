@@ -100,10 +100,36 @@ All commands are discoverable from the Command Palette (`⇧⌘P` / `Ctrl+Shift+
 
 ## Settings
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `vitte.trace.server` | `"off"` | Controls language server trace level (`off`, `messages`, `verbose`). |
-| `vitte.serverPath` | `""` | Absolute path to a custom LSP server binary. Leave empty to use the bundled server. |
+- Core
+  - `vitte.trace.server` (default: `"off"`) — Language server trace level (`off`, `messages`, `verbose`).
+  - `vitte.serverPath` (default: `""`) — Absolute path to a custom LSP server binary. Leave empty to use the bundled server.
+
+- Formatting (`vitte.formatting.*`) — used by the language server for document/range formatting
+  - `vitte.formatting.tabSize` (default: `2`) — Indentation size in spaces (1..16).
+  - `vitte.formatting.insertSpaces` (default: `true`) — Use spaces instead of tabs.
+  - `vitte.formatting.trimTrailingWhitespace` (default: `true`) — Remove trailing spaces at end of lines.
+  - `vitte.formatting.insertFinalNewline` (default: `true`) — Ensure a final newline at end of file.
+  - `vitte.formatting.eol` (default: `"lf"`) — End‑of‑line policy: `lf`, `crlf`, or `auto`.
+  - `vitte.formatting.detectMixedIndentation` (default: `true`) — Heuristic to normalize mixed tabs/spaces to the dominant style.
+
+Example (User or Workspace settings):
+
+```jsonc
+{
+  "vitte.formatting": {
+    "tabSize": 4,
+    "insertSpaces": true,
+    "trimTrailingWhitespace": true,
+    "insertFinalNewline": true,
+    "eol": "lf",
+    "detectMixedIndentation": true
+  }
+}
+```
+
+Tips:
+- Use “Vitte: Format Document” or the standard “Format Document” command; both call the same LSP formatter.
+- You can also format a selection via “Format Selection”.
 
 ---
 

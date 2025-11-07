@@ -14,6 +14,12 @@ import { registerModuleExplorerView, ModuleExplorerProvider } from "./moduleExpl
 import { VitteProjectTreeProvider } from "./providers/tree/projectTree";
 import { DocsPanel } from "./providers/docsPanel";
 import { PlaygroundPanel } from "./providers/playgroundPanel";
+import { registerBuildTasks } from "./tasks/buildTasks";
+import { registerBenchTasks } from "./tasks/benchTasks";
+import { registerRuntimeLocatorCommand } from "./debug/runtimeLocator";
+import { registerDebugFactory } from "./debug/adapterFactory";
+import { registerDebugConfigurationProvider } from "./debug/configurationProvider";
+import { registerTelemetry } from "./utils/telemetry";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -163,10 +169,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 
   await startClient(context);
 
+  // Debug & runtime tooling
+  registerDebugConfigurationProvider(context);
+  registerDebugFactory(context);
+  registerRuntimeLocatorCommand(context);
+  registerBuildTasks(context);
+  registerBenchTasks(context);
+  await registerTelemetry(context);
+
   // Sidebar: Explorateur Vitte (activity bar)
   const vitteTree = new VitteProjectTreeProvider(context);
   context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('vitteView', vitteTree)
+    vscode.window.registerTreeDataProvider('vitteExplorer', vitteTree)
   );
 
   // Toolbar + palette commands for the view

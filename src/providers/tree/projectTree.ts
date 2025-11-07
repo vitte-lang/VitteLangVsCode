@@ -107,12 +107,12 @@ readonly onDidChangeTreeData: vscode.Event<Node | null | undefined> = this._onDi
         item.iconPath = vscode.ThemeIcon.Folder;
         break;
       case 'group':
-        // Use packaged SVG (media/icons/vitte.svg or other). Fallback to 'vitte'.
-        item.iconPath = this.iconAsset('vitte');
+        // Use packaged SVG (media/icons/vitte-logo.svg).
+        item.iconPath = this.iconAsset('vitte-logo');
         break;
       case 'target':
         // Reuse the same SVG; change to 'gear' if you add media/icons/gear.svg later
-        item.iconPath = this.iconAsset('vitte');
+        item.iconPath = this.iconAsset('vitte-logo');
         break;
     }
     return item;

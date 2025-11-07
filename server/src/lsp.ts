@@ -12,10 +12,10 @@ import {
   TextDocuments,
   TextDocumentSyncKind,
   DidChangeConfigurationNotification,
-  CompletionItem,
-  CompletionItemKind,
-  TextDocumentPositionParams,
   Range,
+  TextEdit,
+  DocumentFormattingParams,
+  DocumentRangeFormattingParams,
 } from 'vscode-languageserver/node';
 
 import { TextDocument } from 'vscode-languageserver-textdocument';
@@ -23,6 +23,11 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import Config, { defaultFormatting } from './config';
 import { logLsp, attachConnection } from './logger';
 import { VitteLanguageService } from './languageService';
+import { registerCommands, buildExecuteCommandProvider } from './commands';
+import { provideHover } from '../features/hover';
+import { legend as semanticLegend, tokenize as semanticTokenize } from '../features/semanticTokens';
+import { registerDiagnostics as registerDiagnosticsFeature } from '../features/diagnostics';
+import { registerCompletion } from '../features/completion';
 import {
   normalizeIndentation,
   computeMinimalSmartEdits,
@@ -39,6 +44,8 @@ logLsp.info('Vitte LSP: connection created');
 
 const documents: TextDocuments<TextDocument> = new TextDocuments(TextDocument);
 const lang = new VitteLanguageService();
+// Register completion feature (keywords + snippets)
+registerCompletion(connection as any, documents as any);
 
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
@@ -62,6 +69,12 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
       // Formatting endpoints are exposed via custom requests below
       documentFormattingProvider: true,
       documentRangeFormattingProvider: true,
+      executeCommandProvider: buildExecuteCommandProvider(),
+      semanticTokensProvider: {
+        legend: semanticLegend,
+        full: true,
+        range: false,
+      } as any,
     },
   };
 
@@ -76,10 +89,14 @@ connection.onInitialize((params: InitializeParams): InitializeResult => {
 
 connection.onInitialized(() => {
   logLsp.info('Vitte LSP: initialized');
+  // Register LSP executeCommand handlers
+  try { registerCommands(connection); } catch {}
   if (hasConfigurationCapability) {
     connection.client.register(DidChangeConfigurationNotification.type, undefined);
     logLsp.debug('Registered DidChangeConfiguration');
   }
+  // Wire advanced diagnostics feature (debounced publication)
+  try { registerDiagnosticsFeature(connection as any, documents as any); } catch (e) { logLsp.warn('Diagnostics feature wiring failed', String(e)); }
 });
 
 // ---------------------------------------------------------------------------
@@ -100,50 +117,66 @@ connection.onDidChangeConfiguration(
   })
 );
 
+// Diagnostics are handled by server/features/diagnostics.ts
+
+// Completion is handled by features/completion.ts
+
 // ---------------------------------------------------------------------------
-// Diagnostics lifecycle
+// Hover (features/hover)
 // ---------------------------------------------------------------------------
 
-documents.onDidOpen((e) => handleValidate(e.document));
-documents.onDidChangeContent((e) => handleValidate(e.document));
-documents.onDidClose((e) => {
-  // Clear diagnostics when closing
-  connection.sendDiagnostics({ uri: e.document.uri, diagnostics: [] });
+connection.onHover((params) => {
+  const doc = documents.get(params.textDocument.uri);
+  if (!doc) return null;
+  const ctx = { uri: params.textDocument.uri, text: doc.getText(), line: params.position.line, character: params.position.character };
+  const h = provideHover(ctx);
+  if (!h) return null;
+  return { contents: h.contents as any, range: h.range as any };
 });
 
-async function handleValidate(doc: TextDocument) {
-  try {
-    const diags = await lang.doValidation({ uri: doc.uri, getText: doc.getText.bind(doc) } as any);
-    connection.sendDiagnostics({ uri: doc.uri, diagnostics: diags });
-    logLsp.debug('Diagnostics sent', { uri: doc.uri, count: diags.length });
-  } catch (err) {
-    logLsp.error('Validation failed', { uri: doc.uri, error: String(err) });
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Completion
+// Semantic Tokens (features/semanticTokens)
 // ---------------------------------------------------------------------------
 
-connection.onCompletion((params: TextDocumentPositionParams): CompletionItem[] => {
-  try {
-    const items = lang.doComplete(params);
-    return items;
-  } catch (err) {
-    logLsp.error('Completion failed', { error: String(err) });
-    return [
-      { label: 'error', kind: CompletionItemKind.Text, detail: 'Error during completion' },
-    ];
-  }
-});
-
-connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
-  try { return lang.doResolve(item); } catch { return item; }
+connection.onRequest('textDocument/semanticTokens/full', (params: any) => {
+  const doc = documents.get(params?.textDocument?.uri);
+  if (!doc) return { data: [] };
+  try { return semanticTokenize(doc.getText()); } catch { return { data: [] }; }
 });
 
 // ---------------------------------------------------------------------------
 // Formatting (document, range, documentOrRange)
 // ---------------------------------------------------------------------------
+
+// Standard LSP handlers
+connection.onDocumentFormatting(async (params: DocumentFormattingParams): Promise<TextEdit[]> => {
+  const uri = params.textDocument.uri;
+  const doc = documents.get(uri);
+  if (!doc) return [];
+  let opts;
+  try { opts = await Config.getFormattingSettings(connection, uri); } catch { opts = defaultFormatting; }
+  const original = doc.getText();
+  const pre = normalizeIndentation(original, opts.insertSpaces, opts.tabSize);
+  const formatted = formatText(pre, opts);
+  const edits = computeMinimalSmartEdits(original, formatted);
+  return edits.map((e) => ({ range: e.range as Range, newText: e.newText } as TextEdit));
+});
+
+connection.onDocumentRangeFormatting(async (params: DocumentRangeFormattingParams): Promise<TextEdit[]> => {
+  const uri = params.textDocument.uri;
+  const doc = documents.get(uri);
+  if (!doc) return [];
+  let opts;
+  try { opts = await Config.getFormattingSettings(connection, uri); } catch { opts = defaultFormatting; }
+  const start = doc.offsetAt(params.range.start);
+  const end = doc.offsetAt(params.range.end);
+  const original = doc.getText();
+  const fragment = original.slice(start, end);
+  const fragmentNorm = normalizeIndentation(fragment, opts.insertSpaces, opts.tabSize);
+  const formatted = formatText(fragmentNorm, opts, /*isFragment*/ true);
+  if (formatted === fragment) return [];
+  return [{ range: params.range as Range, newText: formatted }];
+});
 
 connection.onRequest('vitte/formatDocument', async (params: any) => {
   const uri: string = params?.textDocument?.uri;

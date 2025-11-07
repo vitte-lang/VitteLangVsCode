@@ -36,8 +36,8 @@ const timers = new Map<string, NodeJS.Timeout>();
 
 /** Register diagnostics on connection & documents */
 export function registerDiagnostics(connection: Connection, documents: TextDocuments<TextDocument>): void {
-  documents.onDidChangeContent((change) => scheduleValidate(change.document));
-  documents.onDidOpen((open) => scheduleValidate(open.document));
+  documents.onDidChangeContent((change) => scheduleValidate(connection, change.document));
+  documents.onDidOpen((open) => scheduleValidate(connection, open.document));
   documents.onDidClose((close) => clearDiagnostics(connection, close.document));
 
   // Optional: react to config changes from client (if supported)
@@ -47,7 +47,7 @@ export function registerDiagnostics(connection: Connection, documents: TextDocum
       if (cfg && typeof cfg === 'object') {
         updateConfig(cfg);
         // revalidate all open docs after config change
-        for (const doc of documents.all()) scheduleValidate(doc);
+        for (const doc of documents.all()) scheduleValidate(connection, doc);
       }
     } catch {
       // ignore invalid settings payloads
@@ -72,13 +72,13 @@ export function updateConfig(partial: Partial<DiagnosticsConfig>): void {
   currentConfig = next;
 }
 
-function scheduleValidate(doc: TextDocument): void {
+function scheduleValidate(connection: Connection, doc: TextDocument): void {
   const uri = doc.uri;
   const existing = timers.get(uri);
   if (existing) clearTimeout(existing);
   const t = setTimeout(() => {
     timers.delete(uri);
-    void validateAndPublish(doc);
+    void validateAndPublish(connection, doc);
   }, debounceMs);
   timers.set(uri, t);
 }
@@ -93,7 +93,7 @@ function clearDiagnostics(connection: Connection, doc: TextDocument): void {
   }
 }
 
-async function validateAndPublish(doc: TextDocument): Promise<void> {
+async function validateAndPublish(connection: Connection, doc: TextDocument): Promise<void> {
   const diagnostics = computeDiagnostics(doc, currentConfig);
   // Respect cap
   const limited = diagnostics.length > currentConfig.maxProblems
@@ -101,7 +101,7 @@ async function validateAndPublish(doc: TextDocument): Promise<void> {
     : diagnostics;
   // Publish
   // In LSP, diagnostics are pushed by server to client
-  (doc as any)._connection?.sendDiagnostics?.({ uri: doc.uri, diagnostics: limited });
+  try { connection.sendDiagnostics({ uri: doc.uri, diagnostics: limited }); } catch { /* ignore */ }
 }
 
 /** Compute diagnostics with lightweight, syntax-agnostic heuristics. */
