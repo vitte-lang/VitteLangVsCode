@@ -58,55 +58,33 @@ export function getSemanticTokensLegend(): SemanticTokensLegend {
 /* --------------------------------- Hover ---------------------------------- */
 
 const HOVER_DOC: Record<string, string> = {
-  module: "Déclare un module.",
-  import: "Importe un chemin.",
-  use: "Rend un symbole accessible dans le scope courant.",
-  as: "Alias de symbole.",
-  pub: "Visibilité publique.",
-  const: "Constante compile-time.",
-  let: "Déclare une variable locale.",
-  mut: "Rend la variable mutable.",
-  var: "Déclare une variable (alias let).",
-  static: "Lie une variable à durée de vie statique.",
+  module: "Déclare le module courant.",
+  import: "Importe un chemin depuis un autre module.",
+  as: "Assigne un alias à un import.",
+  pub: "Rend le symbole public.",
+  struct: "Définit une structure.",
+  enum: "Définit une énumération.",
+  union: "Définit une union.",
+  type: "Déclare un alias de type.",
   fn: "Déclare une fonction.",
-  async: "Marque une fonction asynchrone.",
-  await: "Suspend l’exécution jusqu’à résolution d’une future.",
-  struct: "Déclare une structure.",
-  enum: "Déclare une énumération.",
-  impl: "Bloc d’implémentation.",
-  type: "Alias de type.",
+  let: "Déclare une variable locale.",
+  mut: "Rend un binding mutable.",
+  const: "Déclare une constante.",
+  static: "Déclare un symbole statique.",
   where: "Contraintes de type.",
   if: "Instruction conditionnelle.",
   else: "Branche alternative.",
-  match: "Branchements par motifs.",
+  match: "Branches par motifs.",
   while: "Boucle conditionnelle.",
   for: "Boucle itérative.",
   in: "Itération sur une séquence.",
+  loop: "Boucle infinie interrompue par break.",
   break: "Interrompt une boucle.",
   continue: "Passe à l’itération suivante.",
-  loop: "Boucle infinie interrompue par break.",
-  switch: "Switch multi-branches.",
-  case: "Branche d’un switch.",
-  default: "Branche par défaut d’un switch.",
   return: "Retourne depuis une fonction.",
-  try: "Bloc surveillant des erreurs.",
-  catch: "Capture les erreurs d’un try.",
-  finally: "Bloc exécuté après try/catch.",
-  throw: "Lance une erreur.",
-  yield: "Produit une valeur dans un générateur.",
-  with: "Ouvre un bloc avec gestion de ressource.",
-  defer: "Planifie du code exécuté en sortie de scope.",
-  unsafe: "Bloc où les garanties de sécurité doivent être assurées manuellement.",
-  extern: "Lien vers une fonction ou donnée externe.",
-  inline: "Suggestion d’inlining au compilateur.",
-  volatile: "Empêche l’optimisation d’accès mémoire.",
   true: "Booléen vrai.",
   false: "Booléen faux.",
-  mod: "Déclare un module (alias).",
-  test: "Marque une fonction de test.",
-  null: "Valeur nulle.",
-  nil: "Valeur nulle (synonyme).",
-  none: "Valeur nulle (synonyme).",
+  nil: "Valeur nulle.",
 };
 
 export function provideHover(doc: TextDocument, position: Position): Hover | null {
@@ -154,12 +132,13 @@ export function buildSemanticTokens(doc: TextDocument): SemanticTokens {
   }
 
   // 4) déclarations: colorer uniquement le nom
-  addDeclSpans(text, lex.mask, /\b(?:module|mod)\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.namespace, spans);
+  addDeclSpans(text, lex.mask, /\bmodule\s+([A-Za-z_][\w:]*)/g, 1, TYPE_INDEX.namespace, spans);
   addDeclSpans(text, lex.mask, /\bstruct\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
   addDeclSpans(text, lex.mask, /\benum\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
+  addDeclSpans(text, lex.mask, /\bunion\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
   addDeclSpans(text, lex.mask, /\btype\s+([A-Za-z_]\w*)/g, 1, TYPE_INDEX.type, spans);
   addDeclSpans(text, lex.mask, /\bfn\s+([A-Za-z_]\w*)\s*\(/g, 1, TYPE_INDEX.function, spans);
-  addDeclSpans(text, lex.mask, /\b(?:let|const)\s+(?:mut\s+)?([A-Za-z_]\w*)/g, 1, TYPE_INDEX.variable, spans);
+  addDeclSpans(text, lex.mask, /\b(?:let|const|static)\s+(?:mut\s+)?([A-Za-z_]\w*)/g, 1, TYPE_INDEX.variable, spans);
 
   // 5) paramètres de fonctions
   for (const m of matchAll(/\bfn\s+[A-Za-z_]\w*\s*\(([^)]*)\)/g, text)) {

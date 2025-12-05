@@ -30,8 +30,8 @@ export function registerBenchTasks(ctx: vscode.ExtensionContext) {
     }),
   );
 
-  const provider: vscode.TaskProvider = {
-    provideTasks: async () => {
+  const provider = {
+    provideTasks: async (_token?: vscode.CancellationToken): Promise<vscode.Task[]> => {
       const cmd = await benchCommandLine();
       const definition: VitteBenchTaskDefinition = { type: 'vitte', command: 'bench' };
       const task = new vscode.Task(
@@ -43,8 +43,8 @@ export function registerBenchTasks(ctx: vscode.ExtensionContext) {
       );
       return [task];
     },
-    resolveTask: (task) => task,
-  };
+    resolveTask: (task: vscode.Task) => task,
+  } as unknown as vscode.TaskProvider;
   ctx.subscriptions.push(vscode.tasks.registerTaskProvider('vitte', provider));
 }
 

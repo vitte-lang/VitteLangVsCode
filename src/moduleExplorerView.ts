@@ -293,7 +293,7 @@ function uriToBasename(uri: string): string {
 }
 
 function themeIcon(id: string): vscode.ThemeIcon {
-  return new vscode.ThemeIcon(id);
+  return { id } as vscode.ThemeIcon;
 }
 
 function isVitteDocument(document: vscode.TextDocument): boolean {

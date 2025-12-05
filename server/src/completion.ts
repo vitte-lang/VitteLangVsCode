@@ -34,7 +34,7 @@ const COMMON_MEMBERS: readonly { recv: RegExp; members: string[] }[] = [
   { recv: /(map|dict|table)$/i, members: ["len()", "get(${1:key})", "set(${1:key}, ${2:val})", "remove(${1:key})", "keys()", "values()"] }
 ];
 
-// Idées d’imports rapides. Utiles lorsque la ligne commence par `use ` ou `import `.
+// Idées d’imports rapides. Utiles lorsque la ligne commence par `import `.
 const QUICK_IMPORTS: readonly string[] = [
   "std.core",
   "std.io",
@@ -79,37 +79,41 @@ const SYMBOL_KIND_LABEL: Record<number, string> = {
  * ========================================================================== */
 
 const SNIPPETS: CompletionItem[] = [
+  ciSnippet("module", "Déclare un module", "Déclare le module courant.",
+    "module ${1:my.module};"),
+  ciSnippet("import", "Importe un module", "Importe un chemin depuis un autre module.",
+    "import ${1:std::core};"),
   ciSnippet("fn", "Déclare une fonction",
-    "Déclare une fonction avec paramètres et type de retour optionnel.",
+    "Fonction avec paramètres et type de retour optionnel.",
     "fn ${1:name}(${2:params})${3: -> ${4:Type}} {\n\t$0\n}"),
   ciSnippet("main", "Point d’entrée", "Déclare la fonction principale.",
     "fn main() {\n\t$0\n}"),
-  ciSnippet("struct", "Déclare une struct", "Déclare une structure avec des champs typés.",
+  ciSnippet("struct", "Déclare une struct", "Structure avec des champs typés.",
     "struct ${1:Name} {\n\t${2:field}: ${3:Type},\n}"),
-  ciSnippet("enum", "Déclare une enum", "Déclare une énumération avec plusieurs variantes.",
+  ciSnippet("enum", "Déclare une enum", "Énumération avec variantes.",
     "enum ${1:Name} {\n\t${2:Variant1},\n\t${3:Variant2}\n}"),
-  ciSnippet("impl", "Impl bloc", "Implémente des méthodes pour un type donné.",
-    "impl ${1:Type} {\n\tfn ${2:new}(${3:args}) -> Self {\n\t\t$0\n\t}\n}"),
+  ciSnippet("union", "Déclare une union", "Union tagged simple.",
+    "union ${1:Name} {\n\t${2:field}: ${3:Type},\n}"),
+  ciSnippet("type", "Alias de type", "Déclare un alias de type.",
+    "type ${1:Alias} = ${2:Existing};"),
   ciSnippet("match", "Match expression", "Expression de branchement avec motifs.",
     "match ${1:expr} {\n\t${2:Pattern} => ${3:expr},\n\t_ => ${0:default}\n}"),
-  ciSnippet("switch", "Switch / case", "Switch multi-branches avec clause default.",
-    "switch ${1:expr} {\n\tcase ${2:Pattern} => ${3:expr},\n\tdefault => ${0}\n}"),
-  ciSnippet("trycatch", "Bloc try/catch", "Gestion d’erreurs avec bloc finally optionnel.",
-    "try {\n\t${1}\n} catch ${2:error} {\n\t${3}\n}${4: finally {\n\t$0\n}}"),
-  ciSnippet("asyncfn", "Fonction async", "Déclare une fonction asynchrone avec await.",
-    "async fn ${1:name}(${2:params})${3: -> ${4:Type}} {\n\tawait ${5:future()}\n\t$0\n}"),
   ciSnippet("ifelse", "If / Else", "Structure conditionnelle complète.",
     "if ${1:cond} {\n\t${2}\n} else {\n\t${0}\n}"),
   ciSnippet("for", "Boucle for", "Boucle for-in sur un itérable.",
-    "for ${1:item} in ${2:iter} {\n\t$0\n}"),
+    "for ${1:pat} in ${2:iter} {\n\t$0\n}"),
   ciSnippet("while", "Boucle while", "Boucle conditionnelle.",
     "while ${1:cond} {\n\t$0\n}"),
   ciSnippet("loop", "Boucle infinie", "Boucle sans fin, utiliser break pour sortir.",
     "loop {\n\t$0\n}"),
+  ciSnippet("let", "Binding local", "Déclare une variable locale.",
+    "let ${1:name}${2: : ${3:Type}}${4: = ${5:value}};"),
+  ciSnippet("const", "Constante", "Déclare une constante globale.",
+    "const ${1:NAME}: ${2:Type} = ${3:value};"),
+  ciSnippet("static", "Statique", "Déclare un statique global.",
+    "static ${1:NAME}: ${2:Type} = ${3:value};"),
   ciSnippet("print", "Affichage console", "Affiche un message sur la sortie standard.",
     "println(\"${1:msg}\");"),
-  ciSnippet("test", "Test unitaire", "Déclare une fonction de test unitaire.",
-    "#[test]\nfn ${1:it_works}() {\n\t$0\n}"),
   ciSnippet("doc", "Commentaire doc", "Ajoute un commentaire de documentation.",
     "/// ${1:Résumé}\n///\n/// ${0:Détails}")
 ];
@@ -123,14 +127,14 @@ interface ExtractedSym { name: string; kind: SymbolKind; }
 function extractSymbols(doc: TextDocument): ExtractedSym[] {
   const text = doc.getText();
   const rules: { rx: RegExp; kind: SymbolKind; g: number }[] = [
-    { rx: /^\s*(?:pub\s+)?(?:module|mod)\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Namespace, g: 1 },
-    { rx: /^\s*(?:pub\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern\s+(?:"[^"]*"\s+)?)?fn\s+([A-Za-z_]\w*)/gm, kind: SymbolKind.Function, g: 1 },
+    { rx: /^\s*module\s+([A-Za-z_][\w:]*)/gm,                 kind: SymbolKind.Namespace, g: 1 },
+    { rx: /^\s*(?:pub\s+)?fn\s+([A-Za-z_]\w*)/gm,             kind: SymbolKind.Function,  g: 1 },
     { rx: /^\s*(?:pub\s+)?struct\s+([A-Za-z_]\w*)/gm,         kind: SymbolKind.Struct,    g: 1 },
     { rx: /^\s*(?:pub\s+)?enum\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Enum,      g: 1 },
-    { rx: /^\s*(?:pub\s+)?trait\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Interface, g: 1 },
+    { rx: /^\s*(?:pub\s+)?union\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Struct,    g: 1 },
     { rx: /^\s*(?:pub\s+)?type\s+([A-Za-z_]\w*)/gm,           kind: SymbolKind.Interface, g: 1 },
-    { rx: /^\s*(?:pub\s+)?let\s+(?:mut\s+)?([A-Za-z_]\w*)/gm, kind: SymbolKind.Variable,  g: 1 },
-    { rx: /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Constant,  g: 1 }
+    { rx: /^\s*(?:pub\s+)?const\s+([A-Za-z_]\w*)/gm,          kind: SymbolKind.Constant,  g: 1 },
+    { rx: /^\s*(?:pub\s+)?static\s+([A-Za-z_]\w*)/gm,         kind: SymbolKind.Variable,  g: 1 },
   ];
 
   const out: ExtractedSym[] = [];
@@ -225,7 +229,7 @@ function diagnosticsCompletion(linePrefix: string): CompletionItem[] {
       sortText: tier(0)
     });
   }
-  if (/^\s*(use|import)\s+/.test(linePrefix)) {
+  if (/^\s*import\s+/.test(linePrefix)) {
     for (const imp of QUICK_IMPORTS) {
       items.push({
         label: imp,
@@ -420,8 +424,8 @@ export function provideCompletions(doc: TextDocument, position: Position): Compl
   // Contexte: membres après un point
   items.push(...memberCompletion(linePrefix));
 
-  // Contexte: import/use et autres heuristiques
-  const isImportContext = /^\s*(use|import)\s+/.test(linePrefix);
+  // Contexte: import et autres heuristiques
+  const isImportContext = /^\s*import\s+/.test(linePrefix);
 
   items.push(...diagnosticsCompletion(linePrefix).map(ci => ({
     ...ci,

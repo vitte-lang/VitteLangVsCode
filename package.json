@@ -1,8 +1,8 @@
 {
   "name": "vitte-studio",
   "displayName": "Vitte Language Support",
-  "description": "Support complet pour Vitte, Vit et Vitl : grammaire, LSP, debug, tasks, tests, explorer, docs, bench & playground.",
-  "version": "1.7.1",
+  "description": "Full tooling for Vitte and Vit: grammar, LSP, debug, tasks, tests, explorer, docs, bench & playground.",
+  "version": "1.8.0",
   "publisher": "VitteStudio",
   "license": "MIT",
   "repository": {
@@ -20,7 +20,7 @@
     "Programming Languages",
     "Debuggers"
   ],
-  "icon": "images/icon.png",
+  "icon": "icons/vitte.png",
   "extensionKind": [
     "workspace",
     "ui"
@@ -31,6 +31,7 @@
     "server/out/**",
     "syntaxes/**",
     "media/**",
+    "icons/**",
     "schemas/**",
     "language-configuration.json",
     "README.md",
@@ -40,12 +41,14 @@
   "activationEvents": [
     "onLanguage:vitte",
     "onLanguage:vit",
-    "onLanguage:vitl",
     "onView:vitteDiagnostics",
     "onView:vitteModules",
     "onView:vitteExplorer",
     "onView:vitteView",
     "onCommand:vitte.showServerLog",
+    "onCommand:vitte.showServerMetrics",
+    "onCommand:vitte.showCommandMenu",
+    "onCommand:vitte.metrics.refresh",
     "onCommand:vitte.restartServer",
     "onCommand:vitte.runAction",
     "onCommand:vitte.runActionWithArgs",
@@ -77,24 +80,21 @@
     "onCommand:vitte.toggleIncremental",
     "onCommand:vitte.refreshTests",
     "onCommand:vitte.runTests",
+    "onCommand:vitte.quickActions",
+    "onCommand:vitte.quickActions.exportStats",
     "onCommand:vitte.telemetry.toggle",
     "onDebugInitialConfigurations",
-    "onDebugResolve:vitte",
-    "onDebugResolve:vitl"
+    "onDebugResolve:vitte"
   ],
   "contributes": {
     "languages": [
       {
         "id": "vitte",
         "aliases": [
-          "Vitte",
-          "vit",
-          "vitl"
+          "Vitte"
         ],
         "extensions": [
-          ".vitte",
-          ".vit",
-          ".vitl"
+          ".vitte"
         ],
         "configuration": "./language-configuration.json"
       },
@@ -107,17 +107,6 @@
           ".vit"
         ],
         "configuration": "./language-configuration.json"
-      },
-      {
-        "id": "vitl",
-        "aliases": [
-          "Vitl",
-          "Vitte Light"
-        ],
-        "extensions": [
-          ".vitl"
-        ],
-        "configuration": "./language-configuration.json"
       }
     ],
     "grammars": [
@@ -128,11 +117,6 @@
       },
       {
         "language": "vit",
-        "scopeName": "source.vitte",
-        "path": "./syntaxes/vitte.tmLanguage.json"
-      },
-      {
-        "language": "vitl",
         "scopeName": "source.vitte",
         "path": "./syntaxes/vitte.tmLanguage.json"
       }
@@ -161,13 +145,17 @@
         {
           "id": "vitteView",
           "name": "Explorateur Vitte"
+        },
+        {
+          "id": "vitteMetrics",
+          "name": "Vitte Metrics"
         }
       ]
     },
     "viewsWelcome": [
       {
         "view": "vitteView",
-        "contents": "# Bienvenue dans Vitte\n\nAucun projet détecté.\n\n- $(refresh) **Rafraîchir** pour rescanner le workspace → `vscode:command:vitte.refreshExplorer`\n- $(book) **Docs** → `vscode:command:vitte.openDocs`\n- $(beaker) **Playground** → `vscode:command:vitte.openPlayground`\n",
+        "contents": "# Welcome to Vitte\n\nNo project detected.\n\n- $(refresh) **Refresh** to rescan the workspace → `vscode:command:vitte.refreshExplorer`\n- $(book) **Docs** → `vscode:command:vitte.openDocs`\n- $(beaker) **Playground** → `vscode:command:vitte.openPlayground`\n",
         "when": "view == vitteView && !workspaceFolderCount"
       }
     ],
@@ -177,8 +165,7 @@
         "label": "Vitte Debug",
         "languages": [
           "vitte",
-          "vit",
-          "vitl"
+          "vit"
         ],
         "configurationAttributes": {
           "launch": {
@@ -186,17 +173,17 @@
             "properties": {
               "program": {
                 "type": "string",
-                "description": "Chemin vers vitte-runtime (optionnel, sinon auto)",
+                "description": "Path to vitte-runtime (optional, auto-detected otherwise)",
                 "default": ""
               },
               "cwd": {
                 "type": "string",
-                "description": "Répertoire de travail",
+                "description": "Working directory",
                 "default": "${workspaceFolder}"
               },
               "args": {
                 "type": "array",
-                "description": "Arguments CLI",
+                "description": "CLI arguments",
                 "default": []
               },
               "trace": {
@@ -233,60 +220,24 @@
             ]
           }
         ]
-      },
-      {
-        "type": "vitl",
-        "label": "Vitl Debug",
-        "languages": [
-          "vitte",
-          "vit",
-          "vitl"
-        ],
-        "configurationAttributes": {
-          "launch": {
-            "required": [
-              "program"
-            ],
-            "properties": {
-              "program": {
-                "type": "string",
-                "description": "Fichier à exécuter",
-                "default": "${file}"
-              },
-              "cwd": {
-                "type": "string",
-                "description": "Répertoire de travail",
-                "default": "${workspaceFolder}"
-              },
-              "args": {
-                "type": "array",
-                "description": "Arguments CLI",
-                "default": []
-              },
-              "stopOnEntry": {
-                "type": "boolean",
-                "default": true
-              }
-            }
-          }
-        },
-        "initialConfigurations": [
-          {
-            "type": "vitl",
-            "request": "launch",
-            "name": "Vitl: Launch current file",
-            "program": "${file}",
-            "cwd": "${workspaceFolder}",
-            "stopOnEntry": true,
-            "args": []
-          }
-        ]
       }
     ],
     "commands": [
       {
         "command": "vitte.showServerLog",
         "title": "Vitte: Show Server Log"
+      },
+      {
+        "command": "vitte.showServerMetrics",
+        "title": "Vitte: Show Server Metrics"
+      },
+      {
+        "command": "vitte.metrics.refresh",
+        "title": "Vitte: Refresh Metrics View"
+      },
+      {
+        "command": "vitte.showCommandMenu",
+        "title": "Vitte: Show Command Menu"
       },
       {
         "command": "vitte.restartServer",
@@ -334,23 +285,23 @@
       },
       {
         "command": "vitte.diagnostics.refresh",
-        "title": "Vitte: Rafraîchir les diagnostics"
+        "title": "Vitte: Refresh Diagnostics"
       },
       {
         "command": "vitte.diagnostics.open",
-        "title": "Vitte: Ouvrir le diagnostic"
+        "title": "Vitte: Open Diagnostic"
       },
       {
         "command": "vitte.modules.refresh",
-        "title": "Vitte: Rafraîchir la structure"
+        "title": "Vitte: Refresh Structure"
       },
       {
         "command": "vitte.refreshExplorer",
-        "title": "Vitte: Rafraîchir l'explorer"
+        "title": "Vitte: Refresh Explorer"
       },
       {
         "command": "vitte.revealInExplorer",
-        "title": "Vitte: Révéler dans l'explorateur"
+        "title": "Vitte: Reveal in Explorer"
       },
       {
         "command": "vitte.openDocs",
@@ -428,6 +379,16 @@
         "category": "Vitte"
       },
       {
+        "command": "vitte.quickActions",
+        "title": "Vitte: Quick",
+        "category": "Vitte"
+      },
+      {
+        "command": "vitte.quickActions.exportStats",
+        "title": "Vitte: Quick Export",
+        "category": "Vitte"
+      },
+      {
         "command": "vitte.telemetry.toggle",
         "title": "Vitte: Toggle Telemetry",
         "category": "Vitte"
@@ -460,6 +421,11 @@
         {
           "command": "vitte.refreshExplorer",
           "when": "view == vitteView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "vitte.metrics.refresh",
+          "when": "view == vitteMetrics",
           "group": "navigation@1"
         }
       ],
@@ -525,11 +491,43 @@
           "when": "workspaceFolderCount > 0"
         },
         {
+          "command": "vitte.quickActions",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "vitte.quickActions.exportStats",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
           "command": "vitte.telemetry.toggle",
           "when": "workspaceFolderCount > 0"
         }
       ]
     },
+    "walkthroughs": [
+      {
+        "id": "vitte.quickstart",
+        "title": "Vitte Quickstart",
+        "description": "Learn how to open the docs, detect the toolchain, and run your first build.",
+        "steps": [
+          {
+            "id": "vitte.quickstart.docs",
+            "title": "Explore the docs & playground",
+            "description": "Run [Vitte: Quick Actions](command:vitte.quickActions) and pick **Docs + Playground** to browse the bundled documentation."
+          },
+          {
+            "id": "vitte.quickstart.toolchain",
+            "title": "Detect the Vitte toolchain",
+            "description": "Use [Vitte: Detect Toolchain](command:vitte.detectToolchain) to auto-discover the CLI binaries or configure them manually."
+          },
+          {
+            "id": "vitte.quickstart.setup",
+            "title": "Run the onboarding setup",
+            "description": "Trigger [Vitte: Quick Actions](command:vitte.quickActions) again and choose **Run full setup** to chain docs, toolchain detection, and a build in one go."
+          }
+        ]
+      }
+    ],
     "keybindings": [
       {
         "command": "vitte.restartServer",
@@ -540,11 +538,6 @@
         "command": "vitte.restartServer",
         "key": "ctrl+shift+r",
         "when": "editorLangId == vit"
-      },
-      {
-        "command": "vitte.restartServer",
-        "key": "ctrl+shift+r",
-        "when": "editorLangId == vitl"
       }
     ],
     "taskDefinitions": [
@@ -579,57 +572,52 @@
             "verbose"
           ],
           "default": "off",
-          "description": "Active le traçage du serveur de langage Vitte."
+          "description": "Enable tracing for the Vitte language server."
         },
         "vitte.serverPath": {
           "type": "string",
           "default": "",
-          "description": "Chemin absolu vers le binaire/serveur personnalisé de Vitte. Vide = utilise le serveur intégré."
+          "description": "Absolute path to a custom Vitte server binary. Empty = use the bundled server."
         },
         "vitte.debug.program": {
           "type": "string",
           "default": "",
-          "description": "Chemin vers le binaire vitte-runtime (laisse vide pour auto-détection)."
-        },
-        "vitte.vitl.debug.program": {
-          "type": "string",
-          "default": "",
-          "description": "Chemin vers le binaire vitl-runtime (optionnel)."
+          "description": "Path to the vitte-runtime binary (leave blank for auto-detection)."
         },
         "vitte.toolchain.root": {
           "type": "string",
           "default": "",
-          "description": "Racine du toolchain Vitte (préfixe pour binaires)."
+          "description": "Root directory of the Vitte toolchain (prefix for binaries)."
         },
         "vitte.toolchainPath": {
           "type": "string",
           "default": "",
-          "description": "(Legacy) Ancien champ pour la racine du toolchain."
+          "description": "(Legacy) Deprecated fallback for the toolchain root."
         },
         "vitte.runtime.path": {
           "type": "string",
           "default": "",
-          "description": "Chemin du runtime (alternative aux réglages debug.program)."
+          "description": "Path to the runtime binary (alternative to debug.program)."
         },
         "vitte.lsp.path": {
           "type": "string",
           "default": "",
-          "description": "Chemin du binaire vitte-lsp."
+          "description": "Path to the vitte-lsp binary."
         },
         "vitte.build.path": {
           "type": "string",
           "default": "",
-          "description": "Chemin du binaire vitte-build."
+          "description": "Path to the vitte-build binary."
         },
         "vitte.fmt.path": {
           "type": "string",
           "default": "",
-          "description": "Chemin du binaire vitte-fmt."
+          "description": "Path to the vitte-fmt binary."
         },
         "vitte.bench.path": {
           "type": "string",
           "default": "",
-          "description": "Chemin du binaire vitte-bench."
+          "description": "Path to the vitte-bench binary."
         },
         "vitte.build.profile": {
           "type": "string",
@@ -640,51 +628,220 @@
             "bench"
           ],
           "default": "dev",
-          "description": "Profil de build par défaut."
+          "description": "Default build profile."
         },
         "vitte.build.incremental": {
           "type": "boolean",
           "default": false,
-          "description": "Active le build incrémental si supporté."
+          "description": "Enable incremental build when supported."
         },
         "vitte.build.distributed": {
           "type": "boolean",
           "default": false,
-          "description": "Active le build distribué si supporté."
+          "description": "Enable distributed build when supported."
         },
         "vitte.bench.reportDir": {
           "type": "string",
           "default": ".vitte/bench",
-          "description": "Dossier des rapports de benchmarks."
+          "description": "Directory that stores benchmark reports."
         },
         "vitte.docs.include": {
           "type": "string",
           "default": "**/*.md",
-          "description": "Glob d’inclusion pour l’index des docs locales."
+          "description": "Include glob for the local docs index."
         },
         "vitte.docs.exclude": {
           "type": "string",
           "default": "**/{node_modules,.git,dist,out,target,build}/**",
-          "description": "Glob d’exclusion pour l’index des docs locales."
+          "description": "Exclude glob for the local docs index."
         },
         "vitte.docs.indexLimit": {
           "type": "number",
           "default": 2000,
           "minimum": 100,
           "maximum": 10000,
-          "description": "Nombre max de fichiers .md indexés."
+          "description": "Maximum number of .md files to index."
         },
         "vitte.telemetry.enabled": {
           "type": "boolean",
           "default": false,
-          "description": "Active la télémétrie locale (JSONL écrit dans .vitte/telemetry)."
+          "description": "Enable local telemetry (JSONL stored under .vitte/telemetry)."
         },
         "vitte.telemetry.sampleRate": {
           "type": "number",
           "default": 0.1,
           "minimum": 0,
           "maximum": 1,
-          "description": "Taux d’échantillonnage 0..1."
+          "description": "Sampling rate in the [0,1] range."
+        },
+        "vitte.quickActions.sequences": {
+          "type": "array",
+          "default": [],
+          "description": "Define custom sequences for the “Vitte: Quick” command. Each entry triggers multiple VS Code commands sequentially.",
+          "items": {
+            "type": "object",
+            "required": [
+              "label",
+              "steps"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the sequence (used for history/favorites)."
+              },
+              "label": {
+                "type": "string",
+                "description": "Label displayed inside the palette."
+              },
+              "description": {
+                "type": "string",
+                "description": "Optional description displayed under the title."
+              },
+              "detail": {
+                "type": "string",
+                "description": "Optional detail text (for instance a summary of the steps). Defaults to the command list."
+              },
+              "steps": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "command"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "string",
+                      "description": "Full identifier of the VS Code command to execute."
+                    },
+                    "args": {
+                      "type": "array",
+                      "description": "Optional arguments forwarded to the command.",
+                      "items": {}
+                    }
+                  }
+                },
+                "description": "Ordered list of commands to execute."
+              }
+            }
+          }
+        },
+        "vitte.quickActions.defaults": {
+          "type": "object",
+          "default": {},
+          "description": "Override built-in Quick Actions (build, run, bench, diagnostics, etc.). Each property key matches an action id (e.g., \"build\", \"bench\").",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Custom label displayed in the palette."
+              },
+              "description": {
+                "type": "string",
+                "description": "Description shown under the label."
+              },
+              "detail": {
+                "type": "string",
+                "description": "Extra detail text displayed on the item."
+              },
+              "command": {
+                "type": "string",
+                "description": "Command identifier to execute instead of the default."
+              },
+              "args": {
+                "type": "array",
+                "description": "Arguments forwarded to the command.",
+                "items": {}
+              },
+              "actions": {
+                "type": "array",
+                "description": "Override the action with a custom list of steps (same format as quickActions.sequences).",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "command"
+                  ],
+                  "properties": {
+                    "command": {
+                      "type": "string",
+                      "description": "Command identifier."
+                    },
+                    "args": {
+                      "type": "array",
+                      "description": "Optional arguments forwarded to the command.",
+                      "items": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "vitte.commandShortcuts": {
+          "type": "array",
+          "default": [
+            {
+              "label": "Build",
+              "command": "vitte.build",
+              "icon": "$(tools)",
+              "tooltip": "Build the workspace (vitte.build)",
+              "statusBar": true,
+              "startup": true
+            },
+            {
+              "label": "Run",
+              "command": "vitte.run",
+              "icon": "$(debug-start)",
+              "tooltip": "Build and run the entry point (vitte.run)",
+              "statusBar": true,
+              "startup": true
+            },
+            {
+              "label": "Test",
+              "command": "vitte.test",
+              "icon": "$(beaker)",
+              "tooltip": "Execute the test suite (vitte.test)",
+              "statusBar": true,
+              "startup": true
+            }
+          ],
+          "description": "Customize the shortcuts shown in the status bar and startup prompt. Each entry defines a label, command, and optional icon/tooltip.",
+          "items": {
+            "type": "object",
+            "required": [
+              "label",
+              "command"
+            ],
+            "properties": {
+              "label": {
+                "type": "string",
+                "description": "Text displayed for the shortcut."
+              },
+              "command": {
+                "type": "string",
+                "description": "Identifier of the VS Code command to execute."
+              },
+              "icon": {
+                "type": "string",
+                "description": "Optional codicon (e.g. $(tools))."
+              },
+              "tooltip": {
+                "type": "string",
+                "description": "Tooltip displayed when hovering the button."
+              },
+              "statusBar": {
+                "type": "boolean",
+                "description": "Show this shortcut as a status bar button.",
+                "default": true
+              },
+              "startup": {
+                "type": "boolean",
+                "description": "Include this shortcut in the startup toast.",
+                "default": true
+              }
+            }
+          }
         }
       }
     }
@@ -698,8 +855,8 @@
     "compile": "npm run build",
     "lint": "eslint .",
     "package": "vsce package",
-    "vsix": "vsce package -o dist/vitte-studio.vsix",
-    "vsix:verify": "vsce verify dist/vitte-studio.vsix",
+    "vsix": "vsce package -o vitte-studio.vsix",
+    "vsix:verify": "vsce verify vitte-studio.vsix",
     "publish": "vsce publish",
     "prepack": "npm run build",
     "vscode:prepublish": "npm run build",

@@ -1,55 +1,45 @@
 /*! basic.vitte — fixture de colorisation pour Vitte
-   Couvre : comments (//, /* */), keywords, strings, numbers, decls, match, loops.
+   Couvre : commentaires, mots-clés, littéraux, types, unions, match, boucles.
 */
 
-///! Doc du module
-module demo.basic
+/// Doc du module officiel
+module demo::basic;
 
 // Imports
-use std.io as io
-use std.math::{sin, cos}
+import std::io;
+import std::math::{sin, cos};
 
-// Constantes & variables globales
-pub const PI: f64 = 3.141_592_653_589
-pub let VERSION: &str = "0.1.0"
+// Constantes & globaux
+pub const PI: f64 = 3.141_592_653_589;
+pub static VERSION: str = "0.2.0";
 
-// Déclarations de types
-struct Point { x: i32, y: i32 }
+type Coord = i32;
+struct Point { x: Coord, y: Coord }
 enum Color { Red, Green, Blue(u8) }
-trait Drawable { fn draw(&self) -> Result<(), Error> }
+union Payload { bits: u32, bytes: [u8; 4] }
 
-// Implémentations
-impl Drawable for Point {
-  fn draw(&self) -> Result<(), Error> {
-    // TODO: impl réelle
-    return Ok(())
-  }
-}
-
-// Fonctions
 fn distance(p: &Point, q: &Point) -> f64 {
-  let dx = (p.x - q.x) as f64
-  let dy = (p.y - q.y) as f64
-  return (dx*dx + dy*dy).sqrt()
+  let dx = (p.x - q.x) as f64;
+  let dy = (p.y - q.y) as f64;
+  return (dx*dx + dy*dy).sqrt();
 }
 
 fn main() -> i32 {
-  // Commentaire simple
-  let mut sum: i64 = 0xFF + 0b1010 + 1_000_000
-  let f: f64 = 42.0 / 3.5
-  let truth: bool = true && !false
-  let ch = 'a'
-  let s = "hello \"world\"\t\u{1F600}"
-  let path = "C:\\Users\\vince\\file.vit"
+  let mut sum: i64 = 0xFF + 0b1010 + 1_000_000;
+  let f: f64 = 42.0 / 3.5;
+  let truth: bool = true && !false;
+  let ch = 'a';
+  let s = "hello \"world\"\t\u{1F600}";
+  let _payload = Payload { bits: 0xCAFE_BABE };
 
   if sum > 42 {
-    io::println("big {sum}")
+    io::println("big {sum}");
   } else if sum == 0 {
     // rien
   } else {
     for i in 0..10 {
       while i < 5 && truth || false {
-        sum += i as i64
+        sum += i as i64;
         match i {
           0 => io::println("zero"),
           1 | 2 => io::println("one or two"),
@@ -60,22 +50,20 @@ fn main() -> i32 {
     }
   }
 
-  let p = Point { x: 1, y: -2 }
-  let c = Color::Blue(128)
-  match c {
+  let p = Point { x: 1, y: -2 };
+  match Color::Blue(128) {
     Color::Red => {},
     Color::Blue(b) => assert(b >= 0),
     _ => {}
   }
 
-  // Boucle infinie + break/continue
-  let mut n = 0
+  let mut n = 0;
   loop {
-    n += 1
+    n += 1;
     if n % 2 == 0 { continue }
     if n > 7 { break }
   }
 
   // Ligne avec espaces de fin pour tester le trailing whitespace…    
-  return 0
+  return 0;
 }

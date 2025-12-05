@@ -2,7 +2,7 @@
   "name": "vitte-client",
   "private": true,
   "version": "0.1.0",
-  "description": "VS Code client for the Vitte/Vitl language server",
+  "description": "VS Code client for the Vitte/Vit language server",
   "author": "VitteStudio",
   "license": "MIT",
   "main": "./out/extension.js",

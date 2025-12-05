@@ -1,462 +1,172 @@
 {
   "Module": {
-    "prefix": ["mod", "module"],
-    "body": ["module ${1:my.module}", "$0"],
-    "description": "Déclaration de module"
+    "prefix": ["module"],
+    "body": ["module ${1:core.module}", "$0"],
+    "description": "Déclaration du module courant"
   },
-  "Submodule (file)": {
-    "prefix": ["submod"],
-    "body": ["module ${1:sub}", "// file: ${1:sub}.vitte", "$0"],
-    "description": "Sous-module déporté"
+  "Import": {
+    "prefix": ["import"],
+    "body": ["import ${1:core.module}${2: as ${3:alias}}", "$0"],
+    "description": "Import d’un module ou alias facultatif"
   },
-  "Use import": {
-    "prefix": ["use", "import"],
-    "body": ["use ${1:path::to::item}${2: as ${3:alias}};", "$0"],
-    "description": "Import (use ... as ...)"
+  "Struct": {
+    "prefix": ["struct"],
+    "body": [
+      "struct ${1:Name}",
+      "    let ${2:field}: ${3:Type}",
+      ".end",
+      "$0"
+    ],
+    "description": "Structure with fields (.end)"
   },
-  "Public use": {
-    "prefix": ["pubuse"],
-    "body": ["pub use ${1:path::to::item}${2: as ${3:alias}};", "$0"],
-    "description": "Import public (ré-export)"
+  "Union": {
+    "prefix": ["union"],
+    "body": [
+      "union ${1:Name}",
+      "    let ${2:field}: ${3:Type}",
+      ".end",
+      "$0"
+    ],
+    "description": "Union with variants (.end)"
   },
-
-  "Type alias": {
-    "prefix": ["type", "alias"],
-    "body": ["type ${1:Alias} = ${2:Existing};$0"],
-    "description": "Alias de type"
+  "Enum": {
+    "prefix": ["enum"],
+    "body": [
+      "enum ${1:Name}",
+      "    ${2:Variant1}",
+      "    ${3:Variant2}",
+      ".end",
+      "$0"
+    ],
+    "description": "Enumeration (.end)"
   },
-
+  "Typedef": {
+    "prefix": ["typedef"],
+    "body": ["typedef ${1:Existing} ${2:Alias}", "$0"],
+    "description": "Type alias"
+  },
   "Function": {
     "prefix": ["fn"],
     "body": [
-      "fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
-      "  $0",
-      "}"
+      "fn ${1:name}(${2:param}: ${3:Type})${4: -> ${5:Return}}",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Définition de fonction"
+    "description": "Function definition (.end)"
   },
-  "Public function": {
-    "prefix": ["pfn", "pubfn"],
+  "Scenario": {
+    "prefix": ["scenario", "scn"],
     "body": [
-      "pub fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
-      "  $0",
-      "}"
+      "scenario ${1:name}(${2:param}: ${3:Type})",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Définition de fonction publique"
+    "description": "Scenario (.end)"
   },
-  "Async function": {
-    "prefix": ["asyncfn", "afn"],
+  "Program Entry": {
+    "prefix": ["program", "prog"],
     "body": [
-      "async fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
-      "  await ${5:future()}",
-      "  ${0}",
-      "}"
+      "program ${1:module.path}",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Définition de fonction asynchrone"
+    "description": "Program entry (.end)"
   },
-  "Generic function": {
-    "prefix": ["gfn"],
+  "Type Block (phrase)": {
+    "prefix": ["type", "field"],
     "body": [
-      "fn ${1:name}<${2:T}>(${3:arg}: ${2:T}) -> ${4:U} {",
-      "  $0",
-      "}"
+      "type ${1:Name}",
+      "    field ${2:x} : ${3:Type}",
+      "    field ${4:y} : ${5:Type}",
+      ".end",
+      "$0"
     ],
-    "description": "Fonction générique"
+    "description": "Phrase syntax type/field (.end)"
   },
-  "Const fn": {
-    "prefix": ["constfn"],
-    "body": [
-      "const fn ${1:name}(${2:params})${3: -> ${4:Type}} {",
-      "  $0",
-      "}"
-    ],
-    "description": "Fonction constante"
-  },
-  "Return": {
-    "prefix": ["ret", "return"],
-    "body": ["return ${1:value};$0"],
-    "description": "Instruction return"
-  },
-
-  "Struct": {
-    "prefix": ["struct", "st"],
-    "body": [
-      "struct ${1:Name} {",
-      "  ${2:field}: ${3:Type},",
-      "}$0"
-    ],
-    "description": "Déclaration de struct"
-  },
-  "Public Struct": {
-    "prefix": ["pstruct", "pubstruct"],
-    "body": [
-      "pub struct ${1:Name} {",
-      "  ${2:field}: ${3:Type},",
-      "}$0"
-    ],
-    "description": "Struct publique"
-  },
-  "Tuple Struct": {
-    "prefix": ["tstruct"],
-    "body": ["struct ${1:Name}(${2:Type1}, ${3:Type2});$0"],
-    "description": "Struct tuple"
-  },
-  "Newtype": {
-    "prefix": ["newtype"],
-    "body": ["struct ${1:Name}(${2:Inner});$0"],
-    "description": "Newtype pattern"
-  },
-  "Struct impl new()": {
-    "prefix": ["implnew"],
-    "body": [
-      "impl ${1:Name} {",
-      "  pub fn new(${2:params}) -> Self {",
-      "    ${3:Self { ${4:field}: ${5:value} }}",
-      "  }",
-      "}$0"
-    ],
-    "description": "Implémentation constructeur"
-  },
-
-  "Enum": {
-    "prefix": ["enum", "en"],
-    "body": [
-      "enum ${1:Name} {",
-      "  ${2:Variant1},",
-      "  ${3:Variant2}${4:( ${5:fields} )}",
-      "}$0"
-    ],
-    "description": "Déclaration d’enum"
-  },
-  "Public Enum": {
-    "prefix": ["penum", "pubenum"],
-    "body": [
-      "pub enum ${1:Name} {",
-      "  ${2:Variant1},",
-      "  ${3:Variant2}${4:( ${5:fields} )}",
-      "}$0"
-    ],
-    "description": "Enum publique"
-  },
-
-  "Trait": {
-    "prefix": ["trait"],
-    "body": [
-      "trait ${1:TraitName} {",
-      "  fn ${2:method}(${3:&self})${4: -> ${5:Type}};",
-      "}$0"
-    ],
-    "description": "Déclaration de trait (interface)"
-  },
-  "Impl": {
-    "prefix": ["impl"],
-    "body": [
-      "impl ${1:TypeName} {",
-      "  pub fn ${2:new}(${3:})${4: -> Self} {",
-      "    $0",
-      "  }",
-      "}$0"
-    ],
-    "description": "Bloc d’implémentation sur un type"
-  },
-  "Impl for Trait": {
-    "prefix": ["implfor", "implt"],
-    "body": [
-      "impl ${1:TraitName} for ${2:TypeName} {",
-      "  fn ${3:method}(${4:&self})${5: -> ${6:Type}} {",
-      "    $0",
-      "  }",
-      "}$0"
-    ],
-    "description": "Implémenter un trait pour un type"
-  },
-
   "Match": {
     "prefix": ["match"],
     "body": [
-      "match ${1:expr} {",
-      "  ${2:pattern} => ${3:expr},",
-      "  _ => ${4:default},",
-      "}$0"
+      "match ${1:expr}",
+      "    ${2:pattern} =>",
+      "        ${3:expr}",
+      "    _ =>",
+      "        ${4:default}",
+      ".end",
+      "$0"
     ],
-    "description": "Expression de sélection (match)"
-  },
-  "Switch": {
-    "prefix": ["switch"],
-    "body": [
-      "switch ${1:expr} {",
-      "  case ${2:pattern} => {",
-      "    ${3}",
-      "  },",
-      "  default => {",
-      "    ${0}",
-      "  }",
-      "}"
-    ],
-    "description": "Instruction switch/case"
-  },
-  "Match Option": {
-    "prefix": ["matchopt", "mopt"],
-    "body": [
-      "match ${1:opt} {",
-      "  Some(${2:val}) => ${3},",
-      "  None => ${4},",
-      "}$0"
-    ],
-    "description": "Pattern matching sur Option"
-  },
-  "Match Result": {
-    "prefix": ["matchres", "mres"],
-    "body": [
-      "match ${1:res} {",
-      "  Ok(${2:val}) => ${3},",
-      "  Err(${4:err}) => ${5},",
-      "}$0"
-    ],
-    "description": "Pattern matching sur Result"
-  },
-  "Match guard": {
-    "prefix": ["mguard"],
-    "body": [
-      "match ${1:expr} {",
-      "  ${2:pat} if ${3:cond} => ${4:expr},",
-      "  _ => ${5:default},",
-      "}$0"
-    ],
-    "description": "Match avec garde"
-  },
-  "Try catch": {
-    "prefix": ["trycatch", "tc"],
-    "body": [
-      "try {",
-      "  ${1}",
-      "} catch ${2:error} {",
-      "  ${0}",
-      "}"
-    ],
-    "description": "Bloc try/catch d’erreurs"
-  },
-  "Defer": {
-    "prefix": ["defer"],
-    "body": [
-      "defer {",
-      "  ${0}",
-      "}"
-    ],
-    "description": "Exécute un bloc à la sortie du scope"
-  },
-  "Unsafe block": {
-    "prefix": ["unsafe"],
-    "body": [
-      "unsafe {",
-      "  ${0}",
-      "}"
-    ],
-    "description": "Bloc marquant du code non sûr"
-  },
-  "With block": {
-    "prefix": ["with"],
-    "body": [
-      "with ${1:resource} {",
-      "  ${0}",
-      "}"
-    ],
-    "description": "Bloc de gestion de ressource with"
-  },
-
-  "If": {
-    "prefix": ["if"],
-    "body": [
-      "if ${1:cond} {",
-      "  $0",
-      "}"
-    ],
-    "description": "Bloc if"
+    "description": "Expression match avec .end"
   },
   "If / Else": {
-    "prefix": ["ife", "ifelse"],
+    "prefix": ["if"],
     "body": [
-      "if ${1:cond} {",
-      "  ${2}",
-      "} else {",
-      "  ${3}",
-      "}$0"
+      "if ${1:cond}",
+      "    ${2}",
+      "elif ${3:other}",
+      "    ${4}",
+      "else",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Bloc if/else"
-  },
-  "Else if": {
-    "prefix": ["elif", "elseif"],
-    "body": [
-      "else if ${1:cond} {",
-      "  $0",
-      "}"
-    ],
-    "description": "Branche else if"
-  },
-
-  "For in": {
-    "prefix": ["for"],
-    "body": [
-      "for ${1:item} in ${2:iterable} {",
-      "  $0",
-      "}"
-    ],
-    "description": "Boucle for-in"
+    "description": "Bloc conditionnel (.end)"
   },
   "While": {
     "prefix": ["while"],
     "body": [
-      "while ${1:cond} {",
-      "  $0",
-      "}"
+      "while ${1:cond}",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Boucle while"
+    "description": "Boucle while (.end)"
   },
-  "Loop": {
+  "For": {
+    "prefix": ["for"],
+    "body": [
+      "for ${1:item} in ${2:iterable}",
+      "    ${0}",
+      ".end"
+    ],
+    "description": "Boucle for-in (.end)"
+  },
+  "Loop (from/to/step)": {
     "prefix": ["loop"],
     "body": [
-      "loop {",
-      "  $0",
-      "}"
+      "loop ${1:i} from ${2:0} to ${3:10} step ${4:1}",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Boucle infinie"
+    "description": "Phrase loop with from/to/step (.end)"
   },
-  "Break / Continue": {
-    "prefix": ["brkcont"],
-    "body": ["${1|break,continue|};$0"],
-    "description": "Contrôle de boucle"
-  },
-
-  "Let binding": {
-    "prefix": ["let"],
-    "body": ["let ${1:name}${2:: ${3:Type}} = ${4:init};$0"],
-    "description": "Déclaration avec let"
-  },
-  "Mutable let": {
-    "prefix": ["letm", "mut"],
-    "body": ["let mut ${1:name}${2:: ${3:Type}} = ${4:init};$0"],
-    "description": "Variable mutable"
-  },
-  "Const": {
-    "prefix": ["const"],
-    "body": ["const ${1:NAME}${2:: ${3:Type}} = ${4:value};$0"],
-    "description": "Constante"
-  },
-
-  "Attribute": {
-    "prefix": ["attr", "#["],
-    "body": ["#[${1:attribute}]$0"],
-    "description": "Attribut #[...]"
-  },
-  "Derive": {
-    "prefix": ["derive"],
-    "body": ["#[derive(${1:Debug,Clone})]$0"],
-    "description": "Attribut derive"
-  },
-
-  "Doc line": {
-    "prefix": ["doc", "///"],
-    "body": ["/// ${1:Description}$0"],
-    "description": "Commentaire de documentation (ligne)"
-  },
-  "Doc block": {
-    "prefix": ["/**", "docb"],
+  "When": {
+    "prefix": ["when"],
     "body": [
-      "/**",
-      " * ${1:Résumé}",
-      " *",
-      " * ${2:Détails}",
-      " */$0"
+      "when ${1:condition}",
+      "    ${2}",
+      "else when ${3:other}",
+      "    ${4}",
+      "else",
+      "    ${0}",
+      ".end"
     ],
-    "description": "Bloc de documentation"
+    "description": "Phrase when/else chain (.end)"
   },
-  "Comment line": {
-    "prefix": ["//"],
-    "body": ["// ${1:note}$0"],
-    "description": "Commentaire simple"
+  "Set": {
+    "prefix": ["set"],
+    "body": ["set ${1:target} = ${2:value}", "$0"],
+    "description": "Assignment (phrase syntax)"
   },
-  "Comment block": {
-    "prefix": ["/*"],
-    "body": [
-      "/*",
-      " ${1:commentaire}",
-      " */$0"
-    ],
-    "description": "Commentaire multi-lignes"
+  "Say": {
+    "prefix": ["say"],
+    "body": ["say \"${1:message}\"", "$0"],
+    "description": "Standard output (phrase syntax)"
   },
-
-  "Panic": {
-    "prefix": ["panic"],
-    "body": ["panic(${1:\"message\"});$0"],
-    "description": "Arrêt avec message (panic)"
+  "Do": {
+    "prefix": ["do"],
+    "body": ["do ${1:action} ${2:arg}", "$0"],
+    "description": "Invoke an action (phrase syntax)"
   },
-  "Todo": {
-    "prefix": ["todo", "unimpl"],
-    "body": ["todo(${1:\"à faire\"});$0"],
-    "description": "Marqueur TODO"
-  },
-  "Debug print": {
-    "prefix": ["dbg"],
-    "body": ["dbg(${1:expr});$0"],
-    "description": "Trace debug"
-  },
-  "Println": {
-    "prefix": ["print", "println"],
-    "body": ["println(${1:\"${2:text}\"});$0"],
-    "description": "Affichage console"
-  },
-
-  "Test": {
-    "prefix": ["test", "utest"],
-    "body": [
-      "#[test]",
-      "fn ${1:it_works}() {",
-      "  $0",
-      "}"
-    ],
-    "description": "Test unitaire"
-  },
-  "Benchmark": {
-    "prefix": ["bench"],
-    "body": [
-      "#[bench]",
-      "fn ${1:bench_case}() {",
-      "  $0",
-      "}"
-    ],
-    "description": "Gabarit de benchmark"
-  },
-  "Test module": {
-    "prefix": ["modtest"],
-    "body": [
-      "module tests",
-      "",
-      "#[test]",
-      "fn ${1:case}() {",
-      "  $0",
-      "}"
-    ],
-    "description": "Module de tests"
-  },
-
-  "Macro call": {
-    "prefix": ["mac", "macro"],
-    "body": ["${1:name}!(${2:args})${3:;}${0}"],
-    "description": "Appel de macro name!(...)"
-  },
-
-  "File header": {
-    "prefix": ["header", "filehdr"],
-    "body": [
-      "/// ${TM_FILENAME}",
-      "/// ${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE}",
-      "/// ${1:Description}$0"
-    ],
-    "description": "Entête de fichier"
-  },
-  "Region": {
-    "prefix": ["region"],
-    "body": ["// region ${1:name}", "$0", "// endregion"],
-    "description": "Marqueurs de repli (folding)"
+  "Return": {
+    "prefix": ["ret", "return"],
+    "body": ["ret ${1:value}", "$0"],
+    "description": "Return a value (phrase or core syntax)"
   }
 }

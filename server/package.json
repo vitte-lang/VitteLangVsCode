@@ -2,7 +2,7 @@
   "name": "vitte-server",
   "private": true,
   "version": "0.3.0",
-  "description": "Language Server Protocol (LSP) server for the Vitte/Vitl language",
+  "description": "Language Server Protocol (LSP) server for the Vitte/Vit language",
   "author": "VitteStudio",
   "license": "MIT",
   "type": "commonjs",

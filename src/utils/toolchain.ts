@@ -7,12 +7,12 @@ import { exists } from './fs';
 /**
  * Vitte toolchain resolver
  * - Detects toolchain root from settings/env/which
- * - Resolves binaries (vitte-runtime/lsp/build/fmt/bench, vitl-runtime)
+ * - Resolves binaries (vitte-runtime/lsp/build/fmt/bench)
  * - Reads versions lazily ("--version")
  * - Caches results in globalState with a short TTL to avoid costy lookups
  */
 
-export type BinKind = 'runtime' | 'lsp' | 'build' | 'fmt' | 'bench' | 'vitlRuntime';
+export type BinKind = 'runtime' | 'lsp' | 'build' | 'fmt' | 'bench';
 
 export interface ToolchainInfo {
   /** Toolchain root directory, if known (folder that contains `bin/`). */
@@ -87,7 +87,6 @@ export async function getToolchain(ctx?: vscode.ExtensionContext, forceRefresh =
   const build = await resolveBinary('vitte-build', { settingKeys: ['build.path'], ...rootOpt });
   const fmt = await resolveBinary('vitte-fmt', { settingKeys: ['fmt.path'], ...rootOpt });
   const bench = await resolveBinary('vitte-bench', { settingKeys: ['bench.path'], ...rootOpt });
-  const vitlRuntime = await resolveBinary('vitl-runtime', { settingKeys: ['vitl.debug.program'], ...rootOpt });
 
   const bins: ToolchainInfo['bins'] = {};
   if (runtime !== undefined) bins.runtime = runtime;
@@ -95,7 +94,6 @@ export async function getToolchain(ctx?: vscode.ExtensionContext, forceRefresh =
   if (build !== undefined) bins.build = build;
   if (fmt !== undefined) bins.fmt = fmt;
   if (bench !== undefined) bins.bench = bench;
-  if (vitlRuntime !== undefined) bins.vitlRuntime = vitlRuntime;
 
   const ok = !!runtime;
   if (!ok) messages.push('vitte-runtime introuvable (paramètre vitte.debug.program ou PATH).');

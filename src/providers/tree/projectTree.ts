@@ -180,7 +180,7 @@ readonly onDidChangeTreeData: vscode.Event<Node | null | undefined> = this._onDi
       const nodes: Node[] = [];
       for (const [name, type] of entries) {
         const uri = joinPathCompat(dir, name);
-        if (type === vscode.FileType.File && /\.(vitte|vit|vitl)$/i.test(name)) nodes.push(mkFile(uri));
+        if (type === vscode.FileType.File && /\.(vitte|vit)$/i.test(name)) nodes.push(mkFile(uri));
         if (type === vscode.FileType.Directory) nodes.push(mkDir(uri));
       }
       return nodes;

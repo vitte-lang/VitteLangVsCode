@@ -79,7 +79,7 @@ function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): T 
   return debounced as T;
 }
 
-const SUPPORTED_EXTS = new Set([".vitte", ".vit", ".vitl"]);
+const SUPPORTED_EXTS = new Set([".vitte", ".vit"]);
 
 export interface DiagnosticsView {
   readonly provider: DiagnosticsTreeDataProvider;
@@ -296,16 +296,17 @@ function relativeLabel(uri: vscode.Uri | undefined): string {
 }
 
 function iconForSeverity(severity: vscode.DiagnosticSeverity | undefined): vscode.ThemeIcon {
+  const makeIcon = (id: string): vscode.ThemeIcon => ({ id } as vscode.ThemeIcon);
   switch (severity) {
     case vscode.DiagnosticSeverity.Error:
-      return new vscode.ThemeIcon("error");
+      return makeIcon("error");
     case vscode.DiagnosticSeverity.Warning:
-      return new vscode.ThemeIcon("warning");
+      return makeIcon("warning");
     case vscode.DiagnosticSeverity.Information:
-      return new vscode.ThemeIcon("info");
+      return makeIcon("info");
     case vscode.DiagnosticSeverity.Hint:
-      return new vscode.ThemeIcon("lightbulb");
+      return makeIcon("lightbulb");
     default:
-      return new vscode.ThemeIcon("question");
+      return makeIcon("question");
   }
 }

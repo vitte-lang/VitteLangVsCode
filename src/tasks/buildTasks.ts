@@ -29,9 +29,8 @@ export function registerBuildTasks(ctx: vscode.ExtensionContext) {
     vscode.commands.registerCommand('vitte.toggleIncremental', async () => { await toggleIncremental(); }),
   );
 
-  // Task provider — overload-safe, non-generic to avoid T-variance issues under strict settings
-  const provider: vscode.TaskProvider = {
-    provideTasks: async () => {
+  const provider = {
+    provideTasks: async (_token?: vscode.CancellationToken): Promise<vscode.Task[]> => {
       const defs: { cmd: SubCmd; label: string }[] = [
         { cmd: 'build', label: 'Vitte Build' },
         { cmd: 'run',   label: 'Vitte Run' },
@@ -44,8 +43,8 @@ export function registerBuildTasks(ctx: vscode.ExtensionContext) {
         return new vscode.Task(definition, vscode.TaskScope.Workspace, label, 'vitte', exec);
       }));
     },
-    resolveTask: (task) => task,
-  };
+    resolveTask: (task: vscode.Task) => task,
+  } as unknown as vscode.TaskProvider;
   ctx.subscriptions.push(vscode.tasks.registerTaskProvider('vitte', provider));
 }
 
@@ -138,7 +137,7 @@ async function runBuild(sub: SubCmd) {
   let cmdLine: string;
   if (sub === 'run') {
     const current = vscode.window.activeTextEditor?.document.uri.fsPath;
-    const isVitte = !!(current && /\.(vitte|vit|vitl)$/i.test(current));
+    const isVitte = !!(current && /\.(vitte|vit)$/i.test(current));
     const extra = isVitte && current ? { currentFile: current } : undefined;
     cmdLine = await buildCommandLine('run', extra);
   } else if (sub === 'test') {
@@ -171,7 +170,7 @@ async function runBuild(sub: SubCmd) {
 async function runTestCurrentFile() {
   const file = vscode.window.activeTextEditor?.document.uri.fsPath;
   if (!file) { void vscode.window.showInformationMessage('Aucun fichier actif.'); return; }
-  const isTest = /(_test\.vitte|\.vit(t|l)?)$/i.test(file); // permissive
+  const isTest = /(_test\.vitte|\.(vitte|vit))$/i.test(file); // permissive
   if (!isTest) { void vscode.window.showInformationMessage('Le fichier actif ne semble pas être un test.'); return; }
   await runBuild('test');
 }

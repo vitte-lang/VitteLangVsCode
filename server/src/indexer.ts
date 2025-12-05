@@ -1,4 +1,4 @@
-// indexer.ts — indexation robuste des symboles pour Vitte/Vitl (LSP prêt, sans dépendance runtime)
+// indexer.ts — indexation robuste des symboles pour Vitte/Vit (LSP prêt, sans dépendance runtime)
 
 // Import minimal côté serveur LSP.
 import { TextDocument } from "vscode-languageserver-textdocument";
@@ -69,30 +69,16 @@ type BodyExpectation =
 
 const DECLARATIONS = new Map<string, DeclarationInfo>([
   ["module", { kind: SK.Namespace, expectBody: true, allowBodyless: true }],
-  ["mod", { kind: SK.Namespace, expectBody: true, allowBodyless: true }],
   ["struct", { kind: SK.Struct, expectBody: true }],
   ["enum", { kind: SK.Enum, expectBody: true }],
-  ["trait", { kind: SK.Interface, expectBody: true }],
+  ["union", { kind: SK.Struct, expectBody: true }],
   ["type", { kind: SK.Interface, expectBody: false }],
-  ["impl", { kind: SK.Class, expectBody: true }],
   ["fn", { kind: SK.Function, expectBody: true, allowBodyless: true }],
-  ["let", { kind: SK.Variable, expectBody: false }],
   ["const", { kind: SK.Constant, expectBody: false }],
+  ["static", { kind: SK.Variable, expectBody: false }],
 ]);
 
-const MODIFIERS = new Set([
-  "pub",
-  "async",
-  "unsafe",
-  "extern",
-  "default",
-  "export",
-  "final",
-  "abstract",
-  "virtual",
-  "override",
-  "static",
-]);
+const MODIFIERS = new Set(["pub"]);
 
 class SymbolParser {
   private readonly text: string;
@@ -214,22 +200,18 @@ class SymbolParser {
   private readSymbolName(keyword: string): string | undefined {
     switch (keyword) {
       case "module":
-      case "mod":
         return this.readQualifiedName();
       case "struct":
       case "enum":
-      case "trait":
+      case "union":
       case "type":
         this.skipTrivia();
         return this.readIdentifierToken();
-      case "impl":
-        return this.readImplSignature();
       case "fn":
         this.skipTrivia();
         return this.readFunctionName();
-      case "let":
-        return this.readLetName();
       case "const":
+      case "static":
         return this.readConstName();
       default:
         return undefined;
@@ -260,47 +242,9 @@ class SymbolParser {
     return this.readIdentifierToken();
   }
 
-  private readLetName(): string | undefined {
-    this.skipTrivia();
-    this.consumeKeyword("mut");
-    this.skipTrivia();
-    return this.readIdentifierToken();
-  }
-
   private readConstName(): string | undefined {
     this.skipTrivia();
     return this.readIdentifierToken();
-  }
-
-  private readImplSignature(): string | undefined {
-    this.skipTrivia();
-    const start = this.pos;
-
-    let depthAngle = 0;
-    let depthParen = 0;
-    let lastNonWs = start;
-
-    while (this.pos < this.length) {
-      const ch = this.masked[this.pos];
-      if (ch === "{") break;
-      if (ch === ";") break;
-
-      if (ch === "<") depthAngle++;
-      else if (ch === ">") depthAngle = Math.max(0, depthAngle - 1);
-      else if (ch === "(") depthParen++;
-      else if (ch === ")") depthParen = Math.max(0, depthParen - 1);
-      else if (!depthAngle && !depthParen && this.matchKeywordAt(this.pos, "where")) {
-        break;
-      }
-
-      if (!isWhitespace(ch)) lastNonWs = this.pos;
-      this.pos++;
-    }
-
-    const end = Math.min(lastNonWs + 1, this.pos);
-    const raw = this.text.slice(start, end).trim();
-    const normalized = raw.replace(/\s+/g, " ");
-    return normalized ? `impl ${normalized}` : "impl";
   }
 
   private readIdentifierToken(): string | undefined {
@@ -313,17 +257,6 @@ class SymbolParser {
     const raw = this.text.slice(start, this.pos);
     const trimmed = raw.trim();
     return trimmed ? trimmed : undefined;
-  }
-
-  private consumeKeyword(word: string): boolean {
-    const saved = this.pos;
-    const token = this.readWord();
-    if (token && token.toLowerCase() === word) {
-      this.skipTrivia();
-      return true;
-    }
-    this.pos = saved;
-    return false;
   }
 
   private readWord(): string {

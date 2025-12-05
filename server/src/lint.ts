@@ -1,4 +1,4 @@
-// lint.ts — Linter minimal pour Vitte/Vitl (LSP), robuste, configurable, directives inline
+// lint.ts — Linter minimal pour Vitte/Vit (LSP), robuste, configurable, directives inline
 
 import {
   DiagnosticSeverity,
