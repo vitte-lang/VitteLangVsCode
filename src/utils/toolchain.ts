@@ -2,17 +2,17 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import * as cp from 'child_process';
-import { exists, workspaceRoot } from './fs';
+import { exists } from './fs';
 
 /**
  * Vitte toolchain resolver
  * - Detects toolchain root from settings/env/which
- * - Resolves binaries (vitte-runtime/lsp/build/fmt/bench, vitl-runtime)
+ * - Resolves binaries (vitte-runtime/lsp/build/fmt/bench)
  * - Reads versions lazily ("--version")
  * - Caches results in globalState with a short TTL to avoid costy lookups
  */
 
-export type BinKind = 'runtime' | 'lsp' | 'build' | 'fmt' | 'bench' | 'vitlRuntime';
+export type BinKind = 'runtime' | 'lsp' | 'build' | 'fmt' | 'bench';
 
 export interface ToolchainInfo {
   /** Toolchain root directory, if known (folder that contains `bin/`). */
@@ -41,7 +41,7 @@ export function configuredToolchainRoot(): string | undefined {
   const s1 = cfg.get<string>('toolchain.root');
   const s2 = cfg.get<string>('toolchainPath'); // legacy
   const env = process.env.VITTE_TOOLCHAIN_ROOT;
-  return firstNonEmpty([s1, s2, env]);
+  return firstNonEmpty(s1, s2, env);
 }
 
 /** Try to resolve a binary path by checking setting, toolchain root, then PATH. */
@@ -53,14 +53,14 @@ export async function resolveBinary(
   // 1) explicit settings
   const keys = opts?.settingKeys ?? [];
   for (const k of keys) {
-    const v = cfg.get<string>(k);
-    if (v && v.trim()) {
-      const p = absolutize(v, opts?.root);
+    const raw = cfg.get<string>(k)?.trim();
+    if (raw) {
+      const p = absolutize(raw, opts?.root);
       if (await exists(p)) return p;
     }
   }
   // 2) toolchain root/bin
-  const root = opts?.root || configuredToolchainRoot();
+  const root = opts?.root ?? configuredToolchainRoot();
   if (root) {
     const candidate = path.join(root, 'bin', nameWithExt(name));
     if (await exists(candidate)) return candidate;
@@ -81,12 +81,12 @@ export async function getToolchain(ctx?: vscode.ExtensionContext, forceRefresh =
   const root = configuredToolchainRoot();
   if (!root) messages.push('Aucun "vitte.toolchain.root" configuré — recherche via PATH…');
 
-  const runtime = await resolveBinary('vitte-runtime', { settingKeys: ['debug.program', 'runtime.path', 'runtime'], ...(root !== undefined ? { root } : {}) });
-  const lsp = await resolveBinary('vitte-lsp', { settingKeys: ['lsp.path'], ...(root !== undefined ? { root } : {}) });
-  const build = await resolveBinary('vitte-build', { settingKeys: ['build.path'], ...(root !== undefined ? { root } : {}) });
-  const fmt = await resolveBinary('vitte-fmt', { settingKeys: ['fmt.path'], ...(root !== undefined ? { root } : {}) });
-  const bench = await resolveBinary('vitte-bench', { settingKeys: ['bench.path'], ...(root !== undefined ? { root } : {}) });
-  const vitlRuntime = await resolveBinary('vitl-runtime', { settingKeys: ['vitl.debug.program'], ...(root !== undefined ? { root } : {}) });
+  const rootOpt = root !== undefined ? { root } : undefined;
+  const runtime = await resolveBinary('vitte-runtime', { settingKeys: ['debug.program', 'runtime.path', 'runtime'], ...rootOpt });
+  const lsp = await resolveBinary('vitte-lsp', { settingKeys: ['lsp.path'], ...rootOpt });
+  const build = await resolveBinary('vitte-build', { settingKeys: ['build.path'], ...rootOpt });
+  const fmt = await resolveBinary('vitte-fmt', { settingKeys: ['fmt.path'], ...rootOpt });
+  const bench = await resolveBinary('vitte-bench', { settingKeys: ['bench.path'], ...rootOpt });
 
   const bins: ToolchainInfo['bins'] = {};
   if (runtime !== undefined) bins.runtime = runtime;
@@ -94,7 +94,6 @@ export async function getToolchain(ctx?: vscode.ExtensionContext, forceRefresh =
   if (build !== undefined) bins.build = build;
   if (fmt !== undefined) bins.fmt = fmt;
   if (bench !== undefined) bins.bench = bench;
-  if (vitlRuntime !== undefined) bins.vitlRuntime = vitlRuntime;
 
   const ok = !!runtime;
   if (!ok) messages.push('vitte-runtime introuvable (paramètre vitte.debug.program ou PATH).');
@@ -104,7 +103,7 @@ export async function getToolchain(ctx?: vscode.ExtensionContext, forceRefresh =
 
   // Optionally read versions (best-effort, don't throw)
   await Promise.all(
-    (Object.entries(bins) as Array<[BinKind, string]>).map(async ([k, p]) => {
+    (Object.entries(bins) as [BinKind, string][]).map(async ([k, p]) => {
       const ver = await readVersion(p);
       if (ver) info.versions[k] = ver;
     })
@@ -142,7 +141,7 @@ function nameWithExt(name: string): string {
   // Defensive: ensure a string even under odd narrowings
   if (!name) return '';
   if (process.platform === 'win32') {
-    const pathext = (process.env.PATHEXT || '.EXE;.CMD;.BAT').toLowerCase().split(';');
+    const pathext = (process.env.PATHEXT ?? '.EXE;.CMD;.BAT').toLowerCase().split(';');
     for (const ext of pathext) if (name.toLowerCase().endsWith(ext.toLowerCase())) return name; // already has an ext
     return name + '.exe';
   }
@@ -153,8 +152,8 @@ function nameWithExt(name: string): string {
 export async function which(bin: string | undefined): Promise<string | undefined> {
   if (!bin) return undefined;
   const b: string = bin; // narrow to plain string for downstream calls
-  const parts = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
-  const exts = process.platform === 'win32' ? (process.env.PATHEXT || '.EXE;.CMD;.BAT').split(';') : [''];
+  const parts = (process.env.PATH ?? '').split(path.delimiter).filter(Boolean);
+  const exts = process.platform === 'win32' ? (process.env.PATHEXT ?? '.EXE;.CMD;.BAT').split(';') : [''];
   for (const dir of parts) {
     for (const ext of exts) {
       const candidate = path.join(dir, b + ext);
@@ -167,13 +166,18 @@ export async function which(bin: string | undefined): Promise<string | undefined
 async function readVersion(bin: string): Promise<string | undefined> {
   try {
     const out = await execCapture([bin, '--version']);
-    const m = String(out).match(/\b(\d+\.\d+\.\d+(?:[-+][\w.]+)?)/);
-    return m ? m[1] : String(out).trim().split(/\r?\n/)[0];
+    const match = /\b(\d+\.\d+\.\d+(?:[-+][\w.]+)?)\b/.exec(String(out));
+    return match ? match[1] : String(out).trim().split(/\r?\n/)[0];
   } catch { return undefined; }
 }
 
-function firstNonEmpty(xs: Array<string | undefined>): string | undefined {
-  for (const x of xs) if (x && x.trim()) return x.trim();
+function firstNonEmpty(...values: (string | undefined | null)[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+  }
   return undefined;
 }
 
@@ -204,7 +208,7 @@ async function execCapture(cmd: string[] | string, opts?: { cwd?: string; env?: 
     let err = '';
 
     const to = setTimeout(() => {
-      try { child.kill(); } catch {}
+      try { child.kill(); } catch { /* ignore */ }
       reject(new Error('timeout'));
     }, timeout);
 
@@ -236,8 +240,8 @@ export function childEnvWithToolchain(info: ToolchainInfo, base: NodeJS.ProcessE
   if (typeof r === 'string' && r.length > 0) {
     binDir = path.join(r, 'bin');
   }
-  if (binDir) env.PATH = binDir + path.delimiter + (base.PATH || '');
-  if (!env.HOME) env.HOME = os.homedir();
+  if (binDir) env.PATH = binDir + path.delimiter + (base.PATH ?? '');
+  env.HOME ??= os.homedir();
   return env;
 }
 

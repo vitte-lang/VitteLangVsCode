@@ -6,50 +6,43 @@
 
 // 🟩 Mots-clés de base (réservés au niveau grammaire)
 export const KEYWORDS = [
-  "module", "mod", "use", "import", "as", "pub",
-  "const", "let", "var", "mut", "static",
-  "fn", "return",
-  "if", "else",
-  "match", "switch", "case", "default",
-  "while", "for", "loop", "in", "break", "continue",
-  "type", "impl", "trait", "struct", "enum", "where",
-  "async", "await", "yield",
-  "with", "try", "catch", "finally", "throw",
-  "unsafe", "extern", "inline", "volatile",
-  "test", "defer"
+  "module", "import", "pub",
+  "struct", "enum", "union", "type",
+  "fn", "let", "mut", "const", "static",
+  "as", "where",
+  "if", "else", "while", "for", "in", "loop", "match",
+  "break", "continue", "return",
 ] as const;
 export type Keyword = typeof KEYWORDS[number];
 
 // 🟩 Mots-clés contextuels (acceptés selon contexte — ne bloquent pas les idents)
-export const CONTEXTUAL_KEYWORDS = [
-  "where", "as", "inline", "volatile", "extern", "unsafe", "with",
-] as const;
+export const CONTEXTUAL_KEYWORDS = [] as const;
 export type ContextualKeyword = typeof CONTEXTUAL_KEYWORDS[number];
 
 // 🟩 Littéraux
 export const BOOL_LITERALS = ["true", "false"] as const;
-export const NIL_LITERALS  = ["null", "nil", "none"] as const;
+export const NIL_LITERALS  = ["nil"] as const;
 export type BoolLiteral = typeof BOOL_LITERALS[number];
 export type NilLiteral  = typeof NIL_LITERALS[number];
 
 // 🟩 Types primitifs (réservés côté type-lexer)
 export const PRIMITIVE_TYPES = [
-  "bool", "char", "str", "string", "void", "never",
-  "i8", "i16", "i32", "i64", "i128",
-  "u8", "u16", "u32", "u64", "u128",
-  "f16", "f32", "f64"
+  "bool", "char", "str", "void",
+  "i8", "i16", "i32", "i64", "isize",
+  "u8", "u16", "u32", "u64", "usize",
+  "f32", "f64"
 ] as const;
 export type PrimitiveType = typeof PRIMITIVE_TYPES[number];
 
 // 🟩 Opérateurs et symboles significatifs (pour tokenizer/semantic)
 export const OPERATORS = [
-  "=", "+", "-", "*", "/", "%", "**",
+  "=", "+", "-", "*", "/", "%",
   "==", "!=", "<", "<=", ">", ">=",
   "&&", "||", "!",
   "&", "|", "^", "~",
-  "<<", ">>",
+  "<<", ">>", "..", "..=",
   "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=",
-  "->", "=>", "::", ":", ",", ";", "..", "...",
+  "->", "=>", "::", "?",
 ] as const;
 
 export const BRACKETS = ["(", ")", "[", "]", "{", "}"] as const;

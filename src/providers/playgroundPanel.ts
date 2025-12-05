@@ -55,22 +55,24 @@ export class PlaygroundPanel implements vscode.Disposable {
   }
 
   // ---- Messaging ----
-  private async onMessage(msg: any) {
-    switch (msg?.type) {
+  private async onMessage(msg: unknown) {
+    if (!msg || typeof msg !== 'object') return;
+    const m = msg as Partial<{ type: string; text: unknown; save: unknown }>;
+    switch (m.type) {
       case 'format': {
-        const text = String(msg.text ?? '');
+        const text = typeof m.text === 'string' ? m.text : '';
         const formatted = await this.formatCode(text);
         this.post({ type: 'formatted', text: formatted ?? text });
         return;
       }
       case 'run': {
-        const text = String(msg.text ?? '');
-        const save = Boolean(msg.save);
+        const text = typeof m.text === 'string' ? m.text : '';
+        const save = Boolean(m.save);
         await this.runSnippet(text, save);
         return;
       }
       case 'save': {
-        const text = String(msg.text ?? '');
+        const text = typeof m.text === 'string' ? m.text : '';
         const file = await this.saveSnippet(text);
         this.post({ type: 'saved', file });
         return;
@@ -86,13 +88,13 @@ export class PlaygroundPanel implements vscode.Disposable {
   }
 
   private post(payload: unknown) {
-    this.panel.webview.postMessage(payload).then(undefined, () => {/* ignore */});
+    void this.panel.webview.postMessage(payload);
   }
 
   // ---- Tooling helpers ----
   private async getTooling(): Promise<{ runtime: string; fmt?: string }> {
     const located = await locateVitteRuntime();
-    const runtime = located.runtimePath || 'vitte-runtime';
+    const runtime = located.runtimePath ?? 'vitte-runtime';
     const out: { runtime: string; fmt?: string } = { runtime };
     if (typeof located.fmtPath === 'string') out.fmt = located.fmtPath;
     return out;
@@ -102,7 +104,7 @@ export class PlaygroundPanel implements vscode.Disposable {
     const wf = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!wf) return undefined;
     const dir = path.join(wf, '.vitte', 'playground');
-    try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+    try { await fs.promises.mkdir(dir, { recursive: true }); } catch { /* ignore */ }
     return dir;
   }
 
@@ -110,7 +112,7 @@ export class PlaygroundPanel implements vscode.Disposable {
     const dir = await this.ensurePlaygroundDir();
     if (!dir) return undefined;
     const file = path.join(dir, 'main.vitte');
-    fs.writeFileSync(file, text, 'utf8');
+    await fs.promises.writeFile(file, text, 'utf8');
     this.lastFile = file;
     return file;
   }
@@ -123,18 +125,23 @@ export class PlaygroundPanel implements vscode.Disposable {
         const p = cp.spawn(fmt, [], { stdio: ['pipe', 'pipe', 'pipe'] });
         let out = '';
         let err = '';
-        p.stdout.on('data', (b) => out += b.toString());
-        p.stderr.on('data', (b) => err += b.toString());
+        p.stdout.on('data', (b: Buffer) => { out += b.toString(); });
+        p.stderr.on('data', (b: Buffer) => { err += b.toString(); });
         p.on('error', reject);
         p.on('close', (code) => {
           if (code === 0) resolve(out);
           else reject(new Error(err || `vitte-fmt exited with ${code}`));
         });
-        p.stdin.write(text);
-        p.stdin.end();
+        if (p.stdin) {
+          p.stdin.write(text);
+          p.stdin.end();
+        } else {
+          reject(new Error('vitte-fmt stdin unavailable'));
+        }
       });
     } catch (e) {
-      void vscode.window.showWarningMessage(`Format: ${(e as Error).message}`);
+      const message = e instanceof Error ? e.message : String(e);
+      void vscode.window.showWarningMessage(`Format: ${message}`);
       return undefined;
     }
   }
@@ -151,13 +158,13 @@ export class PlaygroundPanel implements vscode.Disposable {
     const cmd = `${runtime} run ${quote(file)}`;
 
     // Ensure terminal
-    if (!this.terminal) this.terminal = vscode.window.createTerminal({ name: 'Vitte Playground', cwd: wf });
+    this.terminal ??= vscode.window.createTerminal({ name: 'Vitte Playground', cwd: wf });
     this.terminal.show(true);
     this.terminal.sendText(cmd, true);
   }
 
   // ---- Render ----
-  private async render() {
+  private render() {
     const webview = this.panel.webview;
     const nonce = String(Date.now());
     const csp = `default-src 'none'; style-src 'unsafe-inline' ${webview.cspSource}; script-src 'nonce-${nonce}';`;
@@ -228,8 +235,16 @@ export class PlaygroundPanel implements vscode.Disposable {
 
 export default PlaygroundPanel;
 
+const HTML_ESCAPE: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  '\'': '&#39;',
+};
+
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c] as string));
+  return s.replace(/[&<>"']/g, (c) => HTML_ESCAPE[c] ?? c);
 }
 
 function quote(p: string): string {

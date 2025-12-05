@@ -4,9 +4,9 @@ import {
   TextEdit,
   Range,
   Position,
-  FormattingOptions,
 } from "vscode-languageserver";
-import { TextDocument } from "vscode-languageserver-textdocument";
+import type { FormattingOptions } from "vscode-languageserver";
+import type { TextDocument } from "vscode-languageserver-textdocument";
 
 /* ============================================================================
  * Options étendues
@@ -97,7 +97,7 @@ export function formatDocument(
   options?: ExtraFormattingOptions
 ): TextEdit[] {
   // Ne plus passer {} : on laisse le paramètre non défini pour déclencher les valeurs par défaut
-  return provideFormattingEdits(doc, options as ExtraFormattingOptions | undefined);
+  return provideFormattingEdits(doc, options);
 }
 
 /* ============================================================================
@@ -145,8 +145,6 @@ function passIndentAndSpacing(
   const out: string[] = [];
   let indentLevel = 0;
 
-  let inMultilineString: null | { quote: string } = null;
-
   for (let raw of src) {
     // EOL retiré au split
 
@@ -184,7 +182,7 @@ function passIndentAndSpacing(
 
     // Newline before else
     if (opt.newlineBeforeElse) {
-      line = applyNewlineBeforeElse(line, out);
+      line = applyNewlineBeforeElse(line);
     }
 
     // Trim trailing whitespace
@@ -256,8 +254,8 @@ function applyIndentHeuristic(
 
 function netBracketDelta(line: string): number {
   const s = stripStrings(line);
-  const opens = (s.match(/[{\[(]/g) || []).length;
-  const closes = (s.match(/[}\])]/g) || []).length;
+  const opens = s.match(/[{\[(]/g)?.length ?? 0;
+  const closes = s.match(/[}\])]/g)?.length ?? 0;
   return opens - closes;
 }
 
@@ -327,7 +325,7 @@ function applyBraceStyle(line: string, style: "attach" | "break"): string {
   }
 }
 
-function applyNewlineBeforeElse(line: string, acc: string[]): string {
+function applyNewlineBeforeElse(line: string): string {
   if (!/^\s*else\b/.test(line) && /}\s*else\b/.test(line)) {
     return line.replace(/}\s*else\b/g, "}\nelse");
   }
@@ -339,7 +337,7 @@ function applyNewlineBeforeElse(line: string, acc: string[]): string {
  * ========================================================================== */
 
 function alignEndOfLineComments(lines: string[]): string[] {
-  const info: Array<{ idx: number; code: string; comment: string }> = [];
+  const info: { idx: number; code: string; comment: string }[] = [];
   let maxCode = 0;
 
   for (let i = 0; i < lines.length; i++) {
@@ -447,7 +445,7 @@ function stripStrings(s: string): string {
       continue;
     }
     if (ch === '"' || ch === "'") {
-      inStr = ch as '"' | "'";
+      inStr = ch;
       continue;
     }
     out += ch;
@@ -464,7 +462,7 @@ function splitCodeAndComment(line: string): { code: string; comment: string } {
       if (ch === inStr) inStr = null;
       continue;
     }
-    if (ch === '"' || ch === "'") { inStr = ch as '"' | "'"; continue; }
+    if (ch === '"' || ch === "'") { inStr = ch; continue; }
     if (ch === "/" && i + 1 < line.length && line[i + 1] === "/") {
       return { code: line.slice(0, i), comment: line.slice(i) };
     }
@@ -500,7 +498,7 @@ function rewriteOutsideStrings(line: string, fn: (chunk: string) => string): str
     }
 
     if (ch === '"' || ch === "'") {
-      inStr = ch as '"' | "'";
+      inStr = ch;
       out += ch;
       i++;
       continue;

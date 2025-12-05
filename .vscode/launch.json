@@ -33,8 +33,8 @@
       "internalConsoleOptions": "openOnSessionStart"
     },
     {
-      "name": "Vitl: Launch current file",
-      "type": "vitl",
+      "name": "Vitte: Launch current file",
+      "type": "vitte",
       "request": "launch",
       "program": "${file}",
       "cwd": "${workspaceFolder}",
@@ -44,10 +44,10 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "name": "Vitl: Launch workspace main.vitl",
-      "type": "vitl",
+      "name": "Vitte: Launch workspace main.vitte",
+      "type": "vitte",
       "request": "launch",
-      "program": "${workspaceFolder}/main.vitl",
+      "program": "${workspaceFolder}/main.vitte",
       "cwd": "${workspaceFolder}",
       "stopOnEntry": false,
       "args": ["--verbose"],
@@ -55,8 +55,8 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "name": "Vitl: Attach to running server",
-      "type": "vitl",
+      "name": "Vitte: Attach to running server",
+      "type": "vitte",
       "request": "attach",
       "port": 4711,
       "host": "localhost",
@@ -65,10 +65,10 @@
   ],
   "compounds": [
     {
-      "name": "Dev: Extension + Launch Vitl file",
+      "name": "Dev: Extension + Launch Vitte file",
       "configurations": [
         "Extension: Run Extension Host",
-        "Vitl: Launch current file"
+        "Vitte: Launch current file"
       ],
       "stopAll": true
     },

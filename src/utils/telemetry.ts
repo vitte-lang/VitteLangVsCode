@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import fsx, { ensureDir, writeFileText, workspaceRoot, findUp, readJson } from './fs';
+import { ensureDir, writeFileText, workspaceRoot, findUp, readJson } from './fs';
 
 /**
  * Lightweight, opt‑in telemetry for VitteLangVsCode.
@@ -45,7 +45,9 @@ export class Telemetry implements vscode.Disposable {
     this.ctx = ctx;
     this.enabled = !!opts?.enabled;
     this.sample = clamp01(opts?.sampleRate ?? DEFAULT_SAMPLE);
-    this.extVersion = String((ctx as any).extension?.packageJSON?.version ?? '0.0.0');
+    const extensionPkg = ctx.extension?.packageJSON as { version?: unknown } | undefined;
+    const version = extensionPkg?.version;
+    this.extVersion = typeof version === 'string' ? version : '0.0.0';
     if (opts?.channelName) this.output = vscode.window.createOutputChannel(opts.channelName);
     this.armTimer();
   }
@@ -57,6 +59,7 @@ export class Telemetry implements vscode.Disposable {
     const sampleSetting = cfg.get<number>('telemetry.sampleRate');
 
     const t = new Telemetry(ctx, {
+      ...opts,
       enabled: typeof enabledSetting === 'boolean' ? enabledSetting : enabled,
       sampleRate: typeof sampleSetting === 'number' ? sampleSetting : sampleRate,
       channelName: 'Vitte Telemetry',
@@ -79,7 +82,7 @@ export class Telemetry implements vscode.Disposable {
     if (!this.shouldSample()) return;
     const sp = sanitize(props);
     const ev: TelemetryEventBase = { t: Date.now(), s: this.session, ext: this.extVersion, k: key, lvl: 'info' };
-    if (sp !== undefined) (ev as any).p = sp;
+    if (sp !== undefined) ev.p = sp;
     this.enqueue(ev);
   }
 
@@ -89,7 +92,7 @@ export class Telemetry implements vscode.Disposable {
     const msg = err instanceof Error ? err.message : String(err);
     const sp = sanitize({ ...props, error: msg });
     const ev: TelemetryEventBase = { t: Date.now(), s: this.session, ext: this.extVersion, k: key, lvl: 'error' };
-    if (sp !== undefined) (ev as any).p = sp;
+    if (sp !== undefined) ev.p = sp;
     this.enqueue(ev);
   }
 
@@ -111,7 +114,7 @@ export class Telemetry implements vscode.Disposable {
     if (!this.shouldSample()) return;
     const sp = sanitize(props);
     const ev: TelemetryEventBase = { t: Date.now(), s: this.session, ext: this.extVersion, k: key, d: Math.max(0, Math.floor(ms)), lvl: 'info' };
-    if (sp !== undefined) (ev as any).p = sp;
+    if (sp !== undefined) ev.p = sp;
     this.enqueue(ev);
   }
 
@@ -130,7 +133,8 @@ export class Telemetry implements vscode.Disposable {
       await writeFileText(file, lines);
       this.output?.appendLine(`[telemetry] wrote ${slice.length} event(s) to ${file.fsPath}`);
     } catch (e) {
-      this.output?.appendLine(`[telemetry] flush failed: ${(e as Error).message}`);
+      const message = e instanceof Error ? e.message : String(e);
+      this.output?.appendLine(`[telemetry] flush failed: ${message}`);
     }
     if (!now) this.armTimer();
   }
@@ -152,11 +156,20 @@ export class Telemetry implements vscode.Disposable {
 }
 
 // ---- config loader ----
+interface ProjectTelemetryConfig {
+  workspace?: {
+    telemetry?: {
+      enabled?: boolean;
+      sampleRate?: number;
+    };
+  };
+}
+
 async function readProjectTelemetryConfig(): Promise<{ enabled: boolean; sampleRate: number }> {
   try {
     const found = await findUp(['vitte.config.json', '.vitte/config.json']);
     if (found) {
-      const json = await readJson<any>(found);
+      const json = await readJson<ProjectTelemetryConfig>(found);
       const enabled = !!json?.workspace?.telemetry?.enabled;
       const rate = Number(json?.workspace?.telemetry?.sampleRate);
       return { enabled, sampleRate: Number.isFinite(rate) ? clamp01(rate) : DEFAULT_SAMPLE };
@@ -194,14 +207,14 @@ function sanitize(input?: TelemetryProperties): TelemetryProperties | undefined 
 // ---- singleton convenience ----
 let _telemetry: Telemetry | undefined;
 export async function getTelemetry(ctx: vscode.ExtensionContext): Promise<Telemetry> {
-  if (!_telemetry) _telemetry = await Telemetry.create(ctx);
+  _telemetry ??= await Telemetry.create(ctx);
   return _telemetry;
 }
 
 export async function registerTelemetry(ctx: vscode.ExtensionContext) {
   const tel = await getTelemetry(ctx);
   // Optional toggle command if user adds to package.json
-  const toggle = vscode.commands.registerCommand('vitte.telemetry.toggle', async () => {
+  const toggle = vscode.commands.registerCommand('vitte.telemetry.toggle', () => {
     tel.setEnabled(!tel.isEnabled());
     void vscode.window.showInformationMessage(`Vitte Telemetry: ${tel.isEnabled() ? 'enabled' : 'disabled'}`);
   });

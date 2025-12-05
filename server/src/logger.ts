@@ -38,23 +38,43 @@ const LEVEL_NAMES: Record<LogLevel, string> = {
 };
 
 function env(name: string, def?: string): string | undefined {
-  try { return (process.env?.[name] as string | undefined) ?? def; } catch { return def; }
+  try { return process.env?.[name] ?? def; } catch { return def; }
 }
 
 const ENV_LEVEL = env('VITTE_LOG_LEVEL');
 const ENV_JSON  = env('VITTE_LOG_JSON');
 const ENV_COLOR = env('VITTE_LOG_COLOR');
-const IS_TTY = (() => { try { return !!(process.stderr as any)?.isTTY; } catch { return false; } })();
+function isWriteStream(value: unknown): value is NodeJS.WriteStream {
+  return typeof value === 'object' && value !== null && 'isTTY' in value;
+}
 
-function parseLevel(s?: string | null): LogLevel {
-  if (!s) return LogLevel.INFO;
-  const t = String(s).trim().toUpperCase();
-  for (const k of Object.keys(LogLevel)) {
-    if (/^\d+$/.test(k)) continue;
-    if (k === t) return (LogLevel as any)[k] as LogLevel;
+function detectStderrTTY(): boolean {
+  try {
+    const stderr = process.stderr;
+    return isWriteStream(stderr) && Boolean(stderr.isTTY);
+  } catch {
+    return false;
   }
-  const n = Number(t);
-  return Number.isFinite(n) ? (n as LogLevel) : LogLevel.INFO;
+}
+
+const IS_TTY = detectStderrTTY();
+
+const NAMED_LEVELS: Record<string, LogLevel> = {
+  TRACE: LogLevel.TRACE,
+  DEBUG: LogLevel.DEBUG,
+  INFO: LogLevel.INFO,
+  WARN: LogLevel.WARN,
+  ERROR: LogLevel.ERROR,
+  OFF: LogLevel.OFF,
+};
+
+function parseLevel(input?: string | null): LogLevel {
+  if (!input) return LogLevel.INFO;
+  const t = String(input).trim().toUpperCase();
+  const named = NAMED_LEVELS[t];
+  if (named !== undefined) return named;
+  const numeric = Number(t);
+  return Number.isFinite(numeric) ? (numeric as LogLevel) : LogLevel.INFO;
 }
 
 let GLOBAL_LEVEL: LogLevel = parseLevel(ENV_LEVEL);
@@ -112,17 +132,22 @@ function colorize(s: string, color: keyof typeof ANSI): string {
 }
 
 function safeStringify(v: unknown): string {
-  const seen = new WeakSet();
-  return JSON.stringify(v, (key, val) => {
-    if (typeof val === 'object' && val !== null) {
-      if (seen.has(val as object)) return '[Circular]';
-      seen.add(val as object);
+  const seen = new WeakSet<object>();
+  const replacer = (_key: string, raw: unknown): unknown => {
+    if (raw instanceof Error) {
+      return { name: raw.name, message: raw.message, stack: raw.stack };
     }
-    if (val instanceof Error) {
-      return { name: val.name, message: val.message, stack: val.stack };
+    if (isObject(raw)) {
+      if (seen.has(raw)) return '[Circular]';
+      seen.add(raw);
     }
-    return val;
-  });
+    return raw;
+  };
+  return JSON.stringify(v, replacer);
+}
+
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +160,7 @@ class StderrSink implements LogSink {
   write(rec: LogRecord) {
     HISTORY.push(rec);
     if (GLOBAL_JSON) {
-      try { console.error(safeStringify({ ...rec, levelName: LEVEL_NAMES[rec.level] as string })); } catch {}
+      try { console.error(safeStringify({ ...rec, levelName: LEVEL_NAMES[rec.level] })); } catch {}
       return;
     }
     const ts = new Date(rec.time).toISOString();

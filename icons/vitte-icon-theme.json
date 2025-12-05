@@ -2,18 +2,17 @@
   "$schema": "vscode://schemas/icon-theme",
   "iconDefinitions": {
     "_vitte": {
-      "iconPath": "./vitte.svg"
+      "iconPath": "../media/icons/vitte-logo.svg"
     }
   },
 
   "fileExtensions": {
     "vit": "_vitte",
-    "vitl": "_vitte",
     "vitte": "_vitte"
   },
 
   "fileNames": {
     "Vittefile": "_vitte",
-    "vitte.config": "_vitte"
+    "vitte.config.json": "_vitte"
   }
 }

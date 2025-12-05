@@ -1,42 +1,69 @@
-// colorize-fixtures/basic.vitte
-// Démo basique pour tester la coloration syntaxique du langage Vitte.
+/*! basic.vitte — fixture de colorisation pour Vitte
+   Couvre : commentaires, mots-clés, littéraux, types, unions, match, boucles.
+*/
 
-module fixtures.basic
+/// Doc du module officiel
+module demo::basic;
 
-// Constantes globales
-const PI: f64 = 3.14159
-const MSG: string = "Hello Vitte!"
+// Imports
+import std::io;
+import std::math::{sin, cos};
 
-// Structure simple
-struct Point {
-    x: i32,
-    y: i32,
+// Constantes & globaux
+pub const PI: f64 = 3.141_592_653_589;
+pub static VERSION: str = "0.2.0";
+
+type Coord = i32;
+struct Point { x: Coord, y: Coord }
+enum Color { Red, Green, Blue(u8) }
+union Payload { bits: u32, bytes: [u8; 4] }
+
+fn distance(p: &Point, q: &Point) -> f64 {
+  let dx = (p.x - q.x) as f64;
+  let dy = (p.y - q.y) as f64;
+  return (dx*dx + dy*dy).sqrt();
 }
 
-// Fonction : addition
-fn add(a: i32, b: i32) -> i32 {
-    return a + b
-}
+fn main() -> i32 {
+  let mut sum: i64 = 0xFF + 0b1010 + 1_000_000;
+  let f: f64 = 42.0 / 3.5;
+  let truth: bool = true && !false;
+  let ch = 'a';
+  let s = "hello \"world\"\t\u{1F600}";
+  let _payload = Payload { bits: 0xCAFE_BABE };
 
-// Fonction principale
-pub fn main() {
-    // Variables mutables / immuables
-    let mut counter: i32 = 0
-    let p = Point { x: 10, y: 20 }
-
-    println(MSG)
-    println("PI =", PI)
-
-    // Boucle + condition
-    while counter < 5 {
-        if counter % 2 == 0 {
-            println("pair:", counter)
-        } else {
-            println("impair:", counter)
+  if sum > 42 {
+    io::println("big {sum}");
+  } else if sum == 0 {
+    // rien
+  } else {
+    for i in 0..10 {
+      while i < 5 && truth || false {
+        sum += i as i64;
+        match i {
+          0 => io::println("zero"),
+          1 | 2 => io::println("one or two"),
+          n if n > 5 => io::println("big"),
+          _ => {}
         }
-        counter = add(counter, 1)
+      }
     }
+  }
 
-    // Utilisation d’une structure
-    println("Point:", p.x, p.y)
+  let p = Point { x: 1, y: -2 };
+  match Color::Blue(128) {
+    Color::Red => {},
+    Color::Blue(b) => assert(b >= 0),
+    _ => {}
+  }
+
+  let mut n = 0;
+  loop {
+    n += 1;
+    if n % 2 == 0 { continue }
+    if n > 7 { break }
+  }
+
+  // Ligne avec espaces de fin pour tester le trailing whitespace…    
+  return 0;
 }

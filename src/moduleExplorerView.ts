@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import * as vscode from "vscode";
+import type { DiagnosticsSummary } from "./utils/diagnostics";
 import {
-  DiagnosticsSummary,
   diagnosticsLevel,
   formatDiagnosticsSummary,
   summarizeDiagnosticsForUris,
@@ -117,7 +117,7 @@ export class ModuleExplorerProvider implements vscode.TreeDataProvider<ModuleTre
 
 export function registerModuleExplorerView(context: vscode.ExtensionContext): ModuleExplorerProvider {
   const provider = new ModuleExplorerProvider();
-  const tree = vscode.window.createTreeView<ModuleTreeNode>("vitteView", {
+  const tree = vscode.window.createTreeView<ModuleTreeNode>("vitteModules", {
     treeDataProvider: provider,
     showCollapseAll: true
   });
@@ -137,9 +137,6 @@ export function registerModuleExplorerView(context: vscode.ExtensionContext): Mo
     }),
     vscode.languages.onDidChangeDiagnostics(() => provider.refreshSoon()),
     vscode.commands.registerCommand("vitte.modules.refresh", async () => {
-      await provider.refresh();
-    }),
-    vscode.commands.registerCommand("vitte.refreshExplorer", async () => {
       await provider.refresh();
     }),
     vscode.commands.registerCommand("vitte.modules.openSymbol", async (symbol: vscode.SymbolInformation) => {
@@ -233,7 +230,7 @@ function severityWeight(summary: DiagnosticsSummary): number {
 }
 
 function isAcceptableSymbol(sym: vscode.SymbolInformation | undefined): sym is vscode.SymbolInformation {
-  if (!sym || !sym.location?.uri) return false;
+  if (!sym?.location?.uri) return false;
   if (sym.location.uri.scheme !== "file") return false;
   const ext = path.extname(sym.location.uri.fsPath).toLowerCase();
   return VITTE_FILE_EXTS.has(ext);
@@ -296,8 +293,7 @@ function uriToBasename(uri: string): string {
 }
 
 function themeIcon(id: string): vscode.ThemeIcon {
-  const ctor = vscode.ThemeIcon as unknown as { new(id: string): vscode.ThemeIcon };
-  return new ctor(id);
+  return { id } as vscode.ThemeIcon;
 }
 
 function isVitteDocument(document: vscode.TextDocument): boolean {
