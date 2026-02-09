@@ -1,5 +1,4 @@
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+
 **Vitte Studio** is the official VS Code extension for the Vitte language. It delivers a complete developer experience: syntax highlighting, rich IntelliSense, hover docs, diagnostics, navigation, formatting, semantic tokens, debugging, tasks, and project tooling for real-world Vitte codebases.
 
 ## Badges
