@@ -14,8 +14,6 @@
 **GitHub**
 
 [![CI](https://img.shields.io/github/actions/workflow/status/vitte-lang/VitteLangVsCode/ci.yml?branch=main)](https://github.com/vitte-lang/VitteLangVsCode/actions)
-[![Webpack](https://img.shields.io/github/actions/workflow/status/vitte-lang/VitteLangVsCode/webpack.yml?branch=main)](https://github.com/vitte-lang/VitteLangVsCode/actions)
-[![Release](https://img.shields.io/github/v/release/vitte-lang/VitteLangVsCode)](https://github.com/vitte-lang/VitteLangVsCode/releases)
 [![License](https://img.shields.io/github/license/vitte-lang/VitteLangVsCode)](https://github.com/vitte-lang/VitteLangVsCode/blob/main/LICENSE)
 [![Stars](https://img.shields.io/github/stars/vitte-lang/VitteLangVsCode)](https://github.com/vitte-lang/VitteLangVsCode)
 [![Forks](https://img.shields.io/github/forks/vitte-lang/VitteLangVsCode)](https://github.com/vitte-lang/VitteLangVsCode)
