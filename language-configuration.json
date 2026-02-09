@@ -1,27 +1,30 @@
 {
-  "$schema": "vscode://schemas/language-configuration",
   "comments": {
-    "lineComment": "#"
+    "lineComment": "//",
+    "blockComment": ["/*", "*/"]
   },
-  "brackets": [["[","]"],["(",")"]],
+  "brackets": [
+    ["{", "}"],
+    ["[", "]"],
+    ["(", ")"]
+  ],
   "autoClosingPairs": [
+    { "open": "{", "close": "}" },
     { "open": "[", "close": "]" },
     { "open": "(", "close": ")" },
-    { "open": "\"", "close": "\"", "notIn": ["string"] }
+    { "open": "\"", "close": "\"", "notIn": ["string", "comment"] }
   ],
-  "surroundingPairs": [["[","]"],["(",")"],["\"","\""]],
-  "indentationRules": {
-    "increaseIndentPattern": "^\\s*(?:if|elif|else|while|for|match|struct|union|enum|typedef|scenario|program|service|kernel|driver|tool|pipeline|when|loop|fn|type|scn|prog)\\b.*$",
-    "decreaseIndentPattern": "^\\s*\\.end\\b"
-  },
+  "surroundingPairs": [
+    { "open": "{", "close": "}" },
+    { "open": "[", "close": "]" },
+    { "open": "(", "close": ")" },
+    { "open": "\"", "close": "\"" }
+  ],
+  "wordPattern": "(-?\\d*\\.?\\d+)|(\\w+)",
   "onEnterRules": [
     {
-      "beforeText": "^\\s*(?:if|elif|else|while|for|match|struct|union|enum|typedef|scenario|program|service|kernel|driver|tool|pipeline|when|loop|fn|type|scn|prog)\\b.*$",
-      "action": { "indent": "indent" }
-    },
-    {
-      "beforeText": "^\\s*\\.end\\s*$",
-      "action": { "indent": "outdent" }
+      "beforeText": "^\\s*(proc|entry|match|select|when|if|else|otherwise|loop|for)\\b.*\\{\\s*$",
+      "action": { "indentAction": "Indent" }
     }
   ]
 }

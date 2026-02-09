@@ -1,172 +1,127 @@
 {
-  "Module": {
-    "prefix": ["module"],
-    "body": ["module ${1:core.module}", "$0"],
-    "description": "Déclaration du module courant"
-  },
-  "Import": {
-    "prefix": ["import"],
-    "body": ["import ${1:core.module}${2: as ${3:alias}}", "$0"],
-    "description": "Import d’un module ou alias facultatif"
-  },
-  "Struct": {
-    "prefix": ["struct"],
+  "proc": {
+    "prefix": "proc",
     "body": [
-      "struct ${1:Name}",
-      "    let ${2:field}: ${3:Type}",
-      ".end",
-      "$0"
+      "proc ${1:name}(${2:args})${3: -> ${4:type}} {",
+      "  $0",
+      "}"
     ],
-    "description": "Structure with fields (.end)"
+    "description": "proc definition"
   },
-  "Union": {
-    "prefix": ["union"],
+  "form": {
+    "prefix": "form",
     "body": [
-      "union ${1:Name}",
-      "    let ${2:field}: ${3:Type}",
-      ".end",
-      "$0"
+      "form ${1:Name} {",
+      "  $0",
+      "}"
     ],
-    "description": "Union with variants (.end)"
+    "description": "form definition"
   },
-  "Enum": {
-    "prefix": ["enum"],
+  "trait": {
+    "prefix": "trait",
     "body": [
-      "enum ${1:Name}",
-      "    ${2:Variant1}",
-      "    ${3:Variant2}",
-      ".end",
-      "$0"
+      "trait ${1:Name} {",
+      "  $0",
+      "}"
     ],
-    "description": "Enumeration (.end)"
+    "description": "trait definition"
   },
-  "Typedef": {
-    "prefix": ["typedef"],
-    "body": ["typedef ${1:Existing} ${2:Alias}", "$0"],
-    "description": "Type alias"
-  },
-  "Function": {
-    "prefix": ["fn"],
+  "pick": {
+    "prefix": "pick",
     "body": [
-      "fn ${1:name}(${2:param}: ${3:Type})${4: -> ${5:Return}}",
-      "    ${0}",
-      ".end"
+      "pick ${1:Name} {",
+      "  case ${2:Variant} {",
+      "    $0",
+      "  }",
+      "}"
     ],
-    "description": "Function definition (.end)"
+    "description": "pick definition"
   },
-  "Scenario": {
-    "prefix": ["scenario", "scn"],
+  "match": {
+    "prefix": "match",
     "body": [
-      "scenario ${1:name}(${2:param}: ${3:Type})",
-      "    ${0}",
-      ".end"
+      "match ${1:expr} {",
+      "  case ${2:pattern} {",
+      "    $0",
+      "  }",
+      "  otherwise {",
+      "  }",
+      "}"
     ],
-    "description": "Scenario (.end)"
+    "description": "match expression"
   },
-  "Program Entry": {
-    "prefix": ["program", "prog"],
+  "select": {
+    "prefix": "select",
     "body": [
-      "program ${1:module.path}",
-      "    ${0}",
-      ".end"
+      "select ${1:expr}",
+      "  when ${2:pattern} {",
+      "    $0",
+      "  }",
+      "  otherwise {",
+      "  }"
     ],
-    "description": "Program entry (.end)"
+    "description": "select/when"
   },
-  "Type Block (phrase)": {
-    "prefix": ["type", "field"],
+  "when_is": {
+    "prefix": "when is",
     "body": [
-      "type ${1:Name}",
-      "    field ${2:x} : ${3:Type}",
-      "    field ${4:y} : ${5:Type}",
-      ".end",
-      "$0"
+      "when ${1:expr} is ${2:pattern} {",
+      "  $0",
+      "}"
     ],
-    "description": "Phrase syntax type/field (.end)"
+    "description": "when is pattern"
   },
-  "Match": {
-    "prefix": ["match"],
+  "entry": {
+    "prefix": "entry",
     "body": [
-      "match ${1:expr}",
-      "    ${2:pattern} =>",
-      "        ${3:expr}",
-      "    _ =>",
-      "        ${4:default}",
-      ".end",
-      "$0"
+      "entry ${1:main} at ${2:core/app} {",
+      "  $0",
+      "}"
     ],
-    "description": "Expression match avec .end"
+    "description": "entry block"
   },
-  "If / Else": {
-    "prefix": ["if"],
+  "use": {
+    "prefix": "use",
     "body": [
-      "if ${1:cond}",
-      "    ${2}",
-      "elif ${3:other}",
-      "    ${4}",
-      "else",
-      "    ${0}",
-      ".end"
+      "use ${1:std/core/types}.${2:int}"
     ],
-    "description": "Bloc conditionnel (.end)"
+    "description": "use import"
   },
-  "While": {
-    "prefix": ["while"],
+  "const": {
+    "prefix": "const",
     "body": [
-      "while ${1:cond}",
-      "    ${0}",
-      ".end"
+      "const ${1:NAME}: ${2:int} = ${3:0}"
     ],
-    "description": "Boucle while (.end)"
+    "description": "const declaration"
   },
-  "For": {
-    "prefix": ["for"],
+  "let": {
+    "prefix": "let",
     "body": [
-      "for ${1:item} in ${2:iterable}",
-      "    ${0}",
-      ".end"
+      "let ${1:name}: ${2:int} = ${3:0}"
     ],
-    "description": "Boucle for-in (.end)"
+    "description": "let declaration"
   },
-  "Loop (from/to/step)": {
-    "prefix": ["loop"],
+  "make": {
+    "prefix": "make",
     "body": [
-      "loop ${1:i} from ${2:0} to ${3:10} step ${4:1}",
-      "    ${0}",
-      ".end"
+      "make ${1:name} as ${2:int} = ${3:0}"
     ],
-    "description": "Phrase loop with from/to/step (.end)"
+    "description": "make declaration"
   },
-  "When": {
-    "prefix": ["when"],
+  "asm": {
+    "prefix": "asm",
     "body": [
-      "when ${1:condition}",
-      "    ${2}",
-      "else when ${3:other}",
-      "    ${4}",
-      "else",
-      "    ${0}",
-      ".end"
+      "asm(\"${1:nop}\")"
     ],
-    "description": "Phrase when/else chain (.end)"
+    "description": "asm statement"
   },
-  "Set": {
-    "prefix": ["set"],
-    "body": ["set ${1:target} = ${2:value}", "$0"],
-    "description": "Assignment (phrase syntax)"
-  },
-  "Say": {
-    "prefix": ["say"],
-    "body": ["say \"${1:message}\"", "$0"],
-    "description": "Standard output (phrase syntax)"
-  },
-  "Do": {
-    "prefix": ["do"],
-    "body": ["do ${1:action} ${2:arg}", "$0"],
-    "description": "Invoke an action (phrase syntax)"
-  },
-  "Return": {
-    "prefix": ["ret", "return"],
-    "body": ["ret ${1:value}", "$0"],
-    "description": "Return a value (phrase or core syntax)"
+  "unsafe": {
+    "prefix": "unsafe",
+    "body": [
+      "unsafe {",
+      "  $0",
+      "}"
+    ],
+    "description": "unsafe block"
   }
 }
