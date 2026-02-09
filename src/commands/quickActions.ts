@@ -195,8 +195,7 @@ const UNPIN_BUTTON: vscode.QuickInputButton = { iconPath: new vscode.ThemeIcon('
 function getVitteConfiguration(): vscode.WorkspaceConfiguration | undefined {
   try {
     return vscode.workspace.getConfiguration('vitte');
-  } catch (error) {
-    console.warn('[vitte.quickActions] Unable to read vitte configuration', error);
+  } catch (_error) {
     return undefined;
   }
 }

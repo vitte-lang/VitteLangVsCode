@@ -387,10 +387,10 @@ connection.onInitialized(() => {
 
 const handleConfigChange = Config.makeOnDidChangeConfigurationHandler<TextDocument>(connection, {
   getOpenDocuments: () => documents.all(),
-  validateDocument: (doc) => {
+  validateDocument: async (doc) => {
     try {
       const diagnostics = lintToPublishable(doc.getText(), doc.uri);
-      void connection.sendDiagnostics({ uri: doc.uri, diagnostics });
+      await connection.sendDiagnostics({ uri: doc.uri, diagnostics });
     } catch (e) {
       logLsp.warn('Validation error after config change', { uri: doc.uri, error: String(e) });
     }
@@ -434,10 +434,10 @@ documents.onDidClose((e) => {
   removeDocument(e.document.uri);
 });
 
-function handleValidate(doc: TextDocument) {
+async function handleValidate(doc: TextDocument): Promise<void> {
   try {
     const diags = lintToPublishable(doc.getText(), doc.uri);
-    void connection.sendDiagnostics({ uri: doc.uri, diagnostics: diags });
+    await connection.sendDiagnostics({ uri: doc.uri, diagnostics: diags });
     logLsp.debug('Diagnostics sent', { uri: doc.uri, count: diags.length });
   } catch (err) {
     logLsp.error('Validation failed', { uri: doc.uri, error: String(err) });
