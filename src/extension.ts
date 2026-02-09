@@ -574,10 +574,15 @@ function resolveServerModule(context: vscode.ExtensionContext): string {
     }
     logServerResolution(`Custom server path not found: ${cfgPath}`);
   }
-  const nested = context.asAbsolutePath(path.join("server", "out", "server.js"));
+  const nested = context.asAbsolutePath(path.join("server", "out", "src", "server.js"));
   if (fs.existsSync(nested)) {
-    logServerResolution(`Using packaged server (server/out): ${nested}`);
+    logServerResolution(`Using packaged server (server/out/src): ${nested}`);
     return nested;
+  }
+  const legacyNested = context.asAbsolutePath(path.join("server", "out", "server.js"));
+  if (fs.existsSync(legacyNested)) {
+    logServerResolution(`Using legacy server (server/out): ${legacyNested}`);
+    return legacyNested;
   }
   const bundled = context.asAbsolutePath(path.join("out", "server.js"));
   if (fs.existsSync(bundled)) {
