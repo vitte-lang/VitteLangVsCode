@@ -3338,13 +3338,28 @@ function isLiveSyntaxTarget(doc: vscode.TextDocument): boolean {
   return vscode.window.visibleTextEditors.some((e) => e.document.uri.toString() === key);
 }
 
+function normalizeDiagSeverityToken(severity: string | undefined): string {
+  return (severity ?? "").trim().toLowerCase();
+}
+
 function mapDiagSeverity(severity: string | undefined): vscode.DiagnosticSeverity {
-  switch ((severity ?? "").toLowerCase()) {
-    case "error": return vscode.DiagnosticSeverity.Error;
-    case "warning": return vscode.DiagnosticSeverity.Warning;
-    case "hint": return vscode.DiagnosticSeverity.Hint;
+  const token = normalizeDiagSeverityToken(severity);
+  switch (token) {
+    case "error":
+    case "err":
+    case "fatal":
+    case "bug":
+    case "ice":
+      return vscode.DiagnosticSeverity.Error;
+    case "warning":
+    case "warn":
+      return vscode.DiagnosticSeverity.Warning;
+    case "hint":
+      return vscode.DiagnosticSeverity.Hint;
     case "information":
     case "info":
+    case "note":
+    case "help":
       return vscode.DiagnosticSeverity.Information;
     default:
       return vscode.DiagnosticSeverity.Error;
@@ -3828,7 +3843,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const range = new vscode.Range(doc.positionAt(start), doc.positionAt(end));
         const baseMessage = typeof d.message === "string" && d.message.length > 0 ? d.message : "Syntax error";
         const severity = mapDiagSeverity(d.severity);
-        const severityRaw = (d.severity ?? "").toLowerCase();
+        const severityRaw = normalizeDiagSeverityToken(d.severity);
         const code = normalizeDiagCode(d.code);
         const parseCode = prefixedDiagCode("PARSE", code || "UNKNOWN");
         const sourceKey = "vitte";
