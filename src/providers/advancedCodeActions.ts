@@ -60,6 +60,12 @@ function diagnosticCodeText(d: vscode.Diagnostic): string {
   return "";
 }
 
+function explainableDiagnosticCode(d: vscode.Diagnostic): string | undefined {
+  const code = diagnosticCodeText(d).trim().toUpperCase();
+  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) return code;
+  return undefined;
+}
+
 function buildSyntaxQuickFixes(document: vscode.TextDocument, d: vscode.Diagnostic): vscode.CodeAction[] {
   const actions: vscode.CodeAction[] = [];
   const code = syntaxCodeOf(d);
@@ -444,6 +450,17 @@ export function registerAdvancedCodeActions(context: vscode.ExtensionContext): v
             arguments: [{ uri: document.uri, diagnostic: d }],
           };
           actions.push(explain);
+        }
+        const code = explainableDiagnosticCode(d);
+        if (code) {
+          const copyExplain = new vscode.CodeAction("Vitte: Copy explain command", vscode.CodeActionKind.QuickFix);
+          copyExplain.diagnostics = [d];
+          copyExplain.command = {
+            command: "vitte.diagnostics.copyExplainCommand",
+            title: "Copy explain command",
+            arguments: [{ uri: document.uri, diagnostic: d }],
+          };
+          actions.push(copyExplain);
         }
         actions.push(...buildSyntaxQuickFixes(document, d));
       }

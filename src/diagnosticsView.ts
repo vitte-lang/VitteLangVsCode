@@ -169,6 +169,29 @@ function toAggregatedDiagnostic(arg: unknown): AggregatedDiagnostic | undefined 
   return { uri: maybe.uri, diagnostic, index: typeof maybe.index === "number" ? maybe.index : 0 };
 }
 
+function currentDiagnosticEntry(): AggregatedDiagnostic | undefined {
+  const active = vscode.window.activeTextEditor;
+  if (!active) return undefined;
+  const pos = active.selection.active;
+  const hit = vscode.languages.getDiagnostics(active.document.uri)
+    .find((d) => d.range.contains(pos) || d.range.start.line === pos.line);
+  if (!hit) return undefined;
+  return { uri: active.document.uri, diagnostic: hit, index: 0 };
+}
+
+function explainableCodeFromDiagnostic(diagnostic: vscode.Diagnostic): string | undefined {
+  const code = diagnosticCodeText(diagnostic);
+  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) return code;
+  return undefined;
+}
+
+function explainCommandForEntry(entry: AggregatedDiagnostic): string | undefined {
+  const code = explainableCodeFromDiagnostic(entry.diagnostic);
+  if (!code) return undefined;
+  const lang = vscode.workspace.getConfiguration("vitte").get<string>("lang", "en");
+  return `vitte --explain ${code} --lang=${lang}`;
+}
+
 class FileNode extends vscode.TreeItem {
   constructor(
     public readonly uri: vscode.Uri,
@@ -324,16 +347,10 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
     }),
     vscode.commands.registerCommand("vitte.diagnostics.explain", async (arg?: unknown) => {
       let entry = toAggregatedDiagnostic(arg);
+      entry ??= currentDiagnosticEntry();
       if (!entry) {
-        const active = vscode.window.activeTextEditor;
-        if (!active) return;
-        const pos = active.selection.active;
-        const hit = vscode.languages.getDiagnostics(active.document.uri).find((d) => d.range.contains(pos) || d.range.start.line === pos.line);
-        if (!hit) {
-          void vscode.window.showInformationMessage("Vitte: no diagnostic at cursor.");
-          return;
-        }
-        entry = { uri: active.document.uri, diagnostic: hit, index: 0 };
+        void vscode.window.showInformationMessage("Vitte: no diagnostic at cursor.");
+        return;
       }
       const doc = await vscode.workspace.openTextDocument(entry.uri);
       const editor = await vscode.window.showTextDocument(doc, { preserveFocus: false, preview: true });
@@ -347,6 +364,18 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
           await vscode.env.clipboard.writeText(detail);
           void vscode.window.setStatusBarMessage("Vitte diagnostic explanation copied", 2000);
         });
+    }),
+    vscode.commands.registerCommand("vitte.diagnostics.copyExplainCommand", async (arg?: unknown) => {
+      let entry = toAggregatedDiagnostic(arg);
+      entry ??= currentDiagnosticEntry();
+      if (!entry) return;
+      const command = explainCommandForEntry(entry);
+      if (!command) {
+        void vscode.window.showInformationMessage("Vitte: diagnostic has no explainable code.");
+        return;
+      }
+      await vscode.env.clipboard.writeText(command);
+      void vscode.window.setStatusBarMessage("Vitte explain command copied", 2000);
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration("vitte.diagnostics.displayMode")) return;

@@ -568,7 +568,7 @@ suite("Vitte extension", () => {
     }
   });
 
-  test("Code actions expose syntax fixAll and explain diagnostic", async () => {
+  test("Code actions expose syntax fixAll, explain diagnostic, and copy explain command", async () => {
     const document = await vscode.workspace.openTextDocument({
       content: "}\n",
       language: "vitte",
@@ -621,6 +621,30 @@ suite("Vitte extension", () => {
       }, 4000, 60);
       assert.ok(explainAction, "La code action Explain this diagnostic est absente");
 
+      let copyExplainCommandAction: vscode.CodeAction | undefined;
+      await waitUntil(async () => {
+        try {
+          const actions =
+            (await vscode.commands.executeCommand<(vscode.CodeAction | vscode.Command)[]>(
+              "vscode.executeCodeActionProvider",
+              document.uri,
+              range,
+              vscode.CodeActionKind.QuickFix.value,
+            )) ?? [];
+          const isCopyExplainCommandCodeAction = (a: vscode.CodeAction | vscode.Command): a is vscode.CodeAction =>
+            a instanceof vscode.CodeAction
+            && a.command?.command === "vitte.diagnostics.copyExplainCommand"
+            && (a.title ?? "").toLowerCase().includes("copy explain command");
+          copyExplainCommandAction = actions.find(
+            isCopyExplainCommandCodeAction,
+          );
+          return Boolean(copyExplainCommandAction);
+        } catch {
+          return false;
+        }
+      }, 4000, 60);
+      assert.ok(copyExplainCommandAction, "La code action Copy explain command est absente");
+
       let syntaxFixAllAction: vscode.CodeAction | undefined;
       await waitUntil(async () => {
         try {
@@ -656,9 +680,11 @@ suite("Vitte extension", () => {
       await vscode.commands.executeCommand("vitte.diagnostics.open", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.copy", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.explain", undefined);
+      await vscode.commands.executeCommand("vitte.diagnostics.copyExplainCommand", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.open", { uri: "bad" });
       await vscode.commands.executeCommand("vitte.diagnostics.copy", { diagnostic: 42 });
       await vscode.commands.executeCommand("vitte.diagnostics.explain", { uri: "bad", diagnostic: null });
+      await vscode.commands.executeCommand("vitte.diagnostics.copyExplainCommand", { uri: "bad", diagnostic: null });
     });
   });
 });

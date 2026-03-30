@@ -256,6 +256,11 @@
         "category": "Vitte"
       },
       {
+        "command": "vitte.diagnostics.copyExplainCommand",
+        "title": "Vitte: Copy Explain Command",
+        "category": "Vitte"
+      },
+      {
         "command": "vitte.diagnostics.goToFirstErrorInFile",
         "title": "Vitte: Go To First Error In File",
         "category": "Vitte"
