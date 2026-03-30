@@ -3521,10 +3521,6 @@ function resolveVitteBinary(doc: vscode.TextDocument): { bin: string; cwd: strin
   const folder = vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.fsPath
     ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!folder) return undefined;
-  const local = path.join(folder, "bin", process.platform === "win32" ? "vitte.exe" : "vitte");
-  if (fs.existsSync(local)) {
-    return { bin: local, cwd: folder };
-  }
   return { bin: "vitte", cwd: folder };
 }
 
