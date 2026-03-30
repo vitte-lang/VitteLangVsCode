@@ -17,9 +17,23 @@ function labelAsString(label: vscode.TreeItemLabel | string | undefined): string
 
 function syntaxCodeOf(d: vscode.Diagnostic): string | undefined {
   const raw = d.code;
-  const code = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
-  if (/^E\d{4}$/.test(code)) return code;
-  if (d.source === "vitte-parse") return code || "parse";
+  let code = "";
+  if (typeof raw === "string" || typeof raw === "number") {
+    code = String(raw).trim().toUpperCase();
+  } else if (raw && typeof raw === "object" && "value" in raw) {
+    const value = (raw as { value?: unknown }).value;
+    if (typeof value === "string" || typeof value === "number") {
+      code = String(value).trim().toUpperCase();
+    }
+  }
+  if (!code) return undefined;
+  const prefixed = /^([A-Z][A-Z0-9_-]*):(.*)$/.exec(code);
+  const prefix = prefixed?.[1] ?? "";
+  const base = (prefixed?.[2] ?? code).trim().toUpperCase();
+  if (/^E\d{4}$/.test(base)) return base;
+  if (prefix === "PARSE") return base || "PARSE";
+  if (prefix === "BRACKETS") return code;
+  if (d.source === "vitte" && /^E\d{4}$/.test(base)) return base;
   return undefined;
 }
 

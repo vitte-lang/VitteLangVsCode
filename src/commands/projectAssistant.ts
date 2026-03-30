@@ -327,8 +327,8 @@ function diagnosticsFromToolResult(ws: string, res: ToolRunResult): Map<string, 
         `${res.tool} failed (${res.code}): ${res.stderr.trim() || "no structured output"}`,
         vscode.DiagnosticSeverity.Error
       );
-      d.code = `DOCTOR_${res.tool.toUpperCase()}`;
-      d.source = "vitte-doctor";
+      d.code = `DOCTOR:${res.tool.toUpperCase()}`;
+      d.source = "vitte";
       map.set(uri.toString(), [d]);
     }
     return map;
@@ -345,15 +345,21 @@ function diagnosticsFromToolResult(ws: string, res: ToolRunResult): Map<string, 
       1
     ) - 1;
     const message = firstText(rec.message, rec.msg, rec.error, rec.reason) ?? `${res.tool} issue`;
-    const code = sanitizeCode(firstText(rec.code) ?? `DOCTOR_${res.tool.toUpperCase()}`);
+    const code = sanitizeCode(firstText(rec.code) ?? res.tool.toUpperCase());
     const severity = severityFromAny(rec.severity ?? rec.level ?? (res.code === 0 ? "warning" : "error"));
     const diag = new vscode.Diagnostic(
       new vscode.Range(Math.max(0, line), Math.max(0, col), Math.max(0, line), Math.max(1, col + 1)),
       message,
       severity
     );
-    diag.code = code.startsWith("DOCTOR_") ? code : `DOCTOR_${res.tool.toUpperCase()}_${code}`;
-    diag.source = "vitte-doctor";
+    if (code.startsWith("DOCTOR:")) {
+      diag.code = code;
+    } else if (code.startsWith("DOCTOR_")) {
+      diag.code = `DOCTOR:${code.slice("DOCTOR_".length)}`;
+    } else {
+      diag.code = `DOCTOR:${res.tool.toUpperCase()}_${code}`;
+    }
+    diag.source = "vitte";
     const arr = map.get(uri.toString()) ?? [];
     arr.push(diag);
     map.set(uri.toString(), arr);

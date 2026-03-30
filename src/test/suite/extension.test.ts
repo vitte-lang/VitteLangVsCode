@@ -584,8 +584,8 @@ suite("Vitte extension", () => {
       "Unexpected token at top-level",
       vscode.DiagnosticSeverity.Error,
     );
-    diagnostic.code = "E0007";
-    diagnostic.source = "vitte-parse";
+    diagnostic.code = "PARSE:E0007";
+    diagnostic.source = "vitte";
     testCollection.set(document.uri, [diagnostic]);
 
     try {
@@ -594,7 +594,7 @@ suite("Vitte extension", () => {
         return list.some((d) => {
           const code = d.code;
           const codeText = typeof code === "string" || typeof code === "number" ? String(code) : "";
-          return codeText === "E0007" && d.source === "vitte-parse";
+          return codeText === "PARSE:E0007" && d.source === "vitte";
         });
       }, 3000, 30);
 

@@ -109,7 +109,8 @@ function openLineText(uri: vscode.Uri, line: number): string {
 }
 
 function syntaxSuggestion(entry: AggregatedDiagnostic): string | undefined {
-  const code = diagnosticCodeText(entry.diagnostic);
+  const rawCode = diagnosticCodeText(entry.diagnostic);
+  const code = explainableCodeFromDiagnostic(entry.diagnostic) ?? rawCode;
   if (!code) return undefined;
 
   if (code === "E0007") {
@@ -134,7 +135,12 @@ function syntaxSuggestion(entry: AggregatedDiagnostic): string | undefined {
 
 function diagnosticCodeText(d: vscode.Diagnostic): string {
   const raw = d.code;
-  return typeof raw === "string" || typeof raw === "number" ? String(raw).trim().toUpperCase() : "";
+  if (typeof raw === "string" || typeof raw === "number") return String(raw).trim().toUpperCase();
+  if (raw && typeof raw === "object" && "value" in raw) {
+    const value = (raw as { value?: unknown }).value;
+    if (typeof value === "string" || typeof value === "number") return String(value).trim().toUpperCase();
+  }
+  return "";
 }
 
 function vitteExplainHint(code: string): string {
@@ -151,11 +157,12 @@ function diagnosticDocUrl(code: string): string | undefined {
 function diagnosticExplanationMessage(entry: AggregatedDiagnostic): string {
   const pos = entry.diagnostic.range.start;
   const code = diagnosticCodeText(entry.diagnostic);
+  const explainable = explainableCodeFromDiagnostic(entry.diagnostic);
   const source = entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : "Source: unknown";
   const suggestion = syntaxSuggestion(entry) ?? "Suggestion: inspect the surrounding block and apply the closest Quick Fix.";
   const codePart = code ? `Code: ${code}\n` : "";
-  const explainPart = code ? `\n${vitteExplainHint(code)}` : "";
-  const docUrl = code ? diagnosticDocUrl(code) : undefined;
+  const explainPart = explainable ? `\n${vitteExplainHint(explainable)}` : "";
+  const docUrl = explainable ? diagnosticDocUrl(explainable) : undefined;
   const docPart = docUrl ? `\nDocs: ${docUrl}` : "";
   return `${source}\n${codePart}${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}\n\n${entry.diagnostic.message}\n\n${suggestion}${explainPart}${docPart}`;
 }
@@ -181,7 +188,9 @@ function currentDiagnosticEntry(): AggregatedDiagnostic | undefined {
 
 function explainableCodeFromDiagnostic(diagnostic: vscode.Diagnostic): string | undefined {
   const code = diagnosticCodeText(diagnostic);
-  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) return code;
+  const prefixed = /^([A-Z][A-Z0-9_-]*):(.*)$/.exec(code);
+  const base = (prefixed?.[2] ?? code).trim().toUpperCase();
+  if (/^E\d{4}$/.test(base) || /^VITTE-[A-Z]\d{4}$/.test(base)) return base;
   return undefined;
 }
 
@@ -239,12 +248,10 @@ class DiagnosticNode extends vscode.TreeItem {
       `${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}`,
       entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : ""
     ].filter(Boolean);
-    const codeValue = entry.diagnostic.code;
-    const codeText = typeof codeValue === 'string' || typeof codeValue === 'number'
-      ? `Code: ${String(codeValue)}`
-      : undefined;
+    const codeValue = diagnosticCodeText(entry.diagnostic);
+    const codeText = codeValue ? `Code: ${codeValue}` : undefined;
     const suggestion = syntaxSuggestion(entry);
-    const code = diagnosticCodeText(entry.diagnostic);
+    const code = explainableCodeFromDiagnostic(entry.diagnostic);
     const explain = code ? vitteExplainHint(code) : undefined;
     const docUrl = code ? diagnosticDocUrl(code) : undefined;
     const extra = [severityName && `Niveau: ${severityName}`, codeText, suggestion, explain, docUrl && `Docs: ${docUrl}`].filter(Boolean).join('\n');

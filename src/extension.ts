@@ -3255,9 +3255,27 @@ function normalizeDiagCode(raw: string | number | undefined): string {
   return raw.trim().toUpperCase();
 }
 
+function prefixedDiagCode(prefix: string, code: string): string {
+  const p = prefix.trim().toUpperCase();
+  const c = code.trim().toUpperCase();
+  if (!p) return c;
+  if (!c) return p;
+  return `${p}:${c}`;
+}
+
+function explainableDiagCode(code: string): string | undefined {
+  const text = code.trim().toUpperCase();
+  if (!text) return undefined;
+  const prefixed = /^([A-Z][A-Z0-9_-]*):(.*)$/.exec(text);
+  const base = (prefixed?.[2] ?? text).trim().toUpperCase();
+  if (/^E\d{4}$/.test(base) || /^VITTE-[A-Z]\d{4}$/.test(base)) return base;
+  return undefined;
+}
+
 function diagnosticDocUri(code: string): vscode.Uri | undefined {
-  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) {
-    return vscode.Uri.parse(`https://docs.vitte.dev/diagnostics/${code}`);
+  const normalized = explainableDiagCode(code);
+  if (normalized) {
+    return vscode.Uri.parse(`https://docs.vitte.dev/diagnostics/${normalized}`);
   }
   return undefined;
 }
@@ -3564,8 +3582,9 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const severity = mapDiagSeverity(d.severity);
         const severityRaw = (d.severity ?? "").toLowerCase();
         const code = normalizeDiagCode(d.code);
-        const explainHelp = code ? resolveDiagnosticHelp(code, lang, resolved, helpSource, explainTimeoutMs) : undefined;
-        const message = code ? formatVitteDiagnosticMessage(baseMessage, code, explainHelp) : baseMessage;
+        const baseCode = explainableDiagCode(code);
+        const explainHelp = baseCode ? resolveDiagnosticHelp(baseCode, lang, resolved, helpSource, explainTimeoutMs) : undefined;
+        const message = baseCode ? formatVitteDiagnosticMessage(baseMessage, baseCode, explainHelp) : baseMessage;
         const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${severityRaw}|${code}|${baseMessage}`;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
@@ -3586,10 +3605,9 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         }
 
         const diag = new vscode.Diagnostic(range, message, severity);
-        if (code) {
-          const target = diagnosticDocUri(code);
-          diag.code = target ? { value: code, target } : code;
-        }
+        const parseCode = prefixedDiagCode("PARSE", code || "UNKNOWN");
+        const target = baseCode ? diagnosticDocUri(baseCode) : undefined;
+        diag.code = target ? { value: parseCode, target } : parseCode;
         diag.source = "vitte";
         diagnostics.push(diag);
         if (severity === vscode.DiagnosticSeverity.Error) {
@@ -3674,11 +3692,13 @@ function updateEditorLint(doc: vscode.TextDocument): void {
     if (line === undefined) continue;
     if (!allowTabs && line.includes("\t")) {
       const idx = line.indexOf("\t");
-      diagnostics.push(new vscode.Diagnostic(
+      const diag = new vscode.Diagnostic(
         new vscode.Range(i, idx, i, idx + 1),
         "Tabulation détectée. Utiliser des espaces.",
         vscode.DiagnosticSeverity.Warning
-      ));
+      );
+      diag.code = prefixedDiagCode("LINT", "TABS");
+      diagnostics.push(diag);
     }
     if (!allowTrailing) {
       const m = /[ \t]+$/.exec(line);
@@ -3690,20 +3710,23 @@ function updateEditorLint(doc: vscode.TextDocument): void {
           vscode.DiagnosticSeverity.Hint
         );
         trailing.tags = [vscode.DiagnosticTag.Unnecessary];
+        trailing.code = prefixedDiagCode("LINT", "TRAILING_WHITESPACE");
         diagnostics.push(trailing);
       }
     }
     if (maxLineLength > 0 && line.length > maxLineLength) {
-      diagnostics.push(new vscode.Diagnostic(
+      const diag = new vscode.Diagnostic(
         new vscode.Range(i, maxLineLength, i, line.length),
         `Ligne trop longue (${line.length} > ${maxLineLength}).`,
         vscode.DiagnosticSeverity.Hint
-      ));
+      );
+      diag.code = prefixedDiagCode("LINT", "LINE_LENGTH");
+      diagnostics.push(diag);
     }
   }
   diagnostics.push(...buildBracketDiagnostics(lines));
   for (const d of diagnostics) {
-    d.source = "vitte-lint";
+    d.source = "vitte";
   }
   editorLintCollection.set(doc.uri, diagnostics);
 }
@@ -3729,11 +3752,13 @@ function buildBracketDiagnostics(lines: string[]): vscode.Diagnostic[] {
       const expected = pairs[char];
       const top = stack[stack.length - 1];
       if (!top || top.char !== expected) {
-        diagnostics.push(new vscode.Diagnostic(
+        const diag = new vscode.Diagnostic(
           new vscode.Range(lineIndex, col, lineIndex, col + 1),
           `Parenthèse/accolade fermante inattendue "${char}".`,
           vscode.DiagnosticSeverity.Error
-        ));
+        );
+        diag.code = prefixedDiagCode("BRACKETS", "UNEXPECTED_CLOSER");
+        diagnostics.push(diag);
         continue;
       }
       stack.pop();
@@ -3742,11 +3767,13 @@ function buildBracketDiagnostics(lines: string[]): vscode.Diagnostic[] {
 
   for (const entry of stack) {
     const expected = entry.char === "(" ? ")" : entry.char === "[" ? "]" : "}";
-    diagnostics.push(new vscode.Diagnostic(
+    const diag = new vscode.Diagnostic(
       new vscode.Range(entry.line, entry.col, entry.line, entry.col + 1),
       `Parenthèse/accolade ouvrante "${entry.char}" non fermée (attendu: "${expected}").`,
       vscode.DiagnosticSeverity.Error
-    ));
+    );
+    diag.code = prefixedDiagCode("BRACKETS", "UNCLOSED_OPENER");
+    diagnostics.push(diag);
   }
   return diagnostics;
 }

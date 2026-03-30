@@ -50,19 +50,36 @@ function bestTopLevelKeyword(word: string): string | undefined {
 
 function syntaxCodeOf(d: vscode.Diagnostic): string | undefined {
   const raw = d.code;
-  const code = typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
-  return SYNTAX_CODES.has(code) ? code : undefined;
+  let code = "";
+  if (typeof raw === "string" || typeof raw === "number") {
+    code = String(raw).trim().toUpperCase();
+  } else if (raw && typeof raw === "object" && "value" in raw) {
+    const value = (raw as { value?: unknown }).value;
+    if (typeof value === "string" || typeof value === "number") {
+      code = String(value).trim().toUpperCase();
+    }
+  }
+  const prefixed = /^([A-Z][A-Z0-9_-]*):(.*)$/.exec(code);
+  const base = (prefixed?.[2] ?? code).trim().toUpperCase();
+  return SYNTAX_CODES.has(base) ? base : undefined;
 }
 
 function diagnosticCodeText(d: vscode.Diagnostic): string {
   const raw = d.code;
   if (typeof raw === "string" || typeof raw === "number") return String(raw);
+  if (raw && typeof raw === "object" && "value" in raw) {
+    const value = (raw as { value?: unknown }).value;
+    if (typeof value === "string" || typeof value === "number") return String(value);
+  }
   return "";
 }
 
 function explainableDiagnosticCode(d: vscode.Diagnostic): string | undefined {
   const code = diagnosticCodeText(d).trim().toUpperCase();
-  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) return code;
+  if (!code) return undefined;
+  const prefixed = /^([A-Z][A-Z0-9_-]*):(.*)$/.exec(code);
+  const base = (prefixed?.[2] ?? code).trim().toUpperCase();
+  if (/^E\d{4}$/.test(base) || /^VITTE-[A-Z]\d{4}$/.test(base)) return base;
   return undefined;
 }
 
@@ -433,8 +450,11 @@ export function registerAdvancedCodeActions(context: vscode.ExtensionContext): v
 
       for (const d of ctx.diagnostics) {
         const code = diagnosticCodeText(d);
-        if (!code.startsWith("DOCTOR_")) continue;
-        const tool = code.replace(/^DOCTOR_/, "").toLowerCase();
+        const doctorCode = code.toUpperCase().startsWith("DOCTOR:")
+          ? code.slice("DOCTOR:".length)
+          : (code.toUpperCase().startsWith("DOCTOR_") ? code.slice("DOCTOR_".length) : "");
+        if (!doctorCode) continue;
+        const tool = doctorCode.replace(/[_:].*$/, "").toLowerCase();
         const action = new vscode.CodeAction(`Vitte Doctor: rerun ${tool}`, vscode.CodeActionKind.QuickFix);
         action.diagnostics = [d];
         action.command = { command: "vitte.doctor.runTool", title: "Run Doctor tool", arguments: [tool] };
