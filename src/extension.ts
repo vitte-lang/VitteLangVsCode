@@ -11,8 +11,6 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as cp from "node:child_process";
 import * as vscode from "vscode";
-import { registerDiagnosticsView } from "./diagnosticsView";
-import { registerModuleExplorerView } from "./moduleExplorerView";
 import { PlaygroundPanel } from "./providers/playgroundPanel";
 import { registerOfflineView } from "./providers/offlineView";
 import { registerBuildTasks } from "./tasks/buildTasks";
@@ -22,7 +20,6 @@ import { registerDebugFactory } from "./debug/adapterFactory";
 import { registerDebugConfigurationProvider } from "./debug/configurationProvider";
 import { registerTelemetry } from "./utils/telemetry";
 import { registerQuickActions } from "./commands/quickActions";
-import { registerMetricsView } from "./providers/metricsView";
 import { registerPackageProblemsView } from "./providers/packageProblemsView";
 import { registerModuleGraphView } from "./providers/moduleGraphView";
 import { registerTopSyntaxErrorsView } from "./providers/topSyntaxErrorsView";
@@ -2313,9 +2310,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 
   // Views are registered in best-effort mode so missing contributed view IDs
   // do not interrupt extension activation.
-  safeRegisterView("vitteDiagnostics", () => registerDiagnosticsView(context));
-  safeRegisterView("vitteModules", () => registerModuleExplorerView(context));
-  safeRegisterView("vitteMetrics", () => registerMetricsView(context, () => client, getStreamingCompletionStats));
+  // Disabled for now: these three tree views are not contributed in the current UI profile.
+  // Keep commands/diagnostics runtime active, but skip view registration to avoid
+  // "No view is registered with id" errors.
+  // safeRegisterView("vitteDiagnostics", () => registerDiagnosticsView(context));
+  // safeRegisterView("vitteModules", () => registerModuleExplorerView(context));
+  // safeRegisterView("vitteMetrics", () => registerMetricsView(context, () => client, getStreamingCompletionStats));
   safeRegisterView("vittePackageProblems", () => registerPackageProblemsView(context));
   safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
   safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
