@@ -116,6 +116,7 @@ const completionAstRefreshTimers = new Map<string, NodeJS.Timeout>();
 let completionStreamingRefreshGuard = false;
 let completionNextInvokeIsAutoRefresh = false;
 let completionLoadNextPageKey: string | undefined;
+let completionLoadNextPageIssuedAt = 0;
 const completionTop1StableByKey = new Map<string, { text: string; count: number; lastAt: number }>();
 let completionIdlePrefetchTimer: NodeJS.Timeout | undefined;
 let completionPrefetchInFlight = false;
@@ -475,6 +476,8 @@ function resetSuggestionRuntimeState(): void {
   completionStreamingCacheDocument.clear();
   completionStreamingInFlight.clear();
   completionPagingState.clear();
+  completionLoadNextPageKey = undefined;
+  completionLoadNextPageIssuedAt = 0;
   completionTop1StableByKey.clear();
   completionStickyAcceptedByDoc.clear();
   completionLspNegativeCache.clear();
@@ -1852,13 +1855,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     vscode.commands.registerCommand("vitte.suggestions.loadNextPage", async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
+      if (!isVitteDocument(editor.document)) {
+        void vscode.window.showWarningMessage("Vitte suggestions pagination is available only in Vitte/Vit files.");
+        return;
+      }
       const cfg = vscode.workspace.getConfiguration("vitte");
       const maxPages = Math.max(1, Math.min(10, cfg.get<number>("suggestions.maxPages", 5)));
       const key = getCompletionRequestKey(editor.document, editor.selection.active);
       const current = completionPagingState.get(key)?.page ?? 1;
       const nextPage = Math.min(maxPages, current + 1);
+      if (nextPage === current) {
+        vscode.window.setStatusBarMessage(`Vitte suggestions page: ${nextPage}/${maxPages}`, 1200);
+        return;
+      }
       completionPagingState.set(key, { page: nextPage, ts: Date.now() });
       completionLoadNextPageKey = key;
+      completionLoadNextPageIssuedAt = Date.now();
       await vscode.commands.executeCommand("editor.action.triggerSuggest");
       vscode.window.setStatusBarMessage(`Vitte suggestions page: ${nextPage}/${maxPages}`, 1800);
     }),
@@ -2299,6 +2311,8 @@ export async function deactivate(): Promise<void> {
     try { proc.kill(); } catch { /* noop */ }
   }
   syntaxLintProcByDoc.clear();
+  completionLoadNextPageKey = undefined;
+  completionLoadNextPageIssuedAt = 0;
   if (suggestionProfilerRenderTimer) {
     clearInterval(suggestionProfilerRenderTimer);
     suggestionProfilerRenderTimer = undefined;
@@ -2416,8 +2430,17 @@ async function startClient(context: vscode.ExtensionContext | undefined): Promis
         const contextKey = getCompletionContextKey(document, position);
         const documentKey = getCompletionDocumentKey(document);
         const isPrefetch = completionPrefetchExpectedKey === key;
-        const forceLoadNextPage = completionLoadNextPageKey === key;
-        if (forceLoadNextPage) completionLoadNextPageKey = undefined;
+        if (completionLoadNextPageKey && (Date.now() - completionLoadNextPageIssuedAt) > 5000) {
+          completionLoadNextPageKey = undefined;
+          completionLoadNextPageIssuedAt = 0;
+        }
+        const forceLoadNextPage =
+          completionLoadNextPageKey === key
+          && (Date.now() - completionLoadNextPageIssuedAt) <= 5000;
+        if (completionLoadNextPageKey === key) {
+          completionLoadNextPageKey = undefined;
+          completionLoadNextPageIssuedAt = 0;
+        }
         let cancellationRecorded = false;
         const markRequestCancelled = (): void => {
           if (isPrefetch || cancellationRecorded) return;
