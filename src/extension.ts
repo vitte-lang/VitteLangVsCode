@@ -1694,9 +1694,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
           renameP95Ms: by.get("rename")?.p95Ms ?? null,
           metrics: stats,
         };
-        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!folder) return;
-        const dir = path.join(folder, ".vitte-cache", "diagnostics");
+        const dir = diagnosticsExportDir();
+        if (!dir) return;
         await fs.promises.mkdir(dir, { recursive: true });
         const file = path.join(dir, "perf-session.json");
         await fs.promises.writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -1728,9 +1727,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       const requestId = nextRequestId("obs-export");
       obsLog("command.observability.export.start", "info", undefined, requestId);
       try {
-        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!folder) return;
-        const dir = path.join(folder, ".vitte-cache", "diagnostics");
+        const dir = diagnosticsExportDir();
+        if (!dir) return;
         await fs.promises.mkdir(dir, { recursive: true });
         let metrics: ServerMetricEntry[] | undefined;
         if (client && client.state === ClientState.Running) {
@@ -1801,15 +1799,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     }),
     vscode.commands.registerCommand("vitte.suggestions.exportDiagnostics", async () => {
       try {
-        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!folder) {
+        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceDir) {
           void vscode.window.showWarningMessage("Vitte: open a workspace to export suggestion diagnostics.");
           return;
         }
         const cfg = vscode.workspace.getConfiguration("vitte");
         const payload = {
           ts: new Date().toISOString(),
-          workspace: folder,
+          workspace: workspaceDir,
           streaming: getStreamingCompletionStats(),
           profilerRecent: getSuggestionTraceHistory(120),
           learning: getSuggestionLearningSnapshot(),
@@ -1824,7 +1822,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
             rankingDeadlineMs: cfg.get<number>("suggestions.rankingDeadlineMs"),
           },
         };
-        const dir = path.join(folder, ".vitte-cache", "diagnostics");
+        const dir = diagnosticsExportDir();
+        if (!dir) {
+          void vscode.window.showWarningMessage("Vitte: unable to resolve diagnostics export directory.");
+          return;
+        }
         await fs.promises.mkdir(dir, { recursive: true });
         const file = path.join(dir, "suggestions-diagnostics.json");
         await fs.promises.writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -1839,20 +1841,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     }),
     vscode.commands.registerCommand("vitte.diagnostics.exportSnapshot", async () => {
       try {
-        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (!folder) {
+        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceDir) {
           void vscode.window.showWarningMessage("Vitte: open a workspace to export diagnostics snapshot.");
           return;
         }
         const report = buildWorkspaceDiagnosticsReport();
         const payload = {
           ts: new Date().toISOString(),
-          workspace: folder,
+          workspace: workspaceDir,
           summary: summarizeWorkspaceDiagnostics(),
           perFile: report.perFile,
           perDirectory: summarizeDiagnosticsByDirectory(),
         };
-        const dir = path.join(folder, ".vitte-cache", "diagnostics");
+        const dir = diagnosticsExportDir();
+        if (!dir) {
+          void vscode.window.showWarningMessage("Vitte: unable to resolve diagnostics export directory.");
+          return;
+        }
         await fs.promises.mkdir(dir, { recursive: true });
         const file = path.join(dir, `diagnostics-snapshot-${Date.now()}.json`);
         await fs.promises.writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
@@ -2922,6 +2928,19 @@ function showOfflineNoop(action: string): void {
   });
 }
 
+function safeWorkspaceSubPath(...segments: string[]): string | undefined {
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) return undefined;
+  const target = path.resolve(root, ...segments);
+  const rel = path.relative(root, target);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) return undefined;
+  return target;
+}
+
+function diagnosticsExportDir(): string | undefined {
+  return safeWorkspaceSubPath(".vitte-cache", "diagnostics");
+}
+
 function formatOfflineSince(): string {
   if (!offlineSince) return "unknown";
   const seconds = Math.floor((Date.now() - offlineSince) / 1000);
@@ -3371,9 +3390,8 @@ async function writeRenameReport(data: {
   error?: string;
   files: string[];
 }): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!folder) return;
-  const dir = path.join(folder, ".vitte-cache", "rename");
+  const dir = safeWorkspaceSubPath(".vitte-cache", "rename");
+  if (!dir) return;
   try {
     await fs.promises.mkdir(dir, { recursive: true });
     const file = path.join(dir, `rename-${Date.now()}.json`);
