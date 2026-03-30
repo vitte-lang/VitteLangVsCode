@@ -6,25 +6,34 @@ import { locateVitteRuntime } from '../debug/runtimeLocator';
  * Build / Run / Test tasks & commands for Vitte
  *
  * Commands:
- *  - vitte.build           → builds the workspace
- *  - vitte.clean           → cleans build artifacts
- *  - vitte.run             → runs the project (or current file)
- *  - vitte.test            → runs all tests discovered by the toolchain
- *  - vitte.testCurrent     → runs tests for the current file if applicable
- *  - vitte.switchProfile   → cycles dev → test → release → bench
+ *  - vitte.build             → builds the workspace
+ *  - vitte.clean             → cleans build artifacts
+ *  - vitte.run               → runs the project (or current file)
+ *  - vitte.test              → runs all tests discovered by the toolchain
+ *  - vitte.testCurrent       → runs tests for the current file when supported
+ *  - vitte.runTests          → alias for full test run
+ *  - vitte.refreshTests      → refresh VS Code Testing view
+ *  - vitte.switchProfile     → cycles dev → test → release → bench
  *  - vitte.toggleIncremental → toggles incremental build
  *
  * Task provider:
  *  - type: 'vitte' with command: 'build' | 'clean' | 'run' | 'test'
  */
 export function registerBuildTasks(ctx: vscode.ExtensionContext) {
-  // Commands
   ctx.subscriptions.push(
     vscode.commands.registerCommand('vitte.build', async () => { await runBuild('build'); }),
     vscode.commands.registerCommand('vitte.clean', async () => { await runBuild('clean'); }),
     vscode.commands.registerCommand('vitte.run', async () => { await runBuild('run'); }),
     vscode.commands.registerCommand('vitte.test', async () => { await runBuild('test'); }),
     vscode.commands.registerCommand('vitte.testCurrent', async () => { await runTestCurrentFile(); }),
+    vscode.commands.registerCommand('vitte.runTests', async () => { await runBuild('test'); }),
+    vscode.commands.registerCommand('vitte.refreshTests', async () => {
+      try {
+        await vscode.commands.executeCommand('testing.refreshTests');
+      } catch {
+        void vscode.window.showInformationMessage('Vitte: impossible de rafraichir la vue Tests automatiquement.');
+      }
+    }),
     vscode.commands.registerCommand('vitte.switchProfile', async () => { await cycleProfile(); }),
     vscode.commands.registerCommand('vitte.toggleIncremental', async () => { await toggleIncremental(); }),
   );
@@ -33,12 +42,12 @@ export function registerBuildTasks(ctx: vscode.ExtensionContext) {
     provideTasks: async (_token?: vscode.CancellationToken): Promise<vscode.Task[]> => {
       const defs: { cmd: SubCmd; label: string }[] = [
         { cmd: 'build', label: 'Vitte Build' },
-        { cmd: 'run',   label: 'Vitte Run' },
-        { cmd: 'test',  label: 'Vitte Test' },
+        { cmd: 'run', label: 'Vitte Run' },
+        { cmd: 'test', label: 'Vitte Test' },
         { cmd: 'clean', label: 'Vitte Clean' },
       ];
       return Promise.all(defs.map(async ({ cmd, label }) => {
-        const exec = new vscode.ShellExecution(await buildCommandLine(cmd));
+        const exec = new vscode.ProcessExecution(await buildBin(), await buildArgs(cmd));
         const definition: VitteTaskDefinition = { type: 'vitte', command: cmd };
         return new vscode.Task(definition, vscode.TaskScope.Workspace, label, 'vitte', exec);
       }));
@@ -47,8 +56,6 @@ export function registerBuildTasks(ctx: vscode.ExtensionContext) {
   } as unknown as vscode.TaskProvider;
   ctx.subscriptions.push(vscode.tasks.registerTaskProvider('vitte', provider));
 }
-
-// ---- Types & helpers ----
 
 type SubCmd = 'build' | 'clean' | 'run' | 'test';
 
@@ -97,9 +104,8 @@ async function buildArgs(sub: SubCmd, extra?: { currentFile?: string }): Promise
   if (incremental) args.push('--incremental');
   for (const t of targets) args.push('--target', t);
 
-  if (sub === 'run') {
-    // allow running current file with runtime directly if build tool supports pass-through
-    if (extra?.currentFile) args.push('--file', extra.currentFile);
+  if ((sub === 'run' || sub === 'test') && extra?.currentFile) {
+    args.push('--file', extra.currentFile);
   }
 
   return args;
@@ -120,33 +126,31 @@ function collectTargets(project?: VitteBuildConfig): string[] {
   return out;
 }
 
-async function buildCommandLine(sub: SubCmd, extra?: { currentFile?: string }): Promise<string> {
+async function buildCommand(sub: SubCmd, extra?: { currentFile?: string }): Promise<{ bin: string; args: string[] }> {
   const bin = await buildBin();
   const args = await buildArgs(sub, extra);
-  return [quote(bin), ...args.map(quote)].join(' ');
+  return { bin, args };
 }
 
-async function runBuild(sub: SubCmd) {
+function formatCommandForDisplay(bin: string, args: string[]): string {
+  return [bin, ...args].map((s) => JSON.stringify(s)).join(' ');
+}
+
+async function runBuild(sub: SubCmd, extra?: { currentFile?: string }) {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
     void vscode.window.showErrorMessage('Vitte: aucun workspace ouvert.');
     return;
   }
 
-  // run current file for run/test if applicable
-  let cmdLine: string;
-  if (sub === 'run') {
+  let commandExtra = extra;
+  if (sub === 'run' && !commandExtra?.currentFile) {
     const current = vscode.window.activeTextEditor?.document.uri.fsPath;
     const isVitte = !!(current && /\.(vitte|vit)$/i.test(current));
-    const extra = isVitte && current ? { currentFile: current } : undefined;
-    cmdLine = await buildCommandLine('run', extra);
-  } else if (sub === 'test') {
-    cmdLine = await buildCommandLine('test');
-  } else if (sub === 'clean') {
-    cmdLine = await buildCommandLine('clean');
-  } else {
-    cmdLine = await buildCommandLine('build');
+    commandExtra = isVitte && current ? { currentFile: current } : undefined;
   }
+
+  const { bin, args } = await buildCommand(sub, commandExtra);
 
   const chan = vscode.window.createOutputChannel('Vitte Build');
   await vscode.window.withProgress({
@@ -156,9 +160,9 @@ async function runBuild(sub: SubCmd) {
   }, async () => {
     chan.clear();
     chan.show(true);
-    chan.appendLine(`[cmd] ${cmdLine}`);
+    chan.appendLine(`[cmd] ${formatCommandForDisplay(bin, args)}`);
     await new Promise<void>((resolve) => {
-      const proc = cp.spawn(cmdLine, { cwd: root, shell: true, env: process.env });
+      const proc = cp.spawn(bin, args, { cwd: root, shell: false, env: process.env });
       proc.stdout?.on('data', (b: Buffer) => chan.append(b.toString()));
       proc.stderr?.on('data', (b: Buffer) => chan.append(b.toString()));
       proc.on('error', (e) => { chan.appendLine(`\n[error] ${e.message}`); resolve(); });
@@ -169,10 +173,16 @@ async function runBuild(sub: SubCmd) {
 
 async function runTestCurrentFile() {
   const file = vscode.window.activeTextEditor?.document.uri.fsPath;
-  if (!file) { void vscode.window.showInformationMessage('Aucun fichier actif.'); return; }
-  const isTest = /(_test\.vitte|\.(vitte|vit))$/i.test(file); // permissive
-  if (!isTest) { void vscode.window.showInformationMessage('Le fichier actif ne semble pas être un test.'); return; }
-  await runBuild('test');
+  if (!file) {
+    void vscode.window.showInformationMessage('Aucun fichier actif.');
+    return;
+  }
+  const isTest = /(_test\.vitte|\.(vitte|vit))$/i.test(file);
+  if (!isTest) {
+    void vscode.window.showInformationMessage('Le fichier actif ne semble pas être un test.');
+    return;
+  }
+  await runBuild('test', { currentFile: file });
 }
 
 async function cycleProfile() {
@@ -190,9 +200,4 @@ async function toggleIncremental() {
   const cur = Boolean(cfg.get<boolean>('build.incremental'));
   await cfg.update('build.incremental', !cur, vscode.ConfigurationTarget.Workspace);
   void vscode.window.showInformationMessage(`Vitte: incremental → ${!cur ? 'ON' : 'OFF'}`);
-}
-
-function quote(s: string): string {
-  if (process.platform === 'win32') return `"${s.replace(/"/g, '\\"')}"`;
-  return `'${s.replace(/'/g, `\'`)}'`;
 }

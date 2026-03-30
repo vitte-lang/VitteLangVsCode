@@ -7,11 +7,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/roussov/VitteLangVsCode.git"
+    "url": "https://github.com/vitte-lang/VitteLangVsCode.git"
   },
-  "homepage": "https://github.com/roussov/VitteLangVsCode#readme",
+  "homepage": "https://github.com/vitte-lang/VitteLangVsCode#readme",
   "bugs": {
-    "url": "https://github.com/roussov/VitteLangVsCode/issues"
+    "url": "https://github.com/vitte-lang/VitteLangVsCode/issues"
   },
   "engines": {
     "vscode": "^1.105.0"

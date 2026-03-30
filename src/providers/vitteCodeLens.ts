@@ -20,20 +20,19 @@ export function registerVitteCodeLens(context: vscode.ExtensionContext): void {
         const line = lines[i] ?? "";
         const decl = /^\s*(?:proc|fn|entry)\s+([A-Za-z_]\w*)/.exec(line);
         if (decl) {
-          const name = decl[1] ?? "symbol";
           const idx = decl[1] ? line.indexOf(decl[1]) : 0;
           const start = new vscode.Position(i, 0);
           const range = new vscode.Range(start, start);
           lenses.push(
             new vscode.CodeLens(range, {
               command: "vitte.codelens.runProc",
-              title: `Run ${name}`,
-              arguments: [document.uri, name],
+              title: "Run file",
+              arguments: [document.uri],
             }),
             new vscode.CodeLens(range, {
               command: "vitte.codelens.runTest",
               title: `Run tests`,
-              arguments: [document.uri, name],
+              arguments: [document.uri],
             }),
             new vscode.CodeLens(range, {
               command: "vitte.codelens.openRefs",

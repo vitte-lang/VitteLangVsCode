@@ -25,6 +25,31 @@ async function writeIfMissing(p: string, content: string): Promise<void> {
   }
 }
 
+async function existsFile(p: string): Promise<boolean> {
+  try {
+    await fs.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function writeWithOverwriteConfirm(p: string, content: string): Promise<boolean> {
+  if (await existsFile(p)) {
+    const pick = await vscode.window.showWarningMessage(
+      `File already exists: ${path.basename(p)}. Overwrite?`,
+      { modal: true },
+      "Overwrite",
+      "Cancel",
+    );
+    if (pick !== "Overwrite") return false;
+  } else {
+    await ensureDir(path.dirname(p));
+  }
+  await fs.writeFile(p, content, "utf8");
+  return true;
+}
+
 async function generateWorkspaceVscodeFiles(base: string): Promise<void> {
   const tasksPath = path.join(base, ".vscode", "tasks.json");
   const launchPath = path.join(base, ".vscode", "launch.json");
@@ -102,8 +127,8 @@ async function createNewModule(): Promise<void> {
   if (!mod) return;
   const rel = mod.replace(/\\/g, "/").replace(/^\/+/, "");
   const file = path.join(ws, "src", `${rel}.vit`);
-  await ensureDir(path.dirname(file));
-  await fs.writeFile(file, `space ${rel}\n\nshare run\n\nproc run() -> i32 {\n  give 0\n}\n`, "utf8");
+  const wrote = await writeWithOverwriteConfirm(file, `space ${rel}\n\nshare run\n\nproc run() -> i32 {\n  give 0\n}\n`);
+  if (!wrote) return;
   await generateWorkspaceVscodeFiles(ws);
   const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
   await vscode.window.showTextDocument(doc, { preview: false });
@@ -118,7 +143,11 @@ async function createNewPackage(): Promise<void> {
   await ensureDir(dir);
   const modFile = path.join(dir, "mod.vit");
   const pkgPath = `vitte/${name}`;
-  await fs.writeFile(modFile, `<<<\nmod.vit\npackage ${pkgPath}\n>>>\n\nspace ${pkgPath}\n\nshare ready\n\nproc ready() -> bool {\n  give true\n}\n\n<<< ROLE-CONTRACT\npackage: ${pkgPath}\nrole: Package responsibility\ninput_contract: Explicit normalized inputs\noutput_contract: Stable explicit outputs\nboundary: No business policy decisions\n>>>\n`, "utf8");
+  const wrote = await writeWithOverwriteConfirm(
+    modFile,
+    `<<<\nmod.vit\npackage ${pkgPath}\n>>>\n\nspace ${pkgPath}\n\nshare ready\n\nproc ready() -> bool {\n  give true\n}\n\n<<< ROLE-CONTRACT\npackage: ${pkgPath}\nrole: Package responsibility\ninput_contract: Explicit normalized inputs\noutput_contract: Stable explicit outputs\nboundary: No business policy decisions\n>>>\n`,
+  );
+  if (!wrote) return;
   await generateWorkspaceVscodeFiles(ws);
   const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(modFile));
   await vscode.window.showTextDocument(doc, { preview: false });

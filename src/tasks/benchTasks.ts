@@ -32,14 +32,14 @@ export function registerBenchTasks(ctx: vscode.ExtensionContext) {
 
   const provider = {
     provideTasks: async (_token?: vscode.CancellationToken): Promise<vscode.Task[]> => {
-      const cmd = await benchCommandLine();
       const definition: VitteBenchTaskDefinition = { type: 'vitte', command: 'bench' };
+      const exec = new vscode.ProcessExecution(await benchBin(), await benchArgs());
       const task = new vscode.Task(
         definition,
         vscode.TaskScope.Workspace,
         'Vitte Bench',
         'vitte',
-        new vscode.ShellExecution(cmd)
+        exec
       );
       return [task];
     },
@@ -125,11 +125,14 @@ async function benchArgs(): Promise<string[]> {
   return args;
 }
 
-async function benchCommandLine(): Promise<string> {
+async function benchCommand(): Promise<{ bin: string; args: string[] }> {
   const bin = await benchBin();
   const args = await benchArgs();
-  const cmd = [quote(bin), ...args.map(quote)].join(' ');
-  return cmd;
+  return { bin, args };
+}
+
+function formatCommandForDisplay(bin: string, args: string[]): string {
+  return [bin, ...args].map((s) => JSON.stringify(s)).join(' ');
 }
 
 async function runBench(openAfter: boolean) {
@@ -139,7 +142,7 @@ async function runBench(openAfter: boolean) {
     return;
   }
 
-  const cmd = await benchCommandLine();
+  const { bin, args } = await benchCommand();
   const outChan = vscode.window.createOutputChannel('Vitte Bench');
 
   await vscode.window.withProgress({
@@ -149,10 +152,10 @@ async function runBench(openAfter: boolean) {
   }, async () => {
     outChan.clear();
     outChan.show(true);
-    outChan.appendLine(`[cmd] ${cmd}`);
+    outChan.appendLine(`[cmd] ${formatCommandForDisplay(bin, args)}`);
 
     await new Promise<void>((resolve) => {
-      const proc = cp.spawn(cmd, { cwd: root, shell: true, env: process.env });
+      const proc = cp.spawn(bin, args, { cwd: root, shell: false, env: process.env });
       proc.stdout?.on('data', (b: Buffer) => outChan.append(b.toString()));
       proc.stderr?.on('data', (b: Buffer) => outChan.append(b.toString()));
       proc.on('error', (e) => {
@@ -199,9 +202,4 @@ async function openLatestReport() {
     const message = e instanceof Error ? e.message : String(e);
     void vscode.window.showWarningMessage(`Vitte Bench: échec d'ouverture du rapport (${message})`);
   }
-}
-
-function quote(s: string): string {
-  if (process.platform === 'win32') return `"${s.replace(/"/g, '\\"')}"`;
-  return `'${s.replace(/'/g, `\'`)}'`;
 }
