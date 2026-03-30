@@ -2311,15 +2311,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     }
   }));
 
-  // Diagnostics view for both beginners and power users
-  registerDiagnosticsView(context);
-  registerModuleExplorerView(context);
-  registerMetricsView(context, () => client, getStreamingCompletionStats);
-  registerPackageProblemsView(context);
-  registerModuleGraphView(context);
-  registerTopSyntaxErrorsView(context);
-  registerCommandCenterView(context, () => client);
-  registerOfflineView(
+  // Views are registered in best-effort mode so missing contributed view IDs
+  // do not interrupt extension activation.
+  safeRegisterView("vitteDiagnostics", () => registerDiagnosticsView(context));
+  safeRegisterView("vitteModules", () => registerModuleExplorerView(context));
+  safeRegisterView("vitteMetrics", () => registerMetricsView(context, () => client, getStreamingCompletionStats));
+  safeRegisterView("vittePackageProblems", () => registerPackageProblemsView(context));
+  safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
+  safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
+  safeRegisterView("vitteCommandCenter", () => registerCommandCenterView(context, () => client));
+  safeRegisterView("vitteOffline", () => registerOfflineView(
     context,
     () => offlineReason,
     () => output,
@@ -2330,7 +2331,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       if (total === 0) return "No local diagnostics";
       return `${summary.errors} errors, ${summary.warnings} warnings`;
     }
-  );
+  ));
   context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(() => refreshDiagnosticsStatus()));
   context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (doc) => {
     if (!shouldFormatOnSave(doc)) return;
@@ -3249,6 +3250,16 @@ function showOfflineNoop(action: string): void {
       void vscode.window.showInformationMessage("Vitte: offline report copied to clipboard.");
     }
   });
+}
+
+function safeRegisterView(label: string, register: () => void): void {
+  try {
+    register();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    output.appendLine(`[view.register.skip:${label}] ${message}`);
+    obsLog("view.register.skipped", "warn", { view: label, message });
+  }
 }
 
 function safeWorkspaceSubPath(...segments: string[]): string | undefined {
