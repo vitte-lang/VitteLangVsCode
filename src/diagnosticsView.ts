@@ -109,8 +109,7 @@ function openLineText(uri: vscode.Uri, line: number): string {
 }
 
 function syntaxSuggestion(entry: AggregatedDiagnostic): string | undefined {
-  const codeRaw = entry.diagnostic.code;
-  const code = typeof codeRaw === "string" || typeof codeRaw === "number" ? String(codeRaw) : "";
+  const code = diagnosticCodeText(entry.diagnostic);
   if (!code) return undefined;
 
   if (code === "E0007") {
@@ -126,12 +125,27 @@ function syntaxSuggestion(entry: AggregatedDiagnostic): string | undefined {
   if (code === "E0004") return "Suggestion: ajoute un type valide (`int`, `i32`, `string`, `bool`, `Option[T]`, ...).";
   if (code === "E0005") return "Suggestion: termine le bloc avec `.end`.";
   if (code === "E0006") return "Suggestion: un attribut doit être suivi d’un `proc`.";
+  if (code === "E1016") return "Suggestion: import interne refusé. Importe la façade publique du module (`use vitte/<module> as <alias>`).";
+  if (code === "E1017") return "Suggestion: conflit de re-export. Remplace les glob imports par des symboles explicites.";
+  if (code === "E1018") return "Suggestion: chemin d’import ambigu. Garde soit la forme fichier soit la forme dossier, pas les deux.";
+  if (/^VITTE-P\d{4}$/.test(code)) return "Suggestion: diagnostic process. Vérifie timeout/grace/policy/allowlist dans la config process.";
   return undefined;
 }
 
 function diagnosticCodeText(d: vscode.Diagnostic): string {
   const raw = d.code;
-  return typeof raw === "string" || typeof raw === "number" ? String(raw) : "";
+  return typeof raw === "string" || typeof raw === "number" ? String(raw).trim().toUpperCase() : "";
+}
+
+function vitteExplainHint(code: string): string {
+  return `Explain: vitte --explain ${code}`;
+}
+
+function diagnosticDocUrl(code: string): string | undefined {
+  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) {
+    return `https://docs.vitte.dev/diagnostics/${code}`;
+  }
+  return undefined;
 }
 
 function diagnosticExplanationMessage(entry: AggregatedDiagnostic): string {
@@ -140,7 +154,10 @@ function diagnosticExplanationMessage(entry: AggregatedDiagnostic): string {
   const source = entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : "Source: unknown";
   const suggestion = syntaxSuggestion(entry) ?? "Suggestion: inspect the surrounding block and apply the closest Quick Fix.";
   const codePart = code ? `Code: ${code}\n` : "";
-  return `${source}\n${codePart}${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}\n\n${entry.diagnostic.message}\n\n${suggestion}`;
+  const explainPart = code ? `\n${vitteExplainHint(code)}` : "";
+  const docUrl = code ? diagnosticDocUrl(code) : undefined;
+  const docPart = docUrl ? `\nDocs: ${docUrl}` : "";
+  return `${source}\n${codePart}${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}\n\n${entry.diagnostic.message}\n\n${suggestion}${explainPart}${docPart}`;
 }
 
 function toAggregatedDiagnostic(arg: unknown): AggregatedDiagnostic | undefined {
@@ -199,7 +216,10 @@ class DiagnosticNode extends vscode.TreeItem {
       ? `Code: ${String(codeValue)}`
       : undefined;
     const suggestion = syntaxSuggestion(entry);
-    const extra = [severityName && `Niveau: ${severityName}`, codeText, suggestion].filter(Boolean).join('\n');
+    const code = diagnosticCodeText(entry.diagnostic);
+    const explain = code ? vitteExplainHint(code) : undefined;
+    const docUrl = code ? diagnosticDocUrl(code) : undefined;
+    const extra = [severityName && `Niveau: ${severityName}`, codeText, suggestion, explain, docUrl && `Docs: ${docUrl}`].filter(Boolean).join('\n');
     this.tooltip = [parts.join('\n'), extra].filter(Boolean).join('\n');
     this.iconPath = iconForSeverity(entry.diagnostic.severity);
     this.command = {
