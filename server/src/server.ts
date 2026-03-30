@@ -616,6 +616,26 @@ function readNumberField(
   return Math.min(max, Math.max(min, Math.trunc(value)));
 }
 
+function withHierarchyBackpressure<T>(
+  contextName: string,
+  uri: string | undefined,
+  token: CancellationToken | undefined,
+  compute: (doc: TextDocument) => T,
+): Promise<T | null> {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
+    if (!uri) return Promise.resolve(null);
+    const doc = documents.get(uri);
+    if (!doc || cancelled(token)) return Promise.resolve(null);
+    try {
+      return Promise.resolve(compute(doc));
+    } catch (e) {
+      logErr(contextName, e);
+      return Promise.resolve(null);
+    }
+  });
+}
+
 connection.onCompletion(async (params: CompletionParams, token?: CancellationToken): Promise<CompletionItem[]> => {
   if (failFast("completion")) return [];
   if (isBreakerActive()) return [];
@@ -860,87 +880,57 @@ connection.onReferences(async (params: ReferenceParams, token?: CancellationToke
 });
 
 connection.languages.callHierarchy.onPrepare((params: CallHierarchyPrepareParams, token?: CancellationToken): Promise<CallHierarchyItem[] | null> => {
-  if (isBreakerActive()) return Promise.resolve(null);
-  return withBackpressure(() => {
-    const doc = documents.get(params.textDocument.uri);
-    if (!doc || cancelled(token)) return Promise.resolve(null);
-    try {
-      return Promise.resolve(prepareCallHierarchy(doc, params.position, params.textDocument.uri));
-    } catch (e) {
-      logErr("callHierarchy.prepare", e);
-      return Promise.resolve(null);
-    }
-  });
+  return withHierarchyBackpressure(
+    "callHierarchy.prepare",
+    params.textDocument.uri,
+    token,
+    (doc) => prepareCallHierarchy(doc, params.position, params.textDocument.uri),
+  );
 });
 
 connection.languages.callHierarchy.onIncomingCalls((params: CallHierarchyIncomingCallsParams, token?: CancellationToken): Promise<CallHierarchyIncomingCall[] | null> => {
-  if (isBreakerActive()) return Promise.resolve(null);
-  return withBackpressure(() => {
-    const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return Promise.resolve(null);
-    try {
-      return Promise.resolve(callHierarchyIncoming(doc, params.item));
-    } catch (e) {
-      logErr("callHierarchy.incoming", e);
-      return Promise.resolve(null);
-    }
-  });
+  return withHierarchyBackpressure(
+    "callHierarchy.incoming",
+    params.item.uri,
+    token,
+    (doc) => callHierarchyIncoming(doc, params.item),
+  );
 });
 
 connection.languages.callHierarchy.onOutgoingCalls((params: CallHierarchyOutgoingCallsParams, token?: CancellationToken): Promise<CallHierarchyOutgoingCall[] | null> => {
-  if (isBreakerActive()) return Promise.resolve(null);
-  return withBackpressure(() => {
-    const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return Promise.resolve(null);
-    try {
-      return Promise.resolve(callHierarchyOutgoing(doc, params.item));
-    } catch (e) {
-      logErr("callHierarchy.outgoing", e);
-      return Promise.resolve(null);
-    }
-  });
+  return withHierarchyBackpressure(
+    "callHierarchy.outgoing",
+    params.item.uri,
+    token,
+    (doc) => callHierarchyOutgoing(doc, params.item),
+  );
 });
 
 connection.languages.typeHierarchy.onPrepare((params: TypeHierarchyPrepareParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
-  if (isBreakerActive()) return Promise.resolve(null);
-  return withBackpressure(() => {
-    const doc = documents.get(params.textDocument.uri);
-    if (!doc || cancelled(token)) return Promise.resolve(null);
-    try {
-      return Promise.resolve(prepareTypeHierarchy(doc, params.position, params.textDocument.uri));
-    } catch (e) {
-      logErr("typeHierarchy.prepare", e);
-      return Promise.resolve(null);
-    }
-  });
+  return withHierarchyBackpressure(
+    "typeHierarchy.prepare",
+    params.textDocument.uri,
+    token,
+    (doc) => prepareTypeHierarchy(doc, params.position, params.textDocument.uri),
+  );
 });
 
 connection.languages.typeHierarchy.onSupertypes((params: TypeHierarchySupertypesParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
-  if (isBreakerActive()) return Promise.resolve(null);
-  return withBackpressure(() => {
-    const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return Promise.resolve(null);
-    try {
-      return Promise.resolve(typeHierarchySupertypes(doc, params));
-    } catch (e) {
-      logErr("typeHierarchy.supertypes", e);
-      return Promise.resolve(null);
-    }
-  });
+  return withHierarchyBackpressure(
+    "typeHierarchy.supertypes",
+    params.item.uri,
+    token,
+    (doc) => typeHierarchySupertypes(doc, params),
+  );
 });
 
 connection.languages.typeHierarchy.onSubtypes((params: TypeHierarchySubtypesParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
-  if (isBreakerActive()) return Promise.resolve(null);
-  return withBackpressure(() => {
-    const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return Promise.resolve(null);
-    try {
-      return Promise.resolve(typeHierarchySubtypes(doc, params));
-    } catch (e) {
-      logErr("typeHierarchy.subtypes", e);
-      return Promise.resolve(null);
-    }
-  });
+  return withHierarchyBackpressure(
+    "typeHierarchy.subtypes",
+    params.item.uri,
+    token,
+    (doc) => typeHierarchySubtypes(doc, params),
+  );
 });
 
 connection.onPrepareRename(async (params: PrepareRenameParams, token?: CancellationToken): Promise<{ range: Range; placeholder: string } | null> => {
