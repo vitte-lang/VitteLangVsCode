@@ -175,6 +175,7 @@ const completionTraceActiveByKey = new Map<string, SuggestionTraceEntry>();
 const completionTraceHistory: SuggestionTraceEntry[] = [];
 let suggestionProfilerPanel: vscode.WebviewPanel | undefined;
 let suggestionProfilerRenderTimer: NodeJS.Timeout | undefined;
+let lastSettingsIssueDigest = "";
 
 function incCounter(map: Map<string, number>, key: string, delta = 1): void {
   map.set(key, (map.get(key) ?? 0) + delta);
@@ -946,6 +947,79 @@ interface CommandMenuItem extends vscode.QuickPickItem {
   command: string;
 }
 
+function readNumberSetting(cfg: vscode.WorkspaceConfiguration, key: string, fallback: number): number {
+  const raw = cfg.get<unknown>(key);
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return fallback;
+  return raw;
+}
+
+function validateRuntimeSettings(): string[] {
+  const cfg = vscode.workspace.getConfiguration("vitte");
+  const issues: string[] = [];
+
+  const topN = readNumberSetting(cfg, "suggestions.topN", 50);
+  const minN = readNumberSetting(cfg, "suggestions.minN", 20);
+  const maxN = readNumberSetting(cfg, "suggestions.maxN", 80);
+  if (minN > topN) issues.push(`vitte.suggestions.minN (${minN}) should be <= vitte.suggestions.topN (${topN}).`);
+  if (topN > maxN) issues.push(`vitte.suggestions.topN (${topN}) should be <= vitte.suggestions.maxN (${maxN}).`);
+
+  const pageSize = readNumberSetting(cfg, "suggestions.pageSize", 20);
+  if (pageSize < 5 || pageSize > 200) {
+    issues.push(`vitte.suggestions.pageSize (${pageSize}) is outside supported range [5..200].`);
+  }
+
+  const fnRatio = readNumberSetting(cfg, "suggestions.functionBudgetRatio", 0.45);
+  const varRatio = readNumberSetting(cfg, "suggestions.variableBudgetRatio", 0.35);
+  const snipRatio = readNumberSetting(cfg, "suggestions.snippetBudgetRatio", 0.15);
+  const ratios = [
+    ["functionBudgetRatio", fnRatio],
+    ["variableBudgetRatio", varRatio],
+    ["snippetBudgetRatio", snipRatio],
+  ] as const;
+  for (const [name, value] of ratios) {
+    if (value < 0 || value > 1) {
+      issues.push(`vitte.suggestions.${name} (${value}) must be in [0..1].`);
+    }
+  }
+  if ((fnRatio + varRatio + snipRatio) > 1.2) {
+    issues.push(`vitte.suggestions.*BudgetRatio sum (${(fnRatio + varRatio + snipRatio).toFixed(2)}) is too high (max 1.20).`);
+  }
+
+  const lspHardTimeoutMs = readNumberSetting(cfg, "suggestions.lspHardTimeoutMs", 120);
+  if (lspHardTimeoutMs < 50 || lspHardTimeoutMs > 1000) {
+    issues.push(`vitte.suggestions.lspHardTimeoutMs (${lspHardTimeoutMs}) is outside supported range [50..1000].`);
+  }
+
+  const liveDelayMs = readNumberSetting(cfg, "syntax.liveDiagnosticsDelayMs", 120);
+  if (liveDelayMs < 60 || liveDelayMs > 2000) {
+    issues.push(`vitte.syntax.liveDiagnosticsDelayMs (${liveDelayMs}) is outside supported range [60..2000].`);
+  }
+
+  const serverPath = cfg.get<string>("serverPath", "").trim();
+  if (serverPath && !fs.existsSync(serverPath)) {
+    issues.push(`vitte.serverPath points to a missing file: ${serverPath}`);
+  }
+  const toolchainRoot = cfg.get<string>("toolchain.root", "").trim();
+  if (toolchainRoot && !fs.existsSync(toolchainRoot)) {
+    issues.push(`vitte.toolchain.root points to a missing directory: ${toolchainRoot}`);
+  }
+
+  return issues;
+}
+
+function reportSettingsIssues(outputChannel: vscode.OutputChannel, phase: "activate" | "config"): void {
+  const issues = validateRuntimeSettings();
+  const digest = issues.join(" | ");
+  if (digest === lastSettingsIssueDigest) return;
+  lastSettingsIssueDigest = digest;
+  if (issues.length === 0) return;
+  for (const issue of issues) {
+    outputChannel.appendLine(`[settings:${phase}] ${issue}`);
+  }
+  const suffix = issues.length > 1 ? ` (+${issues.length - 1} more)` : "";
+  void vscode.window.showWarningMessage(`Vitte settings validation: ${issues[0]}${suffix}`);
+}
+
 interface CommandShortcutConfig {
   label: string;
   command: string;
@@ -1387,6 +1461,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   setStatusBase("$(rocket)", "Vitte Language Server");
   refreshDiagnosticsStatus();
   statusItem.show();
+  reportSettingsIssues(output, "activate");
   updateCommandButtons(context);
   void showStartupCommandPrompt(context);
   void setServerOnlineContext(false);
@@ -1930,6 +2005,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       updateCommandButtons(context);
     }
     if (e.affectsConfiguration("vitte")) {
+      reportSettingsIssues(output, "config");
       await restartClient(context);
     }
     if (e.affectsConfiguration("vitte.server.offlinePermanent")) {
