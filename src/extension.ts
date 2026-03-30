@@ -1183,6 +1183,7 @@ const COMMAND_MENU_ENTRIES: readonly CommandMenuEntry[] = [
   { label: "Export observability session", description: "Export structured logs + runtime metrics snapshot", command: "vitte.observability.export" },
   { label: "Open bench report", description: "Latest bench report", command: "vitte.benchReport" },
   { label: "Diagnostics ▸ Refresh", description: "Re-scan diagnostics", command: "vitte.diagnostics.refresh" },
+  { label: "Diagnostics ▸ Refresh help cache", description: "Clear and reload diagnostics explain cache", command: "vitte.diagnostics.refreshHelpCache" },
   { label: "Diagnostics ▸ Export snapshot", description: "Export workspace diagnostics JSON snapshot", command: "vitte.diagnostics.exportSnapshot" },
   { label: "Diagnostics ▸ First error in file", description: "Jump to first error in active file", command: "vitte.diagnostics.goToFirstErrorInFile" },
   { label: "Diagnostics ▸ Next issue", description: "Jump to next diagnostic", command: "editor.action.marker.next" },
@@ -1251,6 +1252,7 @@ function labelForCommand(command: string): string {
     case "vitte.run": return "Run";
     case "vitte.test": return "Run Tests";
     case "vitte.diagnostics.refresh": return "Refresh Diagnostics";
+    case "vitte.diagnostics.refreshHelpCache": return "Refresh Diagnostics Help Cache";
     case "vitte.diagnostics.exportSnapshot": return "Export Diagnostics Snapshot";
     case "vitte.diagnostics.goToFirstErrorInFile": return "First Error In File";
     default: return command.replace(/^vitte\./, "");
@@ -1976,6 +1978,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
         const message = err instanceof Error ? err.message : String(err);
         void vscode.window.showErrorMessage(`Vitte: failed to export diagnostics snapshot (${message})`);
       }
+    }),
+    vscode.commands.registerCommand("vitte.diagnostics.refreshHelpCache", () => {
+      const result = clearVitteExplainHelpCache(vscode.workspace.workspaceFolders);
+      for (const doc of vscode.workspace.textDocuments) {
+        if (!isVitteDocument(doc)) continue;
+        scheduleLiveSyntaxDiagnostics(doc, "config");
+      }
+      const detail = result.failedFiles > 0
+        ? ` (${result.deletedFiles} file(s) deleted, ${result.failedFiles} failed)`
+        : ` (${result.deletedFiles} file(s) deleted)`;
+      void vscode.window.showInformationMessage(`Vitte diagnostics help cache refreshed${detail}.`);
     }),
     vscode.commands.registerCommand("vitte.diagnostics.goToFirstErrorInFile", () => {
       const editor = vscode.window.activeTextEditor;
@@ -3453,6 +3466,31 @@ function schedulePersistVitteExplainHelpCache(cachePath: string, versionSignatur
     persistVitteExplainHelpCache(cachePath, versionSignature);
   }, 250);
   vitteExplainHelpCachePersistTimers.set(cachePath, timer);
+}
+
+function clearVitteExplainHelpCache(workspaceFolders: readonly vscode.WorkspaceFolder[] | undefined): { deletedFiles: number; failedFiles: number } {
+  for (const timer of vitteExplainHelpCachePersistTimers.values()) {
+    clearTimeout(timer);
+  }
+  vitteExplainHelpCachePersistTimers.clear();
+  vitteExplainHelpCache.clear();
+  vitteExplainHelpCacheLoadedFiles.clear();
+  vitteVersionSignatureByBin.clear();
+
+  let deletedFiles = 0;
+  let failedFiles = 0;
+  for (const folder of workspaceFolders ?? []) {
+    const cachePath = vitteExplainHelpCachePath(folder.uri.fsPath);
+    try {
+      if (fs.existsSync(cachePath)) {
+        fs.unlinkSync(cachePath);
+        deletedFiles += 1;
+      }
+    } catch {
+      failedFiles += 1;
+    }
+  }
+  return { deletedFiles, failedFiles };
 }
 
 function diagnosticHelpObservabilitySnapshot(): DiagnosticHelpObservabilitySnapshot {

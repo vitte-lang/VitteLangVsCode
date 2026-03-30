@@ -70,6 +70,7 @@ suite("Vitte extension", () => {
       "vitte.runAction",
       "vitte.quickActions",
       "vitte.diagnostics.refresh",
+      "vitte.diagnostics.refreshHelpCache",
       "vitte.diagnostics.exportSnapshot",
       "vitte.diagnostics.openDoc",
       "vitte.diagnostics.goToFirstErrorInFile",
@@ -806,6 +807,7 @@ suite("Vitte extension", () => {
       await vscode.commands.executeCommand("vitte.diagnostics.explain", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.copyExplainCommand", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.openDoc", undefined);
+      await vscode.commands.executeCommand("vitte.diagnostics.refreshHelpCache");
       await vscode.commands.executeCommand("vitte.diagnostics.open", { uri: "bad" });
       await vscode.commands.executeCommand("vitte.diagnostics.copy", { diagnostic: 42 });
       await vscode.commands.executeCommand("vitte.diagnostics.explain", { uri: "bad", diagnostic: null });

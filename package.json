@@ -242,6 +242,11 @@
         "title": "Vitte: Refresh Diagnostics"
       },
       {
+        "command": "vitte.diagnostics.refreshHelpCache",
+        "title": "Vitte: Refresh Diagnostic Help Cache",
+        "category": "Vitte"
+      },
+      {
         "command": "vitte.diagnostics.exportSnapshot",
         "title": "Vitte: Export Diagnostics Snapshot",
         "category": "Vitte"
@@ -675,6 +680,10 @@
         },
         {
           "command": "vitte.diagnostics.exportSnapshot",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "vitte.diagnostics.refreshHelpCache",
           "when": "workspaceFolderCount > 0"
         },
         {
