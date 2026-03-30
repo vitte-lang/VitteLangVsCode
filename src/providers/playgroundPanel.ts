@@ -8,12 +8,9 @@ import { locateVitteRuntime } from '../debug/runtimeLocator';
  * Vitte Playground Panel
  * - Local, offline: edit a Vitte snippet, format it, run it via vitte-runtime.
  * - Stores temp files under ${workspace}/.vitte/playground/
+ *
+ * Command registration is centralized in src/extension.ts to avoid duplicates.
  */
-export function registerPlaygroundPanel(ctx: vscode.ExtensionContext) {
-  ctx.subscriptions.push(
-    vscode.commands.registerCommand('vitte.openPlayground', () => PlaygroundPanel.createOrShow(ctx))
-  );
-}
 
 export class PlaygroundPanel implements vscode.Disposable {
   private static current: PlaygroundPanel | undefined;

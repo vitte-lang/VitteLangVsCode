@@ -119,22 +119,6 @@ export async function refreshToolchain(ctx?: vscode.ExtensionContext): Promise<T
   return getToolchain(ctx, true);
 }
 
-/** Register a user-facing command that shows a quick status of the toolchain. */
-export function registerToolchainCommands(ctx: vscode.ExtensionContext) {
-  const cmd = vscode.commands.registerCommand('vitte.detectToolchain', async () => {
-    const info = await getToolchain(ctx, true);
-    const out = vscode.window.createOutputChannel('Vitte Toolchain');
-    out.clear();
-    out.appendLine('[Vitte] Toolchain detection');
-    if (info.root) out.appendLine(`root: ${info.root}`);
-    for (const [k, p] of Object.entries(info.bins)) out.appendLine(`${k}: ${p ?? '—'}`);
-    for (const [k, v] of Object.entries(info.versions)) out.appendLine(`${k} version: ${v}`);
-    if (info.messages.length) out.appendLine(info.messages.map(m => `! ${m}`).join('\n'));
-    out.show(true);
-  });
-  ctx.subscriptions.push(cmd);
-}
-
 // ------------------------- internals -------------------------
 
 function nameWithExt(name: string): string {
