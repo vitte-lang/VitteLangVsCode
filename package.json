@@ -261,6 +261,11 @@
         "category": "Vitte"
       },
       {
+        "command": "vitte.diagnostics.openDoc",
+        "title": "Vitte: Open Diagnostics Doc",
+        "category": "Vitte"
+      },
+      {
         "command": "vitte.diagnostics.goToFirstErrorInFile",
         "title": "Vitte: Go To First Error In File",
         "category": "Vitte"
@@ -591,6 +596,11 @@
           "command": "vitte.diagnostics.explain",
           "when": "(view == vitteDiagnostics && viewItem == vitteDiagnostic && vitte.serverOnline) || (view == vitteTopSyntaxErrors && viewItem == vitteTopSyntaxFile && vitte.serverOnline)",
           "group": "inline@1"
+        },
+        {
+          "command": "vitte.diagnostics.openDoc",
+          "when": "(view == vitteDiagnostics && viewItem == vitteDiagnostic && vitte.serverOnline) || (view == vitteTopSyntaxErrors && viewItem == vitteTopSyntaxFile && vitte.serverOnline)",
+          "group": "inline@2"
         }
       ],
       "view/title": [

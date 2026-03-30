@@ -71,6 +71,7 @@ suite("Vitte extension", () => {
       "vitte.quickActions",
       "vitte.diagnostics.refresh",
       "vitte.diagnostics.exportSnapshot",
+      "vitte.diagnostics.openDoc",
       "vitte.diagnostics.goToFirstErrorInFile",
       "vitte.topSyntaxErrors.setCodeFilter",
       "vitte.topSyntaxErrors.clearCodeFilter",
@@ -568,7 +569,7 @@ suite("Vitte extension", () => {
     }
   });
 
-  test("Code actions expose syntax fixAll, explain diagnostic, and copy explain command", async () => {
+  test("Code actions expose syntax fixAll, explain diagnostic, open diagnostics doc, and copy explain command", async () => {
     const document = await vscode.workspace.openTextDocument({
       content: "}\n",
       language: "vitte",
@@ -620,6 +621,30 @@ suite("Vitte extension", () => {
         }
       }, 4000, 60);
       assert.ok(explainAction, "La code action Explain this diagnostic est absente");
+
+      let openDiagnosticsDocAction: vscode.CodeAction | undefined;
+      await waitUntil(async () => {
+        try {
+          const actions =
+            (await vscode.commands.executeCommand<(vscode.CodeAction | vscode.Command)[]>(
+              "vscode.executeCodeActionProvider",
+              document.uri,
+              range,
+              vscode.CodeActionKind.QuickFix.value,
+            )) ?? [];
+          const isOpenDiagnosticsDocCodeAction = (a: vscode.CodeAction | vscode.Command): a is vscode.CodeAction =>
+            a instanceof vscode.CodeAction
+            && a.command?.command === "vitte.diagnostics.openDoc"
+            && (a.title ?? "").toLowerCase().includes("open diagnostics doc");
+          openDiagnosticsDocAction = actions.find(
+            isOpenDiagnosticsDocCodeAction,
+          );
+          return Boolean(openDiagnosticsDocAction);
+        } catch {
+          return false;
+        }
+      }, 4000, 60);
+      assert.ok(openDiagnosticsDocAction, "La code action Open diagnostics doc est absente");
 
       let copyExplainCommandAction: vscode.CodeAction | undefined;
       await waitUntil(async () => {
@@ -681,10 +706,12 @@ suite("Vitte extension", () => {
       await vscode.commands.executeCommand("vitte.diagnostics.copy", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.explain", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.copyExplainCommand", undefined);
+      await vscode.commands.executeCommand("vitte.diagnostics.openDoc", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.open", { uri: "bad" });
       await vscode.commands.executeCommand("vitte.diagnostics.copy", { diagnostic: 42 });
       await vscode.commands.executeCommand("vitte.diagnostics.explain", { uri: "bad", diagnostic: null });
       await vscode.commands.executeCommand("vitte.diagnostics.copyExplainCommand", { uri: "bad", diagnostic: null });
+      await vscode.commands.executeCommand("vitte.diagnostics.openDoc", { uri: "bad", diagnostic: null });
     });
   });
 });

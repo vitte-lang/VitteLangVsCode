@@ -453,6 +453,15 @@ export function registerAdvancedCodeActions(context: vscode.ExtensionContext): v
         }
         const code = explainableDiagnosticCode(d);
         if (code) {
+          const openDoc = new vscode.CodeAction("Vitte: Open diagnostics doc", vscode.CodeActionKind.QuickFix);
+          openDoc.diagnostics = [d];
+          openDoc.command = {
+            command: "vitte.diagnostics.openDoc",
+            title: "Open diagnostics doc",
+            arguments: [{ uri: document.uri, diagnostic: d }],
+          };
+          actions.push(openDoc);
+
           const copyExplain = new vscode.CodeAction("Vitte: Copy explain command", vscode.CodeActionKind.QuickFix);
           copyExplain.diagnostics = [d];
           copyExplain.command = {

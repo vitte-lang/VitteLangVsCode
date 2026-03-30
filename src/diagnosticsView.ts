@@ -192,6 +192,11 @@ function explainCommandForEntry(entry: AggregatedDiagnostic): string | undefined
   return `vitte --explain ${code} --lang=${lang}`;
 }
 
+function diagnosticsDocUrlForEntry(entry: AggregatedDiagnostic): string | undefined {
+  const code = explainableCodeFromDiagnostic(entry.diagnostic);
+  return code ? diagnosticDocUrl(code) : undefined;
+}
+
 class FileNode extends vscode.TreeItem {
   constructor(
     public readonly uri: vscode.Uri,
@@ -376,6 +381,17 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
       }
       await vscode.env.clipboard.writeText(command);
       void vscode.window.setStatusBarMessage("Vitte explain command copied", 2000);
+    }),
+    vscode.commands.registerCommand("vitte.diagnostics.openDoc", async (arg?: unknown) => {
+      let entry = toAggregatedDiagnostic(arg);
+      entry ??= currentDiagnosticEntry();
+      if (!entry) return;
+      const docUrl = diagnosticsDocUrlForEntry(entry);
+      if (!docUrl) {
+        void vscode.window.showInformationMessage("Vitte: diagnostic has no documentation link.");
+        return;
+      }
+      await vscode.env.openExternal(vscode.Uri.parse(docUrl));
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (!e.affectsConfiguration("vitte.diagnostics.displayMode")) return;
