@@ -169,10 +169,12 @@ interface DiagnosticExplainPayload {
 interface DiagnosticHelpObservabilitySnapshot {
   requests: number;
   explainResolved: number;
+  explainThrottled: number;
   localFallbackResolved: number;
   localOnlyResolved: number;
   unresolved: number;
   explainUsageRate: number;
+  explainThrottledRate: number;
   localFallbackRate: number;
   localOnlyRate: number;
 }
@@ -182,9 +184,13 @@ const vitteExplainHelpCachePersistTimers = new Map<string, NodeJS.Timeout>();
 const vitteVersionSignatureByBin = new Map<string, string>();
 let diagnosticHelpRequests = 0;
 let diagnosticHelpExplainResolved = 0;
+let diagnosticHelpExplainThrottled = 0;
 let diagnosticHelpLocalFallbackResolved = 0;
 let diagnosticHelpLocalOnlyResolved = 0;
 let diagnosticHelpUnresolved = 0;
+const EXPLAIN_THROTTLE_WINDOW_MS = 1000;
+const EXPLAIN_THROTTLE_MAX_CALLS = 3;
+const explainCallTimestamps: number[] = [];
 type SuggestionTraceRefreshCause = "none" | "incomplete" | "richer";
 type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline" | "cancel";
 interface SuggestionTraceEntry {
@@ -3542,6 +3548,7 @@ function clearVitteExplainHelpCache(workspaceFolders: readonly vscode.WorkspaceF
 function diagnosticHelpObservabilitySnapshot(): DiagnosticHelpObservabilitySnapshot {
   const requests = diagnosticHelpRequests;
   const explainResolved = diagnosticHelpExplainResolved;
+  const explainThrottled = diagnosticHelpExplainThrottled;
   const localFallbackResolved = diagnosticHelpLocalFallbackResolved;
   const localOnlyResolved = diagnosticHelpLocalOnlyResolved;
   const unresolved = diagnosticHelpUnresolved;
@@ -3549,13 +3556,25 @@ function diagnosticHelpObservabilitySnapshot(): DiagnosticHelpObservabilitySnaps
   return {
     requests,
     explainResolved,
+    explainThrottled,
     localFallbackResolved,
     localOnlyResolved,
     unresolved,
     explainUsageRate: safeRate(explainResolved),
+    explainThrottledRate: safeRate(explainThrottled),
     localFallbackRate: safeRate(localFallbackResolved),
     localOnlyRate: safeRate(localOnlyResolved),
   };
+}
+
+function shouldRunExplainNow(): boolean {
+  const now = Date.now();
+  while (explainCallTimestamps.length > 0 && (now - explainCallTimestamps[0]!) > EXPLAIN_THROTTLE_WINDOW_MS) {
+    explainCallTimestamps.shift();
+  }
+  if (explainCallTimestamps.length >= EXPLAIN_THROTTLE_MAX_CALLS) return false;
+  explainCallTimestamps.push(now);
+  return true;
 }
 
 function explainHelpFromVitte(
@@ -3575,6 +3594,10 @@ function explainHelpFromVitte(
     const cachedPayload: DiagnosticExplainPayload = { help: cached.help, source: "external" };
     if (cached.example) cachedPayload.example = cached.example;
     return cachedPayload;
+  }
+  if (!shouldRunExplainNow()) {
+    diagnosticHelpExplainThrottled += 1;
+    return undefined;
   }
   try {
     const out = cp.spawnSync(
