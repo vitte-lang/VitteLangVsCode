@@ -970,6 +970,23 @@ const WATCH_PATTERNS = [
   "**/.vitteconfig"
 ] as const;
 const LANGUAGE_SET = new Set<string>(LANGUAGES);
+const RESTART_RELEVANT_CONFIG_KEYS = [
+  "vitte.serverPath",
+  "vitte.server.offline",
+  "vitte.server.offlinePermanent",
+  "vitte.requestTimeoutMs",
+  "vitte.requestMaxConcurrent",
+  "vitte.requestTimeouts",
+  "vitte.trace.server",
+  "vitte.indexerMaxRssMB",
+  "vitte.indexerCacheEnabled",
+  "vitte.channel",
+  "vitte.features",
+  "vitte.lsp.path",
+  "vitte.lang",
+  "vitte.policy.path",
+  "vitte.policy.json",
+] as const;
 
 interface CommandMenuEntry {
   label: string;
@@ -2133,7 +2150,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     }
     if (e.affectsConfiguration("vitte")) {
       reportSettingsIssues(output, "config");
-      scheduleConfigRestart(context, "config-change");
+      if (shouldRestartForConfigChange(e)) {
+        scheduleConfigRestart(context, "config-change");
+      } else {
+        obsLog("config.restart.skipped", "info");
+      }
     }
     if (e.affectsConfiguration("vitte.server.offlinePermanent")) {
       if (isOfflinePermanent()) {
@@ -2861,6 +2882,10 @@ function scheduleConfigRestart(context: vscode.ExtensionContext | undefined, rea
     configRestartTimer = undefined;
     void requestClientRestart(context, reason);
   }, 450);
+}
+
+function shouldRestartForConfigChange(e: vscode.ConfigurationChangeEvent): boolean {
+  return RESTART_RELEVANT_CONFIG_KEYS.some((key) => e.affectsConfiguration(key));
 }
 
 function startHealthChecks(context: vscode.ExtensionContext): void {
