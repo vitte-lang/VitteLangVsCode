@@ -569,6 +569,28 @@ suite("Vitte extension", () => {
     }
   });
 
+  test("E2E: E0001 diagnostic includes non-empty help", async () => {
+    const cfg = vscode.workspace.getConfiguration("vitte");
+    const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
+
+    try {
+      await cfg.update("diagnostics.helpSource", "local", vscode.ConfigurationTarget.Workspace);
+      const rendered = await vscode.commands.executeCommand<string>(
+        "vitte.test.renderDiagnosticMessage",
+        "E0001",
+        "expected identifier",
+      );
+      assert.equal(typeof rendered, "string");
+      assert.match(
+        rendered ?? "",
+        /help:\s*\S+/i,
+        `Le diagnostic E0001 n'inclut pas de help non vide. Message: ${rendered ?? ""}`,
+      );
+    } finally {
+      await cfg.update("diagnostics.helpSource", helpSourceInspect?.workspaceValue, vscode.ConfigurationTarget.Workspace);
+    }
+  });
+
   test("Code actions expose syntax fixAll, explain diagnostic, open diagnostics doc, and copy explain command", async () => {
     const document = await vscode.workspace.openTextDocument({
       content: "}\n",

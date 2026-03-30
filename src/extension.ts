@@ -1982,6 +1982,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       editor.revealRange(first.range, vscode.TextEditorRevealType.InCenter);
       editor.selection = new vscode.Selection(first.range.start, first.range.start);
     }),
+    vscode.commands.registerCommand("vitte.test.renderDiagnosticMessage", (rawCode?: unknown, baseMessage?: unknown) => {
+      const cfg = vscode.workspace.getConfiguration("vitte");
+      const lang = cfg.get<string>("lang", "en");
+      const helpSource = cfg.get<DiagnosticHelpSource>("diagnostics.helpSource", "auto");
+      const explainTimeoutMs = Math.max(100, Math.min(5000, cfg.get<number>("diagnostics.explainTimeoutMs", 450)));
+      const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? process.cwd();
+      const resolved = { bin: "vitte", cwd: folder };
+      const rawCodeText = typeof rawCode === "string" || typeof rawCode === "number" ? String(rawCode) : "";
+      const baseMessageText = typeof baseMessage === "string" && baseMessage.length > 0 ? baseMessage : "Syntax error";
+      const code = normalizeDiagCode(rawCodeText);
+      const baseCode = explainableDiagCode(code) ?? code;
+      const explain = baseCode ? resolveDiagnosticHelp(baseCode, lang, resolved, helpSource, explainTimeoutMs) : undefined;
+      return baseCode ? formatVitteDiagnosticMessage(baseMessageText, baseCode, explain) : baseMessageText;
+    }),
     vscode.commands.registerCommand("vitte.restartServer", async () => {
       if (isOfflinePermanent()) {
         return showOfflineNoop("restart");
