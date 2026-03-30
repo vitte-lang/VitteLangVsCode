@@ -2237,10 +2237,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 export async function deactivate(): Promise<void> {
   try { await client?.stop(); } catch { /* noop */ }
   client = undefined;
+  cancelOfflineRetry();
   if (configRestartTimer) {
     clearTimeout(configRestartTimer);
     configRestartTimer = undefined;
   }
+  if (completionIdlePrefetchTimer) {
+    clearTimeout(completionIdlePrefetchTimer);
+    completionIdlePrefetchTimer = undefined;
+  }
+  for (const timer of completionAstRefreshTimers.values()) {
+    try { clearTimeout(timer); } catch { /* noop */ }
+  }
+  completionAstRefreshTimers.clear();
+  for (const timer of syntaxLintTimers.values()) {
+    try { clearTimeout(timer); } catch { /* noop */ }
+  }
+  syntaxLintTimers.clear();
+  for (const proc of syntaxLintProcByDoc.values()) {
+    try { proc.kill(); } catch { /* noop */ }
+  }
+  syntaxLintProcByDoc.clear();
   if (suggestionProfilerRenderTimer) {
     clearInterval(suggestionProfilerRenderTimer);
     suggestionProfilerRenderTimer = undefined;
