@@ -1696,6 +1696,15 @@
           "default": false,
           "description": "Only refresh live syntax diagnostics on save (useful for large projects or slower machines)."
         },
+        "vitte.syntax.firstErrorMode": {
+          "type": "string",
+          "enum": [
+            "line",
+            "file"
+          ],
+          "default": "line",
+          "description": "Limit parser error noise by keeping either the first error per line or only the first error per file."
+        },
         "vitte.syntax.maxDiagnosticsPerFile": {
           "type": "number",
           "default": 200,

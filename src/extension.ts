@@ -3349,6 +3349,7 @@ function diagnosticDocUri(code: string): vscode.Uri | undefined {
 }
 
 type DiagnosticHelpSource = "auto" | "vitte" | "local";
+type SyntaxFirstErrorMode = "line" | "file";
 
 function vitteExplainHelpCachePath(cwd: string): string {
   return path.join(cwd, ".vitte-cache", "diagnostics", "help-cache.json");
@@ -3638,6 +3639,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
   syntaxParsingInFlight += 1;
   applyStatusBar();
   const maxDiag = Math.max(1, cfg.get<number>("syntax.maxDiagnosticsPerFile", 200));
+  const firstErrorMode = cfg.get<SyntaxFirstErrorMode>("syntax.firstErrorMode", "line");
   const child = cp.spawn(resolved.bin, args, { cwd: resolved.cwd, shell: false });
   syntaxLintProcByDoc.set(key, child);
   let stdout = "";
@@ -3676,6 +3678,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
       const diagnostics: vscode.Diagnostic[] = [];
       const strictSeen = new Set<string>();
       const firstErrorLine = new Set<number>();
+      let firstErrorInFileSeen = false;
       let lastError: vscode.Diagnostic | undefined;
       for (const d of incoming) {
         if (diagnostics.length >= maxDiag) break;
@@ -3696,10 +3699,15 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const explainHelp = baseCode ? resolveDiagnosticHelp(baseCode, lang, resolved, helpSource, explainTimeoutMs) : undefined;
         const message = baseCode ? formatVitteDiagnosticMessage(baseMessage, baseCode, explainHelp) : baseMessage;
 
-        // Avoid cascade noise: keep only first parser error per line.
+        // Avoid cascade noise: configurable first parser error policy.
         if (severity === vscode.DiagnosticSeverity.Error) {
-          if (firstErrorLine.has(range.start.line)) continue;
-          firstErrorLine.add(range.start.line);
+          if (firstErrorMode === "file") {
+            if (firstErrorInFileSeen) continue;
+            firstErrorInFileSeen = true;
+          } else {
+            if (firstErrorLine.has(range.start.line)) continue;
+            firstErrorLine.add(range.start.line);
+          }
         }
 
         if ((severityRaw === "note" || severityRaw === "help") && lastError) {
