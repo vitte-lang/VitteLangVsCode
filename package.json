@@ -1628,6 +1628,16 @@
           "default": "compact",
           "description": "Display mode for the Vitte Diagnostics view."
         },
+        "vitte.diagnostics.helpSource": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "vitte",
+            "local"
+          ],
+          "default": "auto",
+          "description": "Source for diagnostic help text: auto prefers vitte --explain with local fallback, vitte uses only vitte --explain, local uses built-in help."
+        },
         "vitte.topSyntaxErrors.displayMode": {
           "type": "string",
           "enum": [

@@ -3251,6 +3251,8 @@ function diagnosticDocUri(code: string): vscode.Uri | undefined {
   return undefined;
 }
 
+type DiagnosticHelpSource = "auto" | "vitte" | "local";
+
 function explainHelpFromVitte(
   code: string,
   lang: string,
@@ -3303,6 +3305,17 @@ function vitteDiagnosticHelpForCode(code: string): string | undefined {
   return undefined;
 }
 
+function resolveDiagnosticHelp(
+  code: string,
+  lang: string,
+  resolved: { bin: string; cwd: string },
+  helpSource: DiagnosticHelpSource
+): string | undefined {
+  if (helpSource === "local") return vitteDiagnosticHelpForCode(code);
+  if (helpSource === "vitte") return explainHelpFromVitte(code, lang, resolved);
+  return explainHelpFromVitte(code, lang, resolved) ?? vitteDiagnosticHelpForCode(code);
+}
+
 function formatVitteDiagnosticMessage(base: string, code: string, explainHelp?: string): string {
   const help = explainHelp ?? vitteDiagnosticHelpForCode(code);
   if (!help) return base;
@@ -3341,6 +3354,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
 
   const cfg = vscode.workspace.getConfiguration("vitte");
   const lang = cfg.get<string>("lang", "en");
+  const helpSource = cfg.get<DiagnosticHelpSource>("diagnostics.helpSource", "auto");
   const args = ["parse", "--diag-json", `--lang=${lang}`, doc.uri.fsPath];
   const key = doc.uri.toString();
   const prev = syntaxLintProcByDoc.get(key);
@@ -3400,7 +3414,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const severity = mapDiagSeverity(d.severity);
         const severityRaw = (d.severity ?? "").toLowerCase();
         const code = normalizeDiagCode(d.code);
-        const explainHelp = code ? explainHelpFromVitte(code, lang, resolved) : undefined;
+        const explainHelp = code ? resolveDiagnosticHelp(code, lang, resolved, helpSource) : undefined;
         const message = code ? formatVitteDiagnosticMessage(baseMessage, code, explainHelp) : baseMessage;
         const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${severityRaw}|${code}|${baseMessage}`;
         if (seen.has(dedupeKey)) continue;
