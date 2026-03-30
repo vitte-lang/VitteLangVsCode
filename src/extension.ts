@@ -161,6 +161,7 @@ let completionFallbackTimeoutCount = 0;
 let completionFallbackNegativeCacheCount = 0;
 let completionFallbackOfflineCount = 0;
 let completionFallbackCancelCount = 0;
+let lastDiagSchemaSignature = "";
 interface DiagnosticExplainPayload {
   help: string;
   example?: string;
@@ -3726,6 +3727,24 @@ function extractDiagJson(stdout: string, stderr: string): string | undefined {
   return undefined;
 }
 
+function normalizeDiagSchemaSignature(parsed: unknown): string {
+  if (!parsed || typeof parsed !== "object") return "invalid";
+  const asRecord = parsed as Record<string, unknown>;
+  const schema = asRecord.diag_schema;
+  if (schema === undefined || schema === null) return "missing";
+  if (typeof schema === "string" || typeof schema === "number" || typeof schema === "boolean") {
+    return String(schema);
+  }
+  if (typeof schema === "object") {
+    const obj = schema as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    const version = typeof obj.version === "string" || typeof obj.version === "number" ? String(obj.version) : "";
+    if (version) return `${version}|keys:${keys.join(",")}`;
+    return `keys:${keys.join(",")}`;
+  }
+  return "unsupported";
+}
+
 function resolveVitteBinary(doc: vscode.TextDocument): { bin: string; cwd: string } | undefined {
   const folder = vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.fsPath;
   if (!folder) return undefined;
@@ -3778,6 +3797,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
     }
     try {
       const parsed = JSON.parse(payload) as {
+        diag_schema?: unknown;
         diagnostics?: {
           severity?: string;
           code?: string | number;
@@ -3786,6 +3806,14 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
           end?: number;
         }[];
       };
+      const diagSchemaSignature = normalizeDiagSchemaSignature(parsed);
+      if (diagSchemaSignature !== lastDiagSchemaSignature) {
+        lastDiagSchemaSignature = diagSchemaSignature;
+        obsLog("diagnostics.diagSchema.signature", "info", {
+          signature: diagSchemaSignature,
+          diagnosticsCount: Array.isArray(parsed.diagnostics) ? parsed.diagnostics.length : 0,
+        });
+      }
       const incoming = Array.isArray(parsed.diagnostics) ? parsed.diagnostics : [];
       const diagnostics: vscode.Diagnostic[] = [];
       const strictSeen = new Set<string>();
