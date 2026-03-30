@@ -614,6 +614,60 @@ suite("Vitte extension", () => {
     }
   });
 
+  test("Observability: tracks explain usage vs local fallback", async () => {
+    const cfg = vscode.workspace.getConfiguration("vitte");
+    const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
+
+    const before = await vscode.commands.executeCommand<{
+      requests?: number;
+      explainResolved?: number;
+      localFallbackResolved?: number;
+      localOnlyResolved?: number;
+      unresolved?: number;
+      explainUsageRate?: number;
+      localFallbackRate?: number;
+      localOnlyRate?: number;
+    }>("vitte.test.getDiagnosticHelpObservability");
+    assert.ok(before, "Snapshot observability initial manquant");
+
+    try {
+      await cfg.update("diagnostics.helpSource", "local", vscode.ConfigurationTarget.Workspace);
+      await vscode.commands.executeCommand<string>("vitte.test.renderDiagnosticMessage", "E0001", "expected identifier");
+
+      await cfg.update("diagnostics.helpSource", "auto", vscode.ConfigurationTarget.Workspace);
+      await vscode.commands.executeCommand<string>(
+        "vitte.test.renderDiagnosticMessage",
+        "E0001",
+        "expected identifier",
+        { bin: "__missing_vitte_binary_for_test__" },
+      );
+
+      const after = await vscode.commands.executeCommand<{
+        requests?: number;
+        explainResolved?: number;
+        localFallbackResolved?: number;
+        localOnlyResolved?: number;
+        unresolved?: number;
+        explainUsageRate?: number;
+        localFallbackRate?: number;
+        localOnlyRate?: number;
+      }>("vitte.test.getDiagnosticHelpObservability");
+      assert.ok(after, "Snapshot observability final manquant");
+
+      const requestDelta = (after.requests ?? 0) - (before.requests ?? 0);
+      const localOnlyDelta = (after.localOnlyResolved ?? 0) - (before.localOnlyResolved ?? 0);
+      const fallbackDelta = (after.localFallbackResolved ?? 0) - (before.localFallbackResolved ?? 0);
+      assert.ok(requestDelta >= 2, `requests delta attendu >= 2, reçu ${requestDelta}`);
+      assert.ok(localOnlyDelta >= 1, `localOnlyResolved delta attendu >= 1, reçu ${localOnlyDelta}`);
+      assert.ok(fallbackDelta >= 1, `localFallbackResolved delta attendu >= 1, reçu ${fallbackDelta}`);
+      assert.equal(typeof after.explainUsageRate, "number");
+      assert.equal(typeof after.localFallbackRate, "number");
+      assert.equal(typeof after.localOnlyRate, "number");
+    } finally {
+      await cfg.update("diagnostics.helpSource", helpSourceInspect?.workspaceValue, vscode.ConfigurationTarget.Workspace);
+    }
+  });
+
   test("Code actions expose syntax fixAll, explain diagnostic, open diagnostics doc, and copy explain command", async () => {
     const document = await vscode.workspace.openTextDocument({
       content: "}\n",

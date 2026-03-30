@@ -165,10 +165,25 @@ interface DiagnosticExplainPayload {
   help: string;
   example?: string;
 }
+interface DiagnosticHelpObservabilitySnapshot {
+  requests: number;
+  explainResolved: number;
+  localFallbackResolved: number;
+  localOnlyResolved: number;
+  unresolved: number;
+  explainUsageRate: number;
+  localFallbackRate: number;
+  localOnlyRate: number;
+}
 const vitteExplainHelpCache = new Map<string, { help: string; example?: string; at: number }>();
 const vitteExplainHelpCacheLoadedFiles = new Set<string>();
 const vitteExplainHelpCachePersistTimers = new Map<string, NodeJS.Timeout>();
 const vitteVersionSignatureByBin = new Map<string, string>();
+let diagnosticHelpRequests = 0;
+let diagnosticHelpExplainResolved = 0;
+let diagnosticHelpLocalFallbackResolved = 0;
+let diagnosticHelpLocalOnlyResolved = 0;
+let diagnosticHelpUnresolved = 0;
 type SuggestionTraceRefreshCause = "none" | "incomplete" | "richer";
 type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline" | "cancel";
 interface SuggestionTraceEntry {
@@ -1828,6 +1843,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
           healthFailures,
           reliabilityAttempts,
           recentStopCount: recentStops.length,
+          diagnosticHelp: diagnosticHelpObservabilitySnapshot(),
           events: [...obsHistory],
           metrics: metrics ?? null,
         };
@@ -1943,6 +1959,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
           ts: new Date().toISOString(),
           workspace: workspaceDir,
           summary: summarizeWorkspaceDiagnostics(),
+          diagnosticHelp: diagnosticHelpObservabilitySnapshot(),
           perFile: report.perFile,
           perDirectory: summarizeDiagnosticsByDirectory(),
         };
@@ -2000,6 +2017,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       const explain = baseCode ? resolveDiagnosticHelp(baseCode, lang, resolved, helpSource, explainTimeoutMs) : undefined;
       return baseCode ? formatVitteDiagnosticMessage(baseMessageText, baseCode, explain) : baseMessageText;
     }),
+    vscode.commands.registerCommand("vitte.test.getDiagnosticHelpObservability", () => diagnosticHelpObservabilitySnapshot()),
     vscode.commands.registerCommand("vitte.restartServer", async () => {
       if (isOfflinePermanent()) {
         return showOfflineNoop("restart");
@@ -3404,6 +3422,25 @@ function schedulePersistVitteExplainHelpCache(cachePath: string, versionSignatur
   vitteExplainHelpCachePersistTimers.set(cachePath, timer);
 }
 
+function diagnosticHelpObservabilitySnapshot(): DiagnosticHelpObservabilitySnapshot {
+  const requests = diagnosticHelpRequests;
+  const explainResolved = diagnosticHelpExplainResolved;
+  const localFallbackResolved = diagnosticHelpLocalFallbackResolved;
+  const localOnlyResolved = diagnosticHelpLocalOnlyResolved;
+  const unresolved = diagnosticHelpUnresolved;
+  const safeRate = (num: number): number => (requests > 0 ? Number((num / requests).toFixed(4)) : 0);
+  return {
+    requests,
+    explainResolved,
+    localFallbackResolved,
+    localOnlyResolved,
+    unresolved,
+    explainUsageRate: safeRate(explainResolved),
+    localFallbackRate: safeRate(localFallbackResolved),
+    localOnlyRate: safeRate(localOnlyResolved),
+  };
+}
+
 function explainHelpFromVitte(
   code: string,
   lang: string,
@@ -3488,15 +3525,37 @@ function resolveDiagnosticHelp(
   helpSource: DiagnosticHelpSource,
   explainTimeoutMs: number
 ): DiagnosticExplainPayload | undefined {
+  diagnosticHelpRequests += 1;
   if (helpSource === "local") {
     const local = vitteDiagnosticHelpForCode(code);
-    return local ? { help: local } : undefined;
+    if (local) {
+      diagnosticHelpLocalOnlyResolved += 1;
+      return { help: local };
+    }
+    diagnosticHelpUnresolved += 1;
+    return undefined;
   }
-  if (helpSource === "vitte") return explainHelpFromVitte(code, lang, resolved, explainTimeoutMs);
+  if (helpSource === "vitte") {
+    const remote = explainHelpFromVitte(code, lang, resolved, explainTimeoutMs);
+    if (remote) {
+      diagnosticHelpExplainResolved += 1;
+      return remote;
+    }
+    diagnosticHelpUnresolved += 1;
+    return undefined;
+  }
   const remote = explainHelpFromVitte(code, lang, resolved, explainTimeoutMs);
-  if (remote) return remote;
+  if (remote) {
+    diagnosticHelpExplainResolved += 1;
+    return remote;
+  }
   const local = vitteDiagnosticHelpForCode(code);
-  return local ? { help: local } : undefined;
+  if (local) {
+    diagnosticHelpLocalFallbackResolved += 1;
+    return { help: local };
+  }
+  diagnosticHelpUnresolved += 1;
+  return undefined;
 }
 
 function formatVitteDiagnosticMessage(base: string, code: string, explain?: DiagnosticExplainPayload): string {
