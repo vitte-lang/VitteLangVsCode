@@ -2456,7 +2456,6 @@ async function startClient(context: vscode.ExtensionContext | undefined): Promis
 
         if (!isPrefetch && completionSuggestionPendingAccepted) {
           completionSuggestionCanceledCount += 1;
-          completionFallbackCancelCount += 1;
           if (completionPendingRejectedItems.length > 0) {
             recordSuggestionRejections(completionPendingRejectedItems);
             completionPendingRejectedItems = [];
