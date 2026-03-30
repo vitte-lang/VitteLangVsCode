@@ -164,6 +164,7 @@ let completionFallbackCancelCount = 0;
 const vitteExplainHelpCache = new Map<string, { help: string; at: number }>();
 const vitteExplainHelpCacheLoadedFiles = new Set<string>();
 const vitteExplainHelpCachePersistTimers = new Map<string, NodeJS.Timeout>();
+const vitteVersionSignatureByBin = new Map<string, string>();
 type SuggestionTraceRefreshCause = "none" | "incomplete" | "richer";
 type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline" | "cancel";
 interface SuggestionTraceEntry {
@@ -3263,6 +3264,37 @@ function vitteExplainHelpCachePath(cwd: string): string {
   return path.join(cwd, ".vitte-cache", "diagnostics", "help-cache.json");
 }
 
+function resolveVitteVersionSignature(resolved: { bin: string; cwd: string }): string {
+  const existing = vitteVersionSignatureByBin.get(resolved.bin);
+  if (existing) return existing;
+  try {
+    const out = cp.spawnSync(
+      resolved.bin,
+      ["--version"],
+      { cwd: resolved.cwd, shell: false, encoding: "utf8", timeout: 350, maxBuffer: 64 * 1024 }
+    );
+    const text = `${out.stdout ?? ""}\n${out.stderr ?? ""}`.trim();
+    const m = /(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)/.exec(text);
+    if (m?.[1]) {
+      const sig = `vitte-${m[1]}`;
+      vitteVersionSignatureByBin.set(resolved.bin, sig);
+      return sig;
+    }
+  } catch {
+    // ignore and fallback
+  }
+  try {
+    const stats = fs.statSync(resolved.bin);
+    const sig = `bin:${resolved.bin}|mtime:${Math.trunc(stats.mtimeMs)}|size:${stats.size}`;
+    vitteVersionSignatureByBin.set(resolved.bin, sig);
+    return sig;
+  } catch {
+    const sig = `bin:${resolved.bin}|unknown`;
+    vitteVersionSignatureByBin.set(resolved.bin, sig);
+    return sig;
+  }
+}
+
 function touchVitteExplainHelpCache(key: string, help: string, at: number): void {
   if (vitteExplainHelpCache.has(key)) {
     vitteExplainHelpCache.delete(key);
@@ -3270,12 +3302,20 @@ function touchVitteExplainHelpCache(key: string, help: string, at: number): void
   vitteExplainHelpCache.set(key, { help, at });
 }
 
-function loadVitteExplainHelpCache(cachePath: string): void {
-  if (vitteExplainHelpCacheLoadedFiles.has(cachePath)) return;
-  vitteExplainHelpCacheLoadedFiles.add(cachePath);
+function loadVitteExplainHelpCache(cachePath: string, versionSignature: string): void {
+  const loadKey = `${cachePath}::${versionSignature}`;
+  if (vitteExplainHelpCacheLoadedFiles.has(loadKey)) return;
+  vitteExplainHelpCacheLoadedFiles.add(loadKey);
   try {
     const raw = fs.readFileSync(cachePath, "utf8");
-    const parsed = JSON.parse(raw) as { entries?: Record<string, { help?: string; at?: number }> };
+    const parsed = JSON.parse(raw) as {
+      schema?: number;
+      versionSignature?: string;
+      entries?: Record<string, { help?: string; at?: number }>;
+    };
+    if (parsed.versionSignature && parsed.versionSignature !== versionSignature) {
+      return;
+    }
     const entries = parsed.entries ?? {};
     for (const [key, value] of Object.entries(entries)) {
       const help = typeof value?.help === "string" ? value.help.trim() : "";
@@ -3288,10 +3328,11 @@ function loadVitteExplainHelpCache(cachePath: string): void {
   }
 }
 
-function persistVitteExplainHelpCache(cachePath: string): void {
+function persistVitteExplainHelpCache(cachePath: string, versionSignature: string): void {
   try {
     fs.mkdirSync(path.dirname(cachePath), { recursive: true });
     const entries = [...vitteExplainHelpCache.entries()]
+      .filter(([key]) => key.startsWith(`${versionSignature}|`))
       .sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0))
       .slice(0, 800);
     const payload: Record<string, { help: string; at: number }> = {};
@@ -3300,7 +3341,7 @@ function persistVitteExplainHelpCache(cachePath: string): void {
     }
     fs.writeFileSync(
       cachePath,
-      `${JSON.stringify({ schema: 1, entries: payload }, null, 2)}\n`,
+      `${JSON.stringify({ schema: 1, versionSignature, entries: payload }, null, 2)}\n`,
       "utf8"
     );
   } catch {
@@ -3308,12 +3349,12 @@ function persistVitteExplainHelpCache(cachePath: string): void {
   }
 }
 
-function schedulePersistVitteExplainHelpCache(cachePath: string): void {
+function schedulePersistVitteExplainHelpCache(cachePath: string, versionSignature: string): void {
   const prev = vitteExplainHelpCachePersistTimers.get(cachePath);
   if (prev) clearTimeout(prev);
   const timer = setTimeout(() => {
     vitteExplainHelpCachePersistTimers.delete(cachePath);
-    persistVitteExplainHelpCache(cachePath);
+    persistVitteExplainHelpCache(cachePath, versionSignature);
   }, 250);
   vitteExplainHelpCachePersistTimers.set(cachePath, timer);
 }
@@ -3325,9 +3366,10 @@ function explainHelpFromVitte(
   explainTimeoutMs: number
 ): string | undefined {
   if (!/^E\d{4}$/.test(code) && !/^VITTE-[A-Z]\d{4}$/.test(code)) return undefined;
+  const versionSignature = resolveVitteVersionSignature(resolved);
   const cachePath = vitteExplainHelpCachePath(resolved.cwd);
-  loadVitteExplainHelpCache(cachePath);
-  const key = `${lang}|${code}`;
+  loadVitteExplainHelpCache(cachePath, versionSignature);
+  const key = `${versionSignature}|${lang}|${code}`;
   const now = Date.now();
   const cached = vitteExplainHelpCache.get(key);
   if (cached && (now - cached.at) <= 6 * 60 * 60 * 1000) {
@@ -3352,7 +3394,7 @@ function explainHelpFromVitte(
     const picked = (fix ?? summary ?? "").replace(/^(Fix|Summary):\s*/i, "").trim();
     if (!picked) return undefined;
     touchVitteExplainHelpCache(key, picked, now);
-    schedulePersistVitteExplainHelpCache(cachePath);
+    schedulePersistVitteExplainHelpCache(cachePath, versionSignature);
     return picked;
   } catch {
     return undefined;
