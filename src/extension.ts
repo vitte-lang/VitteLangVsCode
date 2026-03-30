@@ -149,6 +149,8 @@ const completionShadowAgreement: number[] = [];
 const completionShadowDrift: number[] = [];
 const completionOpenedAtByDoc = new Map<string, number>();
 let completionCacheEvictionCount = 0;
+let completionCachePressureEvents = 0;
+let lastCachePressureLogAt = 0;
 let completionFallbackTimeoutCount = 0;
 let completionFallbackNegativeCacheCount = 0;
 let completionFallbackOfflineCount = 0;
@@ -371,6 +373,9 @@ function evictLruEntries<K, V>(map: Map<K, V>, maxEntries: number): number {
 }
 
 function trimCompletionCaches(maxEntries: number, softMemoryMb: number): void {
+  const beforePrefix = completionStreamingCachePrefix.size;
+  const beforeContext = completionStreamingCacheContext.size;
+  const beforeDocument = completionStreamingCacheDocument.size;
   completionCacheEvictionCount += evictLruEntries(completionStreamingCachePrefix, maxEntries);
   completionCacheEvictionCount += evictLruEntries(completionStreamingCacheContext, maxEntries);
   completionCacheEvictionCount += evictLruEntries(completionStreamingCacheDocument, maxEntries);
@@ -381,10 +386,32 @@ function trimCompletionCaches(maxEntries: number, softMemoryMb: number): void {
     + mapEstimatedMb(completionStreamingCacheDocument);
   if (rssMb <= softMemoryMb && cacheMb <= Math.max(8, softMemoryMb * 0.25)) return;
 
-  const target = Math.max(32, Math.floor(maxEntries * 0.8));
+  completionCachePressureEvents += 1;
+  let target = Math.max(32, Math.floor(maxEntries * 0.8));
+  if (rssMb > softMemoryMb * 1.5) {
+    target = Math.max(32, Math.floor(maxEntries * 0.6));
+  }
+  if (rssMb > softMemoryMb * 2.0) {
+    target = Math.max(16, Math.floor(maxEntries * 0.35));
+  }
   completionCacheEvictionCount += evictLruEntries(completionStreamingCachePrefix, target);
   completionCacheEvictionCount += evictLruEntries(completionStreamingCacheContext, target);
   completionCacheEvictionCount += evictLruEntries(completionStreamingCacheDocument, target);
+
+  const evictedTotal = (beforePrefix - completionStreamingCachePrefix.size)
+    + (beforeContext - completionStreamingCacheContext.size)
+    + (beforeDocument - completionStreamingCacheDocument.size);
+  if (evictedTotal > 0 && (Date.now() - lastCachePressureLogAt) > 30000) {
+    lastCachePressureLogAt = Date.now();
+    obsLog("completion.cache.pressure.trim", "warn", {
+      rssMb: Number(rssMb.toFixed(1)),
+      cacheMb: Number(cacheMb.toFixed(1)),
+      maxEntries,
+      target,
+      evictedTotal,
+      pressureEvents: completionCachePressureEvents,
+    });
+  }
 }
 
 function getValidCacheItems(
@@ -463,6 +490,8 @@ function resetSuggestionRuntimeState(): void {
   completionPrefetchHitCount = 0;
   completionColdStartCount = 0;
   completionCacheEvictionCount = 0;
+  completionCachePressureEvents = 0;
+  lastCachePressureLogAt = 0;
   completionFallbackTimeoutCount = 0;
   completionFallbackNegativeCacheCount = 0;
   completionFallbackOfflineCount = 0;
@@ -833,6 +862,7 @@ function getStreamingCompletionStats(): {
   stableListP50Ms: number;
   stableListP95Ms: number;
   cacheEvictions: number;
+  cachePressureEvents: number;
   firstUsableP50Ms: number;
   firstUsableP95Ms: number;
   noRefreshStrictP50Ms: number;
@@ -885,6 +915,7 @@ function getStreamingCompletionStats(): {
     stableListP50Ms: percentileLocal(completionStableListMs, 0.5),
     stableListP95Ms: percentileLocal(completionStableListMs, 0.95),
     cacheEvictions: completionCacheEvictionCount,
+    cachePressureEvents: completionCachePressureEvents,
     firstUsableP50Ms: percentileLocal(completionFirstUsableMs, 0.5),
     firstUsableP95Ms: percentileLocal(completionFirstUsableMs, 0.95),
     noRefreshStrictP50Ms: percentileLocal(completionNoRefreshStrictMs, 0.5),
