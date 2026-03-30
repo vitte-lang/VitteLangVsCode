@@ -392,17 +392,24 @@ function compareFiles(
   a: readonly AggregatedDiagnostic[] | undefined,
   b: readonly AggregatedDiagnostic[] | undefined,
 ): number {
-  const headA = a?.[0];
-  const headB = b?.[0];
+  const headA = firstEntry(a);
+  const headB = firstEntry(b);
   const sevA = severityOrder(headA?.diagnostic.severity);
   const sevB = severityOrder(headB?.diagnostic.severity);
   if (sevA !== sevB) return sevA - sevB;
   const countA = a?.length ?? 0;
   const countB = b?.length ?? 0;
   if (countA !== countB) return countB - countA;
-  const uriA = a?.[0]?.uri;
-  const uriB = b?.[0]?.uri;
+  const uriA = headA?.uri;
+  const uriB = headB?.uri;
   return relativeLabel(uriA).localeCompare(relativeLabel(uriB));
+}
+
+function firstEntry(
+  list: readonly AggregatedDiagnostic[] | undefined,
+): AggregatedDiagnostic | undefined {
+  if (!list || list.length === 0) return undefined;
+  return list[0];
 }
 
 function relativeLabel(uri: vscode.Uri | undefined): string {
