@@ -12,7 +12,6 @@ import * as os from "node:os";
 import * as cp from "node:child_process";
 import * as vscode from "vscode";
 import { PlaygroundPanel } from "./providers/playgroundPanel";
-import { registerOfflineView } from "./providers/offlineView";
 import { registerBuildTasks } from "./tasks/buildTasks";
 import { registerBenchTasks } from "./tasks/benchTasks";
 import { registerRuntimeLocatorCommand } from "./debug/runtimeLocator";
@@ -20,9 +19,7 @@ import { registerDebugFactory } from "./debug/adapterFactory";
 import { registerDebugConfigurationProvider } from "./debug/configurationProvider";
 import { registerTelemetry } from "./utils/telemetry";
 import { registerQuickActions } from "./commands/quickActions";
-import { registerPackageProblemsView } from "./providers/packageProblemsView";
 import { registerModuleGraphView } from "./providers/moduleGraphView";
-import { registerTopSyntaxErrorsView } from "./providers/topSyntaxErrorsView";
 import { registerProjectAssistant } from "./commands/projectAssistant";
 import { registerAdvancedCodeActions } from "./providers/advancedCodeActions";
 import { registerVitteCodeLens } from "./providers/vitteCodeLens";
@@ -2316,22 +2313,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   // safeRegisterView("vitteDiagnostics", () => registerDiagnosticsView(context));
   // safeRegisterView("vitteModules", () => registerModuleExplorerView(context));
   // safeRegisterView("vitteMetrics", () => registerMetricsView(context, () => client, getStreamingCompletionStats));
-  safeRegisterView("vittePackageProblems", () => registerPackageProblemsView(context));
+  // safeRegisterView("vittePackageProblems", () => registerPackageProblemsView(context));
   safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
-  safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
+  // safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
   safeRegisterView("vitteCommandCenter", () => registerCommandCenterView(context, () => client));
-  safeRegisterView("vitteOffline", () => registerOfflineView(
-    context,
-    () => offlineReason,
-    () => output,
-    () => formatOfflineSince(),
-    () => {
-      const summary = summarizeWorkspaceDiagnostics();
-      const total = summary.errors + summary.warnings + summary.info + summary.hints;
-      if (total === 0) return "No local diagnostics";
-      return `${summary.errors} errors, ${summary.warnings} warnings`;
-    }
-  ));
+  // safeRegisterView("vitteOffline", () => registerOfflineView(
+  //   context,
+  //   () => offlineReason,
+  //   () => output,
+  //   () => formatOfflineSince(),
+  //   () => {
+  //     const summary = summarizeWorkspaceDiagnostics();
+  //     const total = summary.errors + summary.warnings + summary.info + summary.hints;
+  //     if (total === 0) return "No local diagnostics";
+  //     return `${summary.errors} errors, ${summary.warnings} warnings`;
+  //   }
+  // ));
   context.subscriptions.push(vscode.languages.onDidChangeDiagnostics(() => refreshDiagnosticsStatus()));
   context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(async (doc) => {
     if (!shouldFormatOnSave(doc)) return;
@@ -3273,18 +3270,6 @@ function safeWorkspaceSubPath(...segments: string[]): string | undefined {
 
 function diagnosticsExportDir(): string | undefined {
   return safeWorkspaceSubPath(".vitte-cache", "diagnostics");
-}
-
-function formatOfflineSince(): string {
-  if (!offlineSince) return "unknown";
-  const seconds = Math.floor((Date.now() - offlineSince) / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  return `${days}d`;
 }
 
 async function readOfflineReport(): Promise<string> {
