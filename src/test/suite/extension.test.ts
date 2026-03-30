@@ -591,6 +591,29 @@ suite("Vitte extension", () => {
     }
   });
 
+  test("E2E: missing vitte binary falls back to local help", async () => {
+    const cfg = vscode.workspace.getConfiguration("vitte");
+    const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
+
+    try {
+      await cfg.update("diagnostics.helpSource", "auto", vscode.ConfigurationTarget.Workspace);
+      const rendered = await vscode.commands.executeCommand<string>(
+        "vitte.test.renderDiagnosticMessage",
+        "E0001",
+        "expected identifier",
+        { bin: "__missing_vitte_binary_for_test__" },
+      );
+      assert.equal(typeof rendered, "string");
+      assert.match(
+        rendered ?? "",
+        /help:\s*expected identifier;/i,
+        `Fallback local help absent quand le binaire vitte est introuvable. Message: ${rendered ?? ""}`,
+      );
+    } finally {
+      await cfg.update("diagnostics.helpSource", helpSourceInspect?.workspaceValue, vscode.ConfigurationTarget.Workspace);
+    }
+  });
+
   test("Code actions expose syntax fixAll, explain diagnostic, open diagnostics doc, and copy explain command", async () => {
     const document = await vscode.workspace.openTextDocument({
       content: "}\n",
