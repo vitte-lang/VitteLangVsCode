@@ -3614,8 +3614,7 @@ function extractDiagJson(stdout: string, stderr: string): string | undefined {
 }
 
 function resolveVitteBinary(doc: vscode.TextDocument): { bin: string; cwd: string } | undefined {
-  const folder = vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.fsPath
-    ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const folder = vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.fsPath;
   if (!folder) return undefined;
   return { bin: "vitte", cwd: folder };
 }
