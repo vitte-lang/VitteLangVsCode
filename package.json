@@ -252,6 +252,11 @@
         "category": "Vitte"
       },
       {
+        "command": "vitte.diagnostics.exportExplainBundle",
+        "title": "Vitte: Export Diagnostics Explain Bundle",
+        "category": "Vitte"
+      },
+      {
         "command": "vitte.diagnostics.open",
         "title": "Vitte: Open Diagnostic"
       },
@@ -680,6 +685,10 @@
         },
         {
           "command": "vitte.diagnostics.exportSnapshot",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "vitte.diagnostics.exportExplainBundle",
           "when": "workspaceFolderCount > 0"
         },
         {

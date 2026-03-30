@@ -1185,6 +1185,7 @@ const COMMAND_MENU_ENTRIES: readonly CommandMenuEntry[] = [
   { label: "Diagnostics ▸ Refresh", description: "Re-scan diagnostics", command: "vitte.diagnostics.refresh" },
   { label: "Diagnostics ▸ Refresh help cache", description: "Clear and reload diagnostics explain cache", command: "vitte.diagnostics.refreshHelpCache" },
   { label: "Diagnostics ▸ Export snapshot", description: "Export workspace diagnostics JSON snapshot", command: "vitte.diagnostics.exportSnapshot" },
+  { label: "Diagnostics ▸ Export explain bundle", description: "Export diagnostics + explain bundle for bug report", command: "vitte.diagnostics.exportExplainBundle" },
   { label: "Diagnostics ▸ First error in file", description: "Jump to first error in active file", command: "vitte.diagnostics.goToFirstErrorInFile" },
   { label: "Diagnostics ▸ Next issue", description: "Jump to next diagnostic", command: "editor.action.marker.next" },
   { label: "Quick Actions", description: "Interactive menu", command: "vitte.quickActions" },
@@ -1254,6 +1255,7 @@ function labelForCommand(command: string): string {
     case "vitte.diagnostics.refresh": return "Refresh Diagnostics";
     case "vitte.diagnostics.refreshHelpCache": return "Refresh Diagnostics Help Cache";
     case "vitte.diagnostics.exportSnapshot": return "Export Diagnostics Snapshot";
+    case "vitte.diagnostics.exportExplainBundle": return "Export Diagnostics Explain Bundle";
     case "vitte.diagnostics.goToFirstErrorInFile": return "First Error In File";
     default: return command.replace(/^vitte\./, "");
   }
@@ -1977,6 +1979,49 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         void vscode.window.showErrorMessage(`Vitte: failed to export diagnostics snapshot (${message})`);
+      }
+    }),
+    vscode.commands.registerCommand("vitte.diagnostics.exportExplainBundle", async () => {
+      try {
+        const workspaceDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceDir) {
+          void vscode.window.showWarningMessage("Vitte: open a workspace to export diagnostics explain bundle.");
+          return;
+        }
+        const report = buildWorkspaceDiagnosticsReport();
+        const cfg = vscode.workspace.getConfiguration("vitte");
+        const helpCachePath = vitteExplainHelpCachePath(workspaceDir);
+        const payload = {
+          ts: new Date().toISOString(),
+          workspace: workspaceDir,
+          schema: "diagnostics_explain_bundle@1",
+          summary: summarizeWorkspaceDiagnostics(),
+          diagnosticHelp: diagnosticHelpObservabilitySnapshot(),
+          settings: {
+            helpSource: cfg.get<DiagnosticHelpSource>("diagnostics.helpSource", "auto"),
+            explainTimeoutMs: cfg.get<number>("diagnostics.explainTimeoutMs", 450),
+            lang: cfg.get<string>("lang", "en"),
+          },
+          helpCache: {
+            path: helpCachePath,
+            exists: fs.existsSync(helpCachePath),
+            inMemoryEntries: vitteExplainHelpCache.size,
+          },
+          perFile: report.perFile,
+          perDirectory: summarizeDiagnosticsByDirectory(),
+        };
+        const dir = diagnosticsExportDir();
+        if (!dir) {
+          void vscode.window.showWarningMessage("Vitte: unable to resolve diagnostics export directory.");
+          return;
+        }
+        await fs.promises.mkdir(dir, { recursive: true });
+        const file = path.join(dir, `diagnostics-explain-bundle-${Date.now()}.json`);
+        await fs.promises.writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+        void vscode.window.showInformationMessage(`Vitte diagnostics explain bundle exported: ${file}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        void vscode.window.showErrorMessage(`Vitte: failed to export diagnostics explain bundle (${message})`);
       }
     }),
     vscode.commands.registerCommand("vitte.diagnostics.refreshHelpCache", () => {

@@ -72,6 +72,7 @@ suite("Vitte extension", () => {
       "vitte.diagnostics.refresh",
       "vitte.diagnostics.refreshHelpCache",
       "vitte.diagnostics.exportSnapshot",
+      "vitte.diagnostics.exportExplainBundle",
       "vitte.diagnostics.openDoc",
       "vitte.diagnostics.goToFirstErrorInFile",
       "vitte.topSyntaxErrors.setCodeFilter",
@@ -570,6 +571,63 @@ suite("Vitte extension", () => {
     }
   });
 
+  test("Diagnostics explain bundle export writes timestamped JSON", async () => {
+    const workspace = vscode.workspace.workspaceFolders?.[0];
+    if (!workspace) return;
+    const dir = path.join(workspace.uri.fsPath, ".vitte-cache", "diagnostics");
+    const listBundleFiles = (): string[] => {
+      if (!fs.existsSync(dir)) return [];
+      return fs.readdirSync(dir).filter((name) => /^diagnostics-explain-bundle-\d+\.json$/.test(name));
+    };
+    const before = new Set(listBundleFiles());
+    const created: string[] = [];
+
+    try {
+      await vscode.commands.executeCommand("vitte.diagnostics.exportExplainBundle");
+      await waitUntil(() => {
+        const now = listBundleFiles().filter((name) => !before.has(name));
+        if (now.length === 0) return false;
+        created.splice(0, created.length, ...now);
+        return true;
+      }, 4000, 50);
+
+      assert.ok(created.length > 0, "Aucun diagnostics explain bundle exporté");
+      const latest = created
+        .map((name) => ({ name, mtime: fs.statSync(path.join(dir, name)).mtimeMs }))
+        .sort((a, b) => b.mtime - a.mtime)[0]?.name;
+      assert.ok(latest, "Diagnostics explain bundle introuvable après export");
+      if (!latest) return;
+      const filePath = path.join(dir, latest);
+      const raw = fs.readFileSync(filePath, "utf8");
+      const payload = JSON.parse(raw) as {
+        ts?: unknown;
+        workspace?: unknown;
+        schema?: unknown;
+        summary?: { errors?: unknown; warnings?: unknown; info?: unknown; hints?: unknown };
+        diagnosticHelp?: { requests?: unknown; explainResolved?: unknown; localFallbackResolved?: unknown };
+        perFile?: unknown;
+        perDirectory?: unknown;
+      };
+      assert.equal(typeof payload.ts, "string", "Le bundle doit contenir un timestamp ISO");
+      assert.equal(payload.workspace, workspace.uri.fsPath, "Le workspace exporté est incorrect");
+      assert.equal(payload.schema, "diagnostics_explain_bundle@1");
+      assert.equal(typeof payload.summary?.errors, "number");
+      assert.equal(typeof payload.summary?.warnings, "number");
+      assert.equal(typeof payload.summary?.info, "number");
+      assert.equal(typeof payload.summary?.hints, "number");
+      assert.equal(typeof payload.diagnosticHelp?.requests, "number");
+      assert.equal(typeof payload.diagnosticHelp?.explainResolved, "number");
+      assert.equal(typeof payload.diagnosticHelp?.localFallbackResolved, "number");
+      assert.ok(Array.isArray(payload.perFile), "`perFile` doit être un tableau");
+      assert.ok(Array.isArray(payload.perDirectory), "`perDirectory` doit être un tableau");
+    } finally {
+      for (const name of created) {
+        const fp = path.join(dir, name);
+        if (fs.existsSync(fp)) fs.unlinkSync(fp);
+      }
+    }
+  });
+
   test("E2E: E0001 diagnostic includes non-empty help", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
@@ -807,6 +865,7 @@ suite("Vitte extension", () => {
       await vscode.commands.executeCommand("vitte.diagnostics.explain", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.copyExplainCommand", undefined);
       await vscode.commands.executeCommand("vitte.diagnostics.openDoc", undefined);
+      await vscode.commands.executeCommand("vitte.diagnostics.exportExplainBundle");
       await vscode.commands.executeCommand("vitte.diagnostics.refreshHelpCache");
       await vscode.commands.executeCommand("vitte.diagnostics.open", { uri: "bad" });
       await vscode.commands.executeCommand("vitte.diagnostics.copy", { diagnostic: 42 });
