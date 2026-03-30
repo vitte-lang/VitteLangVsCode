@@ -99,6 +99,9 @@ let healthFailures = 0;
 let healthRestartInFlight = false;
 let reliabilityAttempts = 0;
 let reliabilityNextDelayMs = 30000;
+let restartInFlight: Promise<boolean> | undefined;
+let restartQueued = false;
+let restartQueueReason = "";
 let activationStartedAt = Date.now();
 const completionLatencyWindowMs: number[] = [];
 const completionStreamingCachePrefix = new Map<string, { items: vscode.CompletionItem[]; ts: number }>();
@@ -1350,7 +1353,7 @@ function scheduleOfflineRetry(): void {
       offlineRetryTimer = undefined;
       void (async () => {
         try {
-          const ok = await restartClient(lastActivationContext ?? undefined);
+          const ok = await requestClientRestart(lastActivationContext ?? undefined, "offline-retry");
           if (ok) {
             offlineRetryMs = base;
             cancelOfflineRetry();
@@ -1931,7 +1934,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
           title: "Vitte: restarting language server…",
         },
         async () => {
-          const ok = await restartClient(context);
+          const ok = await requestClientRestart(context, "command");
           if (!ok) {
             showOfflineNoop("restart");
           }
@@ -2129,7 +2132,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     }
     if (e.affectsConfiguration("vitte")) {
       reportSettingsIssues(output, "config");
-      await restartClient(context);
+      await requestClientRestart(context, "config-change");
     }
     if (e.affectsConfiguration("vitte.server.offlinePermanent")) {
       if (isOfflinePermanent()) {
@@ -2220,7 +2223,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
         await runBuiltinAction(action);
       },
       restart: async () => {
-        await restartClient(context);
+        await requestClientRestart(context, "test-api");
       },
       resolveServerModuleForTest: (ctx) => resolveServerModule(ctx as vscode.ExtensionContext),
     };
@@ -2765,6 +2768,41 @@ async function restartClient(context: vscode.ExtensionContext | undefined): Prom
   return startClient(context);
 }
 
+async function requestClientRestart(
+  context: vscode.ExtensionContext | undefined,
+  reason: string
+): Promise<boolean> {
+  if (restartInFlight) {
+    restartQueued = true;
+    restartQueueReason = reason;
+    obsLog("restart.coalesced", "info", { reason });
+    return restartInFlight;
+  }
+  restartInFlight = (async () => {
+    let lastResult = false;
+    let activeReason = reason;
+    do {
+      restartQueued = false;
+      const startedAt = Date.now();
+      obsLog("restart.begin", "info", { reason: activeReason });
+      lastResult = await restartClient(context);
+      obsLog("restart.end", lastResult ? "info" : "warn", {
+        reason: activeReason,
+        ok: lastResult,
+        elapsedMs: Date.now() - startedAt,
+      });
+      activeReason = restartQueueReason || reason;
+      restartQueueReason = "";
+    } while (restartQueued);
+    return lastResult;
+  })().finally(() => {
+    restartInFlight = undefined;
+    restartQueued = false;
+    restartQueueReason = "";
+  });
+  return restartInFlight;
+}
+
 function startHealthChecks(context: vscode.ExtensionContext): void {
   if (healthCheckTimer) clearInterval(healthCheckTimer);
   let lastBudgetAlert = 0;
@@ -2824,7 +2862,7 @@ function startHealthChecks(context: vscode.ExtensionContext): void {
           const jitter = Math.floor(Math.random() * Math.max(1, Math.floor(reliabilityNextDelayMs * 0.25)));
           await sleep(reliabilityNextDelayMs + jitter);
           obsLog("health.restart.attempt", "warn", { delayMs: reliabilityNextDelayMs + jitter, attempt: reliabilityAttempts + 1 });
-          const ok = await restartClient(context);
+          const ok = await requestClientRestart(context, "health-check");
           if (!ok) {
             setOfflineStatus("Health check restart failed.");
             obsLog("health.restart.failed", "error");
