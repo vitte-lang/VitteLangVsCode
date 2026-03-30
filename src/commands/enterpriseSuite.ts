@@ -82,6 +82,18 @@ function getCfg() {
   return vscode.workspace.getConfiguration("vitte");
 }
 
+function asStringPrimitive(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+  return undefined;
+}
+
+function sanitizeCodeKey(value: unknown, fallback: string): string {
+  const raw = asStringPrimitive(value) ?? fallback;
+  const cleaned = raw.replace(/[^A-Za-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned || fallback;
+}
+
 function cfgSnapshot(): Record<string, unknown> {
   const cfg = getCfg();
   const keys = [
@@ -103,7 +115,7 @@ function cfgSnapshot(): Record<string, unknown> {
   return out;
 }
 
-function collectLastEdits(): Array<Record<string, unknown>> {
+function collectLastEdits(): Record<string, unknown>[] {
   const active = vscode.window.activeTextEditor?.document.uri.toString();
   return vscode.workspace.textDocuments
     .filter((d) => d.languageId === "vitte" || d.languageId === "vit")
@@ -193,7 +205,7 @@ async function exportSarif(deps: EnterpriseDeps): Promise<void> {
   for (const [uri, diags] of vscode.languages.getDiagnostics()) {
     for (const d of diags) {
       results.push({
-        ruleId: String(d.code ?? d.source ?? "VITTE-DIAG"),
+        ruleId: sanitizeCodeKey(d.code, sanitizeCodeKey(d.source, "VITTE-DIAG")),
         level: d.severity === vscode.DiagnosticSeverity.Error ? "error" : d.severity === vscode.DiagnosticSeverity.Warning ? "warning" : "note",
         message: { text: d.message },
         locations: [{
@@ -382,7 +394,7 @@ function registerAutoRemediation(context: vscode.ExtensionContext): void {
     const diags = vscode.languages.getDiagnostics(active.document.uri);
     const bucket = new Set<"imports" | "style" | "naming" | "contracts">();
     for (const d of diags) {
-      const code = String(d.code ?? "");
+      const code = sanitizeCodeKey(d.code, "");
       const cat = knownAutoFix[code];
       if (cat) bucket.add(cat);
     }

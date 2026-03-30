@@ -12,6 +12,47 @@ function workspaceRoots(): string[] {
   return (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath);
 }
 
+function isSafeChildPath(base: string, target: string): boolean {
+  const rel = path.relative(base, target);
+  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
+}
+
+function normalizeProjectName(input: string): string | undefined {
+  const value = input.trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) return undefined;
+  return value;
+}
+
+function normalizeModulePath(input: string): string | undefined {
+  const rel = input.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  if (!rel) return undefined;
+  const parts = rel.split("/");
+  if (parts.some((part) => part === "." || part === ".." || part.length === 0)) return undefined;
+  if (!parts.every((part) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(part))) return undefined;
+  return rel;
+}
+
+function normalizePackageName(input: string): string | undefined {
+  const value = input.trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) return undefined;
+  return value;
+}
+
+async function promptOpenProjectFolder(dir: string): Promise<void> {
+  const uri = vscode.Uri.file(dir);
+  const pick = await vscode.window.showInformationMessage(
+    `Project created: ${dir}`,
+    "Open Here",
+    "Open New Window",
+    "Keep Current Window",
+  );
+  if (pick === "Open Here") {
+    await vscode.commands.executeCommand("vscode.openFolder", uri, false);
+  } else if (pick === "Open New Window") {
+    await vscode.commands.executeCommand("vscode.openFolder", uri, true);
+  }
+}
+
 async function ensureDir(p: string): Promise<void> {
   await fs.mkdir(p, { recursive: true });
 }
@@ -110,14 +151,23 @@ async function createNewProject(): Promise<void> {
     void vscode.window.showErrorMessage("Open a workspace folder first.");
     return;
   }
-  const name = await vscode.window.showInputBox({ prompt: "New project name", value: "my_vitte_app" });
-  if (!name) return;
+  const input = await vscode.window.showInputBox({ prompt: "New project name (letters, digits, underscore)", value: "my_vitte_app" });
+  if (!input) return;
+  const name = normalizeProjectName(input);
+  if (!name) {
+    void vscode.window.showErrorMessage("Invalid project name. Use letters, digits, and underscore only.");
+    return;
+  }
   const dir = path.join(ws, name);
+  if (!isSafeChildPath(ws, dir)) {
+    void vscode.window.showErrorMessage("Invalid project path.");
+    return;
+  }
   await ensureDir(path.join(dir, "src"));
   await writeIfMissing(path.join(dir, "src", "main.vit"), `space ${name}\n\nentry main at ${name} {\n  give 0\n}\n`);
   await writeIfMissing(path.join(dir, "vitte.config.json"), `${JSON.stringify({ name, version: "0.1.0" }, null, 2)}\n`);
   await generateWorkspaceVscodeFiles(dir);
-  await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(dir), true);
+  await promptOpenProjectFolder(dir);
 }
 
 async function createNewModule(): Promise<void> {
@@ -125,8 +175,16 @@ async function createNewModule(): Promise<void> {
   if (!ws) return;
   const mod = await vscode.window.showInputBox({ prompt: "Module path (example: app/network/http)" });
   if (!mod) return;
-  const rel = mod.replace(/\\/g, "/").replace(/^\/+/, "");
+  const rel = normalizeModulePath(mod);
+  if (!rel) {
+    void vscode.window.showErrorMessage("Invalid module path. Use slash-separated identifiers (letters, digits, underscore).");
+    return;
+  }
   const file = path.join(ws, "src", `${rel}.vit`);
+  if (!isSafeChildPath(ws, file)) {
+    void vscode.window.showErrorMessage("Invalid module path.");
+    return;
+  }
   const wrote = await writeWithOverwriteConfirm(file, `space ${rel}\n\nshare run\n\nproc run() -> i32 {\n  give 0\n}\n`);
   if (!wrote) return;
   await generateWorkspaceVscodeFiles(ws);
@@ -137,9 +195,18 @@ async function createNewModule(): Promise<void> {
 async function createNewPackage(): Promise<void> {
   const ws = rootDir();
   if (!ws) return;
-  const name = await vscode.window.showInputBox({ prompt: "Package name", value: "core_utils" });
-  if (!name) return;
+  const input = await vscode.window.showInputBox({ prompt: "Package name", value: "core_utils" });
+  if (!input) return;
+  const name = normalizePackageName(input);
+  if (!name) {
+    void vscode.window.showErrorMessage("Invalid package name. Use letters, digits, and underscore only.");
+    return;
+  }
   const dir = path.join(ws, "packages", name);
+  if (!isSafeChildPath(ws, dir)) {
+    void vscode.window.showErrorMessage("Invalid package path.");
+    return;
+  }
   await ensureDir(dir);
   const modFile = path.join(dir, "mod.vit");
   const pkgPath = `vitte/${name}`;
@@ -171,8 +238,26 @@ function chooseToolCommand(tool: DoctorTool): { cmd: string; args: string[] } {
   return { cmd: "vitte", args: [tool, "--json"] };
 }
 
+function asStringPrimitive(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+  return undefined;
+}
+
+function firstText(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    const text = asStringPrimitive(value);
+    if (text && text.length > 0) return text;
+  }
+  return undefined;
+}
+
+function sanitizeCode(code: string): string {
+  return code.replace(/[^A-Za-z0-9_.:-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 120) || "UNKNOWN";
+}
+
 function severityFromAny(value: unknown): vscode.DiagnosticSeverity {
-  const s = String(value ?? "").toLowerCase();
+  const s = (asStringPrimitive(value) ?? "").toLowerCase();
   if (s.includes("error") || s === "err") return vscode.DiagnosticSeverity.Error;
   if (s.includes("warn")) return vscode.DiagnosticSeverity.Warning;
   if (s.includes("info")) return vscode.DiagnosticSeverity.Information;
@@ -218,13 +303,10 @@ function normalizeRecords(value: unknown): Record<string, unknown>[] {
 }
 
 function fileUriFromRecord(ws: string, rec: Record<string, unknown>): vscode.Uri {
-  const pathLike = String(
-    rec.uri
-    ?? rec.file
-    ?? rec.path
-    ?? (typeof rec.location === "object" && rec.location ? (rec.location as Record<string, unknown>).file : "")
-    ?? ""
-  );
+  const locationFile = typeof rec.location === "object" && rec.location
+    ? (rec.location as Record<string, unknown>).file
+    : undefined;
+  const pathLike = firstText(rec.uri, rec.file, rec.path, locationFile) ?? "";
   if (pathLike.startsWith("file://")) return vscode.Uri.parse(pathLike);
   if (pathLike) {
     const fsPath = path.isAbsolute(pathLike) ? pathLike : path.join(ws, pathLike);
@@ -262,8 +344,8 @@ function diagnosticsFromToolResult(ws: string, res: ToolRunResult): Map<string, 
       rec.column ?? rec.col ?? (typeof rec.location === "object" && rec.location ? (rec.location as Record<string, unknown>).column : 1),
       1
     ) - 1;
-    const message = String(rec.message ?? rec.msg ?? rec.error ?? rec.reason ?? `${res.tool} issue`);
-    const code = String(rec.code ?? `DOCTOR_${res.tool.toUpperCase()}`);
+    const message = firstText(rec.message, rec.msg, rec.error, rec.reason) ?? `${res.tool} issue`;
+    const code = sanitizeCode(firstText(rec.code) ?? `DOCTOR_${res.tool.toUpperCase()}`);
     const severity = severityFromAny(rec.severity ?? rec.level ?? (res.code === 0 ? "warning" : "error"));
     const diag = new vscode.Diagnostic(
       new vscode.Range(Math.max(0, line), Math.max(0, col), Math.max(0, line), Math.max(1, col + 1)),
