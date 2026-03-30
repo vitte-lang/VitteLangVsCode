@@ -3679,9 +3679,14 @@ function formatVitteDiagnosticMessage(base: string, code: string, explain?: Diag
   const help = explain?.help ?? vitteDiagnosticHelpForCode(code);
   if (!help) return base;
   const example = explain?.example?.trim();
-  const sourceTag = explain?.source === "external" ? "\nhelp-source: external" : "";
-  if (!example) return `${base}\nhelp: ${help}${sourceTag}`;
-  return `${base}\nhelp: ${help}${sourceTag}\nexample:\n${example}`;
+  const lang = vscode.workspace.getConfiguration("vitte").get<string>("lang", "en").trim().toLowerCase();
+  const isFr = lang.startsWith("fr");
+  const helpLabel = isFr ? "aide" : "help";
+  const sourceLabel = isFr ? "source-aide" : "help-source";
+  const exampleLabel = isFr ? "exemple" : "example";
+  const sourceTag = explain?.source === "external" ? `\n${sourceLabel}: external` : "";
+  if (!example) return `${base}\n${helpLabel}: ${help}${sourceTag}`;
+  return `${base}\n${helpLabel}: ${help}${sourceTag}\n${exampleLabel}:\n${example}`;
 }
 
 function extractDiagJson(stdout: string, stderr: string): string | undefined {

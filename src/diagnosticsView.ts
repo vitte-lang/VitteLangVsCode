@@ -27,6 +27,69 @@ const DEFAULT_CFG: Readonly<Required<VitteDiagnosticsConfig>> = {
   displayMode: "compact",
 };
 
+type UiLocale = "fr" | "en";
+interface UiStrings {
+  source: string;
+  sourceUnknown: string;
+  docs: string;
+  explain: string;
+  level: string;
+  noDiagnostics: string;
+  diagnosticCopied: string;
+  noDiagnosticAtCursor: string;
+  copyExplanation: string;
+  explanationCopied: string;
+  noExplainableCode: string;
+  explainCommandCopied: string;
+  noDocumentationLink: string;
+  diagnosticPrefix: string;
+  externalHelpBadge: string;
+}
+
+function currentLocale(): UiLocale {
+  const lang = vscode.workspace.getConfiguration("vitte").get<string>("lang", "en").trim().toLowerCase();
+  return lang.startsWith("fr") ? "fr" : "en";
+}
+
+function uiStrings(): UiStrings {
+  if (currentLocale() === "fr") {
+    return {
+      source: "Source",
+      sourceUnknown: "Source: inconnue",
+      docs: "Docs",
+      explain: "Expliquer",
+      level: "Niveau",
+      noDiagnostics: "$(pass-filled) Aucun diagnostic Vitte détecté",
+      diagnosticCopied: "Diagnostic copié dans le presse-papiers",
+      noDiagnosticAtCursor: "Vitte: aucun diagnostic au curseur.",
+      copyExplanation: "Copier l'explication",
+      explanationCopied: "Explication du diagnostic Vitte copiée",
+      noExplainableCode: "Vitte: ce diagnostic n'a pas de code explicable.",
+      explainCommandCopied: "Commande vitte --explain copiée",
+      noDocumentationLink: "Vitte: ce diagnostic n'a pas de lien de documentation.",
+      diagnosticPrefix: "Diagnostic Vitte",
+      externalHelpBadge: "aide externe",
+    };
+  }
+  return {
+    source: "Source",
+    sourceUnknown: "Source: unknown",
+    docs: "Docs",
+    explain: "Explain",
+    level: "Level",
+    noDiagnostics: "$(pass-filled) No Vitte diagnostics detected",
+    diagnosticCopied: "Diagnostic copied to clipboard",
+    noDiagnosticAtCursor: "Vitte: no diagnostic at cursor.",
+    copyExplanation: "Copy explanation",
+    explanationCopied: "Vitte diagnostic explanation copied",
+    noExplainableCode: "Vitte: diagnostic has no explainable code.",
+    explainCommandCopied: "Vitte explain command copied",
+    noDocumentationLink: "Vitte: diagnostic has no documentation link.",
+    diagnosticPrefix: "Vitte diagnostic",
+    externalHelpBadge: "external help",
+  };
+}
+
 function isSeverityKey(value: unknown): value is SeverityKey {
   return typeof value === 'string' && value in VALID_SEVERITY_MAP;
 }
@@ -144,7 +207,8 @@ function diagnosticCodeText(d: vscode.Diagnostic): string {
 }
 
 function vitteExplainHint(code: string): string {
-  return `Explain: vitte --explain ${code}`;
+  const u = uiStrings();
+  return `${u.explain}: vitte --explain ${code}`;
 }
 
 function diagnosticDocUrl(code: string): string | undefined {
@@ -155,15 +219,16 @@ function diagnosticDocUrl(code: string): string | undefined {
 }
 
 function diagnosticExplanationMessage(entry: AggregatedDiagnostic): string {
+  const u = uiStrings();
   const pos = entry.diagnostic.range.start;
   const code = diagnosticCodeText(entry.diagnostic);
   const explainable = explainableCodeFromDiagnostic(entry.diagnostic);
-  const source = entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : "Source: unknown";
+  const source = entry.diagnostic.source ? `${u.source}: ${entry.diagnostic.source}` : u.sourceUnknown;
   const suggestion = syntaxSuggestion(entry) ?? "Suggestion: inspect the surrounding block and apply the closest Quick Fix.";
   const codePart = code ? `Code: ${code}\n` : "";
   const explainPart = explainable ? `\n${vitteExplainHint(explainable)}` : "";
   const docUrl = explainable ? diagnosticDocUrl(explainable) : undefined;
-  const docPart = docUrl ? `\nDocs: ${docUrl}` : "";
+  const docPart = docUrl ? `\n${u.docs}: ${docUrl}` : "";
   return `${source}\n${codePart}${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}\n\n${entry.diagnostic.message}\n\n${suggestion}${explainPart}${docPart}`;
 }
 
@@ -237,6 +302,7 @@ class FileNode extends vscode.TreeItem {
 
 class DiagnosticNode extends vscode.TreeItem {
   constructor(public readonly entry: AggregatedDiagnostic, displayMode: DisplayMode) {
+    const u = uiStrings();
     super(formatDiagnosticNodeLabel(entry, displayMode), vscode.TreeItemCollapsibleState.None);
     const pos = entry.diagnostic.range.start;
     const severityName = sevToName(entry.diagnostic.severity);
@@ -246,7 +312,7 @@ class DiagnosticNode extends vscode.TreeItem {
     const parts = [
       entry.diagnostic.message,
       `${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1}`,
-      entry.diagnostic.source ? `Source: ${entry.diagnostic.source}` : ""
+      entry.diagnostic.source ? `${u.source}: ${entry.diagnostic.source}` : ""
     ].filter(Boolean);
     const codeValue = diagnosticCodeText(entry.diagnostic);
     const codeText = codeValue ? `Code: ${codeValue}` : undefined;
@@ -254,7 +320,7 @@ class DiagnosticNode extends vscode.TreeItem {
     const code = explainableCodeFromDiagnostic(entry.diagnostic);
     const explain = code ? vitteExplainHint(code) : undefined;
     const docUrl = code ? diagnosticDocUrl(code) : undefined;
-    const extra = [severityName && `Niveau: ${severityName}`, codeText, suggestion, explain, docUrl && `Docs: ${docUrl}`].filter(Boolean).join('\n');
+    const extra = [severityName && `${u.level}: ${severityName}`, codeText, suggestion, explain, docUrl && `${u.docs}: ${docUrl}`].filter(Boolean).join('\n');
     this.tooltip = [parts.join('\n'), extra].filter(Boolean).join('\n');
     this.iconPath = iconForSeverity(entry.diagnostic.severity);
     this.command = {
@@ -317,17 +383,19 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
   const tree = vscode.window.createTreeView<TreeNode>("vitteDiagnostics", { treeDataProvider: provider });
 
   const refresh = () => {
+    const u = uiStrings();
     provider.refresh();
     if (provider.hasItems()) {
       tree.message = '';
     } else {
-      tree.message = '$(pass-filled) Aucun diagnostic Vitte détecté';
+      tree.message = u.noDiagnostics;
     }
   };
 
   const refreshDebounced = () => {
+    const u = uiStrings();
     provider.refreshDebounced();
-    if (!provider.hasItems()) tree.message = '$(pass-filled) Aucun diagnostic Vitte détecté';
+    if (!provider.hasItems()) tree.message = u.noDiagnostics;
   };
 
   refresh();
@@ -350,18 +418,20 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
       editor.selection = new vscode.Selection(range.start, range.start);
     }),
     vscode.commands.registerCommand('vitte.diagnostics.copy', async (arg?: unknown) => {
+      const u = uiStrings();
       const entry = toAggregatedDiagnostic(arg);
       if (!entry) return;
       const pos = entry.diagnostic.range.start;
       const text = `${entry.uri.fsPath}:${pos.line + 1}:${pos.character + 1} — ${entry.diagnostic.message}`;
       await vscode.env.clipboard.writeText(text);
-      void vscode.window.setStatusBarMessage('Diagnostic copié dans le presse-papiers', 2000);
+      void vscode.window.setStatusBarMessage(u.diagnosticCopied, 2000);
     }),
     vscode.commands.registerCommand("vitte.diagnostics.explain", async (arg?: unknown) => {
+      const u = uiStrings();
       let entry = toAggregatedDiagnostic(arg);
       entry ??= currentDiagnosticEntry();
       if (!entry) {
-        void vscode.window.showInformationMessage("Vitte: no diagnostic at cursor.");
+        void vscode.window.showInformationMessage(u.noDiagnosticAtCursor);
         return;
       }
       const doc = await vscode.workspace.openTextDocument(entry.uri);
@@ -370,38 +440,40 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
       editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
       editor.selection = new vscode.Selection(range.start, range.start);
       const detail = diagnosticExplanationMessage(entry);
-      void vscode.window.showInformationMessage(`Vitte diagnostic: ${entry.diagnostic.message}`, "Copy explanation")
+      void vscode.window.showInformationMessage(`${u.diagnosticPrefix}: ${entry.diagnostic.message}`, u.copyExplanation)
         .then(async (choice) => {
-          if (choice !== "Copy explanation") return;
+          if (choice !== u.copyExplanation) return;
           await vscode.env.clipboard.writeText(detail);
-          void vscode.window.setStatusBarMessage("Vitte diagnostic explanation copied", 2000);
+          void vscode.window.setStatusBarMessage(u.explanationCopied, 2000);
         });
     }),
     vscode.commands.registerCommand("vitte.diagnostics.copyExplainCommand", async (arg?: unknown) => {
+      const u = uiStrings();
       let entry = toAggregatedDiagnostic(arg);
       entry ??= currentDiagnosticEntry();
       if (!entry) return;
       const command = explainCommandForEntry(entry);
       if (!command) {
-        void vscode.window.showInformationMessage("Vitte: diagnostic has no explainable code.");
+        void vscode.window.showInformationMessage(u.noExplainableCode);
         return;
       }
       await vscode.env.clipboard.writeText(command);
-      void vscode.window.setStatusBarMessage("Vitte explain command copied", 2000);
+      void vscode.window.setStatusBarMessage(u.explainCommandCopied, 2000);
     }),
     vscode.commands.registerCommand("vitte.diagnostics.openDoc", async (arg?: unknown) => {
+      const u = uiStrings();
       let entry = toAggregatedDiagnostic(arg);
       entry ??= currentDiagnosticEntry();
       if (!entry) return;
       const docUrl = diagnosticsDocUrlForEntry(entry);
       if (!docUrl) {
-        void vscode.window.showInformationMessage("Vitte: diagnostic has no documentation link.");
+        void vscode.window.showInformationMessage(u.noDocumentationLink);
         return;
       }
       await vscode.env.openExternal(vscode.Uri.parse(docUrl));
     }),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (!e.affectsConfiguration("vitte.diagnostics.displayMode")) return;
+      if (!e.affectsConfiguration("vitte.diagnostics.displayMode") && !e.affectsConfiguration("vitte.lang")) return;
       refresh();
     }),
   );
@@ -522,7 +594,7 @@ function compactText(text: string, maxLen = 100): string {
 }
 
 function hasExternalHelpBadge(diagnostic: vscode.Diagnostic): boolean {
-  return /\bhelp-source:\s*external\b/i.test(diagnostic.message);
+  return /\b(?:help-source|source-aide):\s*external\b/i.test(diagnostic.message);
 }
 
 function formatDiagnosticNodeLabel(entry: AggregatedDiagnostic, displayMode: DisplayMode): string {
@@ -531,6 +603,6 @@ function formatDiagnosticNodeLabel(entry: AggregatedDiagnostic, displayMode: Dis
   const message = displayMode === "detailed"
     ? entry.diagnostic.message
     : compactText(entry.diagnostic.message, 100);
-  const badge = hasExternalHelpBadge(entry.diagnostic) ? " [external help]" : "";
+  const badge = hasExternalHelpBadge(entry.diagnostic) ? ` [${uiStrings().externalHelpBadge}]` : "";
   return `${prefix}${message}${badge}`;
 }
