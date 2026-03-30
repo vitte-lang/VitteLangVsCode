@@ -159,7 +159,7 @@ let completionFallbackNegativeCacheCount = 0;
 let completionFallbackOfflineCount = 0;
 let completionFallbackCancelCount = 0;
 type SuggestionTraceRefreshCause = "none" | "incomplete" | "richer";
-type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline";
+type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline" | "cancel";
 interface SuggestionTraceEntry {
   id: string;
   requestKey: string;
@@ -2351,6 +2351,18 @@ async function startClient(context: vscode.ExtensionContext | undefined): Promis
         const isPrefetch = completionPrefetchExpectedKey === key;
         const forceLoadNextPage = completionLoadNextPageKey === key;
         if (forceLoadNextPage) completionLoadNextPageKey = undefined;
+        let cancellationRecorded = false;
+        const markRequestCancelled = (): void => {
+          if (isPrefetch || cancellationRecorded) return;
+          cancellationRecorded = true;
+          completionFallbackCancelCount += 1;
+          const trace = completionTraceActiveByKey.get(key);
+          if (trace?.fallbackCause === "none") trace.fallbackCause = "cancel";
+        };
+        if (token.isCancellationRequested) {
+          markRequestCancelled();
+          return new vscode.CompletionList([], false);
+        }
 
         if (!isPrefetch && completionSuggestionPendingAccepted) {
           completionSuggestionCanceledCount += 1;
@@ -2569,6 +2581,10 @@ async function startClient(context: vscode.ExtensionContext | undefined): Promis
         const seeded = [...seedMap.values()];
 
         const requestPromise = (async () => {
+          if (token.isCancellationRequested) {
+            markRequestCancelled();
+            return { out: null, items: [] as vscode.CompletionItem[] };
+          }
           if (negativeCacheActive) {
             if (!isPrefetch) completionFallbackNegativeCacheCount += 1;
             if (!isPrefetch) {
@@ -2670,10 +2686,24 @@ async function startClient(context: vscode.ExtensionContext | undefined): Promis
 
         const raced = await Promise.race([
           requestPromise.then((v) => ({ type: "full" as const, ...v })),
+          new Promise<{ type: "cancel" }>((resolve) => {
+            const disposable = token.onCancellationRequested(() => {
+              disposable.dispose();
+              resolve({ type: "cancel" });
+            });
+          }),
           new Promise<{ type: "timeout" }>((resolve) => setTimeout(() => resolve({ type: "timeout" }), firstPaintMs)),
         ]);
 
+        if (raced.type === "cancel") {
+          markRequestCancelled();
+          return new vscode.CompletionList([], false);
+        }
         if (raced.type === "full") {
+          if (token.isCancellationRequested) {
+            markRequestCancelled();
+            return new vscode.CompletionList([], false);
+          }
           if (!isPrefetch) {
             pushWindowSample(completionStreamingFirstPaintMs, Date.now() - now);
             const trace = completionTraceActiveByKey.get(key);
