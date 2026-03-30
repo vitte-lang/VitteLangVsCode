@@ -81,6 +81,28 @@ suite("Vitte extension", () => {
     }
   });
 
+  test("Smoke E2E: commandes critiques exécutables sans crash", async () => {
+    const critical = [
+      "vitte.moduleGraph.refresh",
+      "vitte.commandCenter.refresh",
+      "vitte.packageProblems.refresh",
+      "vitte.offline.refresh",
+      "vitte.offline.copyReport",
+      "vitte.diagnostics.refresh",
+      "vitte.topSyntaxErrors.refresh",
+      "vitte.debug.runFile",
+      "vitte.debug.attachServer",
+    ];
+
+    await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+    for (const cmd of critical) {
+      await assert.doesNotReject(
+        async () => vscode.commands.executeCommand(cmd),
+        `La commande ${cmd} ne doit pas faire planter l'extension`,
+      );
+    }
+  });
+
   test("La commande restart redémarre le client", async () => {
     const testApi = api;
     assert.ok(testApi, "API de test non disponible");
