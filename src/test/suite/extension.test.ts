@@ -6,6 +6,14 @@ import * as vscode from "vscode";
 const EXTENSION_ID = "VitteStudio.vitte-studio";
 
 interface ExtensionTestApi {
+  apiVersion: "1.0.0";
+  extensionVersion: string;
+  capabilities: {
+    status: true;
+    restart: true;
+    runAction: true;
+    serverResolutionTestHook: true;
+  };
   getStatusText(): string;
   getStatusTooltip(): string;
   getClientState(): unknown;
@@ -40,6 +48,18 @@ suite("Vitte extension", () => {
     assert.ok(extension, "Extension non initialisée");
     assert.ok(extension.isActive, "Extension non active après activation");
     assert.ok(api, "API de test non exposée par l’extension");
+  });
+
+  test("API publique versionnée: contrat stable exposé", () => {
+    const testApi = api;
+    assert.ok(testApi, "API de test non disponible");
+    assert.equal(testApi.apiVersion, "1.0.0", "Version de contrat API inattendue");
+    assert.equal(typeof testApi.extensionVersion, "string");
+    assert.ok(testApi.extensionVersion.length > 0, "La version de l’extension doit être exposée");
+    assert.equal(testApi.capabilities.status, true);
+    assert.equal(testApi.capabilities.restart, true);
+    assert.equal(testApi.capabilities.runAction, true);
+    assert.equal(testApi.capabilities.serverResolutionTestHook, true);
   });
 
   test("Les commandes principales sont déclarées", async () => {

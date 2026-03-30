@@ -911,6 +911,14 @@ function getExtensionVersion(ext: vscode.Extension<unknown> | undefined): string
 }
 
 export interface ExtensionApi {
+  apiVersion: "1.0.0";
+  extensionVersion: string;
+  capabilities: {
+    status: true;
+    restart: true;
+    runAction: true;
+    serverResolutionTestHook: true;
+  };
   getStatusText(): string;
   getStatusTooltip(): string;
   getClientState(): ClientState | undefined;
@@ -1991,6 +1999,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 
   if (process.env.VSCODE_TESTING === "1") {
     const api: ExtensionApi = {
+      apiVersion: "1.0.0",
+      extensionVersion: getExtensionVersion(context.extension),
+      capabilities: {
+        status: true,
+        restart: true,
+        runAction: true,
+        serverResolutionTestHook: true,
+      },
       getStatusText: () => statusItem?.text ?? "",
       getStatusTooltip: () => {
         const tip = statusItem?.tooltip;
