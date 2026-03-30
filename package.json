@@ -93,73 +93,6 @@
         "url": "./schemas/vitte-config.schema.json"
       }
     ],
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "vitte-sidebar",
-          "title": "Vitte",
-          "icon": "media/icons/vitte-logo.svg"
-        }
-      ]
-    },
-    "views": {
-      "vitte-sidebar": [
-        {
-          "id": "vitteDiagnostics",
-          "name": "Vitte Diagnostics",
-          "icon": "media/icons/vitte-logo.svg",
-          "when": "vitte.serverOnline"
-        },
-        {
-          "id": "vitteTopSyntaxErrors",
-          "name": "Top Syntax Errors",
-          "icon": "media/icons/vitte-logo.svg",
-          "when": "vitte.serverOnline"
-        },
-        {
-          "id": "vitteModules",
-          "name": "Vitte Modules",
-          "icon": "media/icons/vitte-logo.svg",
-          "when": "vitte.serverOnline"
-        },
-        {
-          "id": "vittePackageProblems",
-          "name": "Problems by Package",
-          "icon": "media/icons/vitte-logo.svg"
-        },
-        {
-          "id": "vitteModuleGraph",
-          "name": "Module Graph",
-          "icon": "media/icons/vitte-logo.svg",
-          "type": "webview"
-        },
-        {
-          "id": "vitteCommandCenter",
-          "name": "Command Center",
-          "icon": "media/icons/vitte-logo.svg",
-          "type": "webview"
-        },
-        {
-          "id": "vitteMetrics",
-          "name": "Vitte Metrics",
-          "icon": "media/icons/vitte-logo.svg",
-          "when": "vitte.serverOnline"
-        },
-        {
-          "id": "vitteOffline",
-          "name": "Vitte Offline",
-          "icon": "media/icons/vitte-logo.svg",
-          "when": "vitte.serverOffline"
-        }
-      ]
-    },
-    "viewsWelcome": [
-      {
-        "view": "vitteOffline",
-        "contents": "# Vitte Offline\n\nThe language server is offline.\n\n- $(question) **Explain Offline** → `vscode:command:vitte.offline.explain`\n- $(settings-gear) **Settings** → `vscode:command:workbench.action.openSettings?%5B%22vitte.server%22%5D`\n",
-        "when": "view == vitteOffline"
-      }
-    ],
     "debuggers": [
       {
         "type": "vitte",
@@ -1956,32 +1889,7 @@
         },
         "vitte.commandShortcuts": {
           "type": "array",
-          "default": [
-            {
-              "label": "Build",
-              "command": "vitte.build",
-              "icon": "$(tools)",
-              "tooltip": "Build the workspace (vitte.build)",
-              "statusBar": true,
-              "startup": true
-            },
-            {
-              "label": "Run",
-              "command": "vitte.run",
-              "icon": "$(debug-start)",
-              "tooltip": "Build and run the entry point (vitte.run)",
-              "statusBar": true,
-              "startup": true
-            },
-            {
-              "label": "Test",
-              "command": "vitte.test",
-              "icon": "$(beaker)",
-              "tooltip": "Execute the test suite (vitte.test)",
-              "statusBar": true,
-              "startup": true
-            }
-          ],
+          "default": [],
           "description": "Customize the shortcuts shown in the status bar and startup prompt. Each entry defines a label, command, and optional icon/tooltip.",
           "items": {
             "type": "object",

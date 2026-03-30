@@ -1471,6 +1471,7 @@ function updateCommandButtons(context: vscode.ExtensionContext): void {
   const shortcuts = readCommandShortcuts();
   const visible = shortcuts.filter((entry) => entry.statusBar !== false);
   let priority = 1000;
+  if (visible.length === 0) return;
   for (const shortcut of visible) {
     const icon = shortcut.icon ?? "$(rocket)";
     const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, priority--);
