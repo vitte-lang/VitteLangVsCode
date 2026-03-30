@@ -516,21 +516,21 @@ function severityOrder(severity: vscode.DiagnosticSeverity | undefined): number 
   }
 }
 
-function diagnosticCodeLabel(diagnostic: vscode.Diagnostic): string {
-  const raw = diagnostic.code;
-  if (typeof raw === "string" || typeof raw === "number") return `[${String(raw)}] `;
-  return "";
-}
-
 function compactText(text: string, maxLen = 100): string {
   if (text.length <= maxLen) return text;
   return `${text.slice(0, Math.max(0, maxLen - 1)).trimEnd()}…`;
 }
 
+function hasExternalHelpBadge(diagnostic: vscode.Diagnostic): boolean {
+  return /\bhelp-source:\s*external\b/i.test(diagnostic.message);
+}
+
 function formatDiagnosticNodeLabel(entry: AggregatedDiagnostic, displayMode: DisplayMode): string {
-  const prefix = diagnosticCodeLabel(entry.diagnostic);
+  const codeValue = diagnosticCodeText(entry.diagnostic);
+  const prefix = codeValue ? `[${codeValue}] ` : "";
   const message = displayMode === "detailed"
     ? entry.diagnostic.message
     : compactText(entry.diagnostic.message, 100);
-  return `${prefix}${message}`;
+  const badge = hasExternalHelpBadge(entry.diagnostic) ? " [external help]" : "";
+  return `${prefix}${message}${badge}`;
 }

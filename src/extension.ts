@@ -164,6 +164,7 @@ let completionFallbackCancelCount = 0;
 interface DiagnosticExplainPayload {
   help: string;
   example?: string;
+  source?: "external" | "local";
 }
 interface DiagnosticHelpObservabilitySnapshot {
   requests: number;
@@ -3571,7 +3572,7 @@ function explainHelpFromVitte(
   const now = Date.now();
   const cached = vitteExplainHelpCache.get(key);
   if (cached && (now - cached.at) <= 6 * 60 * 60 * 1000) {
-    const cachedPayload: DiagnosticExplainPayload = { help: cached.help };
+    const cachedPayload: DiagnosticExplainPayload = { help: cached.help, source: "external" };
     if (cached.example) cachedPayload.example = cached.example;
     return cachedPayload;
   }
@@ -3611,7 +3612,7 @@ function explainHelpFromVitte(
     }
     touchVitteExplainHelpCache(key, picked, now, example);
     schedulePersistVitteExplainHelpCache(cachePath, versionSignature);
-    const payload: DiagnosticExplainPayload = { help: picked };
+    const payload: DiagnosticExplainPayload = { help: picked, source: "external" };
     if (example) payload.example = example;
     return payload;
   } catch {
@@ -3646,7 +3647,7 @@ function resolveDiagnosticHelp(
     const local = vitteDiagnosticHelpForCode(code);
     if (local) {
       diagnosticHelpLocalOnlyResolved += 1;
-      return { help: local };
+      return { help: local, source: "local" };
     }
     diagnosticHelpUnresolved += 1;
     return undefined;
@@ -3668,7 +3669,7 @@ function resolveDiagnosticHelp(
   const local = vitteDiagnosticHelpForCode(code);
   if (local) {
     diagnosticHelpLocalFallbackResolved += 1;
-    return { help: local };
+    return { help: local, source: "local" };
   }
   diagnosticHelpUnresolved += 1;
   return undefined;
@@ -3678,8 +3679,9 @@ function formatVitteDiagnosticMessage(base: string, code: string, explain?: Diag
   const help = explain?.help ?? vitteDiagnosticHelpForCode(code);
   if (!help) return base;
   const example = explain?.example?.trim();
-  if (!example) return `${base}\nhelp: ${help}`;
-  return `${base}\nhelp: ${help}\nexample:\n${example}`;
+  const sourceTag = explain?.source === "external" ? "\nhelp-source: external" : "";
+  if (!example) return `${base}\nhelp: ${help}${sourceTag}`;
+  return `${base}\nhelp: ${help}${sourceTag}\nexample:\n${example}`;
 }
 
 function extractDiagJson(stdout: string, stderr: string): string | undefined {
