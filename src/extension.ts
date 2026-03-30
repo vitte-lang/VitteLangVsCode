@@ -3256,7 +3256,8 @@ type DiagnosticHelpSource = "auto" | "vitte" | "local";
 function explainHelpFromVitte(
   code: string,
   lang: string,
-  resolved: { bin: string; cwd: string }
+  resolved: { bin: string; cwd: string },
+  explainTimeoutMs: number
 ): string | undefined {
   if (!/^E\d{4}$/.test(code) && !/^VITTE-[A-Z]\d{4}$/.test(code)) return undefined;
   const key = `${lang}|${code}`;
@@ -3273,7 +3274,7 @@ function explainHelpFromVitte(
         cwd: resolved.cwd,
         shell: false,
         encoding: "utf8",
-        timeout: 450,
+        timeout: explainTimeoutMs,
         maxBuffer: 128 * 1024,
       }
     );
@@ -3309,11 +3310,12 @@ function resolveDiagnosticHelp(
   code: string,
   lang: string,
   resolved: { bin: string; cwd: string },
-  helpSource: DiagnosticHelpSource
+  helpSource: DiagnosticHelpSource,
+  explainTimeoutMs: number
 ): string | undefined {
   if (helpSource === "local") return vitteDiagnosticHelpForCode(code);
-  if (helpSource === "vitte") return explainHelpFromVitte(code, lang, resolved);
-  return explainHelpFromVitte(code, lang, resolved) ?? vitteDiagnosticHelpForCode(code);
+  if (helpSource === "vitte") return explainHelpFromVitte(code, lang, resolved, explainTimeoutMs);
+  return explainHelpFromVitte(code, lang, resolved, explainTimeoutMs) ?? vitteDiagnosticHelpForCode(code);
 }
 
 function formatVitteDiagnosticMessage(base: string, code: string, explainHelp?: string): string {
@@ -3355,6 +3357,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
   const cfg = vscode.workspace.getConfiguration("vitte");
   const lang = cfg.get<string>("lang", "en");
   const helpSource = cfg.get<DiagnosticHelpSource>("diagnostics.helpSource", "auto");
+  const explainTimeoutMs = Math.max(100, Math.min(5000, cfg.get<number>("diagnostics.explainTimeoutMs", 450)));
   const args = ["parse", "--diag-json", `--lang=${lang}`, doc.uri.fsPath];
   const key = doc.uri.toString();
   const prev = syntaxLintProcByDoc.get(key);
@@ -3414,7 +3417,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const severity = mapDiagSeverity(d.severity);
         const severityRaw = (d.severity ?? "").toLowerCase();
         const code = normalizeDiagCode(d.code);
-        const explainHelp = code ? resolveDiagnosticHelp(code, lang, resolved, helpSource) : undefined;
+        const explainHelp = code ? resolveDiagnosticHelp(code, lang, resolved, helpSource, explainTimeoutMs) : undefined;
         const message = code ? formatVitteDiagnosticMessage(baseMessage, code, explainHelp) : baseMessage;
         const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${severityRaw}|${code}|${baseMessage}`;
         if (seen.has(dedupeKey)) continue;

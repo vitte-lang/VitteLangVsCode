@@ -1638,6 +1638,13 @@
           "default": "auto",
           "description": "Source for diagnostic help text: auto prefers vitte --explain with local fallback, vitte uses only vitte --explain, local uses built-in help."
         },
+        "vitte.diagnostics.explainTimeoutMs": {
+          "type": "number",
+          "default": 450,
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "Timeout in milliseconds for external diagnostic help resolution via vitte --explain."
+        },
         "vitte.topSyntaxErrors.displayMode": {
           "type": "string",
           "enum": [
