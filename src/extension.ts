@@ -3291,6 +3291,38 @@ function normalizeDiagCode(raw: string | number | undefined): string {
   return raw.trim().toUpperCase();
 }
 
+function diagnosticCodeText(raw: vscode.Diagnostic["code"]): string {
+  if (typeof raw === "string" || typeof raw === "number") return String(raw).trim();
+  if (raw && typeof raw === "object" && "value" in raw) {
+    const value = (raw as { value?: unknown }).value;
+    if (typeof value === "string" || typeof value === "number") return String(value).trim();
+  }
+  return "";
+}
+
+function strictDiagnosticDedupKey(
+  range: vscode.Range,
+  source: string,
+  code: string,
+): string {
+  const span = `${range.start.line}:${range.start.character}-${range.end.line}:${range.end.character}`;
+  const src = source.trim().toLowerCase() || "unknown";
+  const c = normalizeDiagCode(code) || "NO_CODE";
+  return `${span}|${c}|${src}`;
+}
+
+function dedupeDiagnosticsBySpanCodeSource(diagnostics: vscode.Diagnostic[]): vscode.Diagnostic[] {
+  const seen = new Set<string>();
+  const deduped: vscode.Diagnostic[] = [];
+  for (const d of diagnostics) {
+    const key = strictDiagnosticDedupKey(d.range, String(d.source ?? ""), diagnosticCodeText(d.code));
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(d);
+  }
+  return deduped;
+}
+
 function prefixedDiagCode(prefix: string, code: string): string {
   const p = prefix.trim().toUpperCase();
   const c = code.trim().toUpperCase();
@@ -3642,7 +3674,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
       };
       const incoming = Array.isArray(parsed.diagnostics) ? parsed.diagnostics : [];
       const diagnostics: vscode.Diagnostic[] = [];
-      const seen = new Set<string>();
+      const strictSeen = new Set<string>();
       const firstErrorLine = new Set<number>();
       let lastError: vscode.Diagnostic | undefined;
       for (const d of incoming) {
@@ -3655,12 +3687,14 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const severity = mapDiagSeverity(d.severity);
         const severityRaw = (d.severity ?? "").toLowerCase();
         const code = normalizeDiagCode(d.code);
+        const parseCode = prefixedDiagCode("PARSE", code || "UNKNOWN");
+        const sourceKey = "vitte";
+        const dedupeKey = strictDiagnosticDedupKey(range, sourceKey, parseCode);
+        if (strictSeen.has(dedupeKey)) continue;
+        strictSeen.add(dedupeKey);
         const baseCode = explainableDiagCode(code);
         const explainHelp = baseCode ? resolveDiagnosticHelp(baseCode, lang, resolved, helpSource, explainTimeoutMs) : undefined;
         const message = baseCode ? formatVitteDiagnosticMessage(baseMessage, baseCode, explainHelp) : baseMessage;
-        const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${severityRaw}|${code}|${baseMessage}`;
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
 
         // Avoid cascade noise: keep only first parser error per line.
         if (severity === vscode.DiagnosticSeverity.Error) {
@@ -3678,16 +3712,15 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         }
 
         const diag = new vscode.Diagnostic(range, message, severity);
-        const parseCode = prefixedDiagCode("PARSE", code || "UNKNOWN");
         const target = baseCode ? diagnosticDocUri(baseCode) : undefined;
         diag.code = target ? { value: parseCode, target } : parseCode;
-        diag.source = "vitte";
+        diag.source = sourceKey;
         diagnostics.push(diag);
         if (severity === vscode.DiagnosticSeverity.Error) {
           lastError = diag;
         }
       }
-      syntaxLintCollection.set(doc.uri, diagnostics);
+      syntaxLintCollection.set(doc.uri, dedupeDiagnosticsBySpanCodeSource(diagnostics));
     } catch (parseErr) {
       output.appendLine(`[syntax.live] invalid diagnostic json: ${String(parseErr)}`);
       syntaxLintCollection.set(doc.uri, []);
@@ -3801,7 +3834,7 @@ function updateEditorLint(doc: vscode.TextDocument): void {
   for (const d of diagnostics) {
     d.source = "vitte";
   }
-  editorLintCollection.set(doc.uri, diagnostics);
+  editorLintCollection.set(doc.uri, dedupeDiagnosticsBySpanCodeSource(diagnostics));
 }
 
 function buildBracketDiagnostics(lines: string[]): vscode.Diagnostic[] {
