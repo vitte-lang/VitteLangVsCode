@@ -162,6 +162,8 @@ let completionFallbackNegativeCacheCount = 0;
 let completionFallbackOfflineCount = 0;
 let completionFallbackCancelCount = 0;
 const vitteExplainHelpCache = new Map<string, { help: string; at: number }>();
+const vitteExplainHelpCacheLoadedFiles = new Set<string>();
+const vitteExplainHelpCachePersistTimers = new Map<string, NodeJS.Timeout>();
 type SuggestionTraceRefreshCause = "none" | "incomplete" | "richer";
 type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline" | "cancel";
 interface SuggestionTraceEntry {
@@ -2313,6 +2315,10 @@ export async function deactivate(): Promise<void> {
     try { proc.kill(); } catch { /* noop */ }
   }
   syntaxLintProcByDoc.clear();
+  for (const timer of vitteExplainHelpCachePersistTimers.values()) {
+    try { clearTimeout(timer); } catch { /* noop */ }
+  }
+  vitteExplainHelpCachePersistTimers.clear();
   completionLoadNextPageKey = undefined;
   completionLoadNextPageIssuedAt = 0;
   if (suggestionProfilerRenderTimer) {
@@ -3253,6 +3259,65 @@ function diagnosticDocUri(code: string): vscode.Uri | undefined {
 
 type DiagnosticHelpSource = "auto" | "vitte" | "local";
 
+function vitteExplainHelpCachePath(cwd: string): string {
+  return path.join(cwd, ".vitte-cache", "diagnostics", "help-cache.json");
+}
+
+function touchVitteExplainHelpCache(key: string, help: string, at: number): void {
+  if (vitteExplainHelpCache.has(key)) {
+    vitteExplainHelpCache.delete(key);
+  }
+  vitteExplainHelpCache.set(key, { help, at });
+}
+
+function loadVitteExplainHelpCache(cachePath: string): void {
+  if (vitteExplainHelpCacheLoadedFiles.has(cachePath)) return;
+  vitteExplainHelpCacheLoadedFiles.add(cachePath);
+  try {
+    const raw = fs.readFileSync(cachePath, "utf8");
+    const parsed = JSON.parse(raw) as { entries?: Record<string, { help?: string; at?: number }> };
+    const entries = parsed.entries ?? {};
+    for (const [key, value] of Object.entries(entries)) {
+      const help = typeof value?.help === "string" ? value.help.trim() : "";
+      const at = typeof value?.at === "number" && Number.isFinite(value.at) ? value.at : Date.now();
+      if (!help) continue;
+      touchVitteExplainHelpCache(key, help, at);
+    }
+  } catch {
+    // missing/invalid cache file => ignore
+  }
+}
+
+function persistVitteExplainHelpCache(cachePath: string): void {
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    const entries = [...vitteExplainHelpCache.entries()]
+      .sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0))
+      .slice(0, 800);
+    const payload: Record<string, { help: string; at: number }> = {};
+    for (const [key, value] of entries) {
+      payload[key] = { help: value.help, at: value.at };
+    }
+    fs.writeFileSync(
+      cachePath,
+      `${JSON.stringify({ schema: 1, entries: payload }, null, 2)}\n`,
+      "utf8"
+    );
+  } catch {
+    // ignore persistence errors
+  }
+}
+
+function schedulePersistVitteExplainHelpCache(cachePath: string): void {
+  const prev = vitteExplainHelpCachePersistTimers.get(cachePath);
+  if (prev) clearTimeout(prev);
+  const timer = setTimeout(() => {
+    vitteExplainHelpCachePersistTimers.delete(cachePath);
+    persistVitteExplainHelpCache(cachePath);
+  }, 250);
+  vitteExplainHelpCachePersistTimers.set(cachePath, timer);
+}
+
 function explainHelpFromVitte(
   code: string,
   lang: string,
@@ -3260,6 +3325,8 @@ function explainHelpFromVitte(
   explainTimeoutMs: number
 ): string | undefined {
   if (!/^E\d{4}$/.test(code) && !/^VITTE-[A-Z]\d{4}$/.test(code)) return undefined;
+  const cachePath = vitteExplainHelpCachePath(resolved.cwd);
+  loadVitteExplainHelpCache(cachePath);
   const key = `${lang}|${code}`;
   const now = Date.now();
   const cached = vitteExplainHelpCache.get(key);
@@ -3284,7 +3351,8 @@ function explainHelpFromVitte(
     const summary = lines.find((line) => /^Summary:\s*/i.test(line));
     const picked = (fix ?? summary ?? "").replace(/^(Fix|Summary):\s*/i, "").trim();
     if (!picked) return undefined;
-    vitteExplainHelpCache.set(key, { help: picked, at: now });
+    touchVitteExplainHelpCache(key, picked, now);
+    schedulePersistVitteExplainHelpCache(cachePath);
     return picked;
   } catch {
     return undefined;
