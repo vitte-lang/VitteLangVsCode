@@ -446,6 +446,15 @@ function clearCacheMapByUriPrefix(
   }
 }
 
+function clearSetByUriPrefix(
+  set: Set<string>,
+  uriPrefix: string,
+): void {
+  for (const key of set.values()) {
+    if (key.startsWith(uriPrefix)) set.delete(key);
+  }
+}
+
 function invalidateCompletionCachesForDocument(document: vscode.TextDocument): void {
   const uriPrefix = `${document.uri.toString()}#`;
   clearCacheMapByUriPrefix(completionStreamingCachePrefix, uriPrefix);
@@ -453,6 +462,11 @@ function invalidateCompletionCachesForDocument(document: vscode.TextDocument): v
   clearCacheMapByUriPrefix(completionStreamingCacheDocument, uriPrefix);
   clearCacheMapByUriPrefix(completionStreamingInFlight, uriPrefix);
   clearCacheMapByUriPrefix(completionPagingState, uriPrefix);
+  clearCacheMapByUriPrefix(completionTop1StableByKey, uriPrefix);
+  clearCacheMapByUriPrefix(completionRequestStartedAt, uriPrefix);
+  clearCacheMapByUriPrefix(completionRequestRefreshed, uriPrefix);
+  clearCacheMapByUriPrefix(completionTraceActiveByKey, uriPrefix);
+  clearSetByUriPrefix(completionFirstUsableMarked, uriPrefix);
 }
 
 function resetSuggestionRuntimeState(): void {
@@ -1635,7 +1649,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     completionOpenedAtByDoc.delete(key);
     typingSpeedByDoc.delete(key);
     completionStickyAcceptedByDoc.delete(key);
-    clearCacheMapByUriPrefix(completionTop1StableByKey, `${key}#`);
+    invalidateCompletionCachesForDocument(doc);
     completionAstFingerprintByDoc.delete(key);
     const t = completionAstRefreshTimers.get(key);
     if (t) {
