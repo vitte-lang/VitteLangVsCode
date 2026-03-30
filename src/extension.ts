@@ -102,6 +102,7 @@ let reliabilityNextDelayMs = 30000;
 let restartInFlight: Promise<boolean> | undefined;
 let restartQueued = false;
 let restartQueueReason = "";
+let configRestartTimer: NodeJS.Timeout | undefined;
 let activationStartedAt = Date.now();
 const completionLatencyWindowMs: number[] = [];
 const completionStreamingCachePrefix = new Map<string, { items: vscode.CompletionItem[]; ts: number }>();
@@ -2126,13 +2127,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   updateStatusText(vscode.window.activeTextEditor ?? undefined);
 
   // Relance si config Vitte change
-  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (e) => {
+  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((e) => {
     if (e.affectsConfiguration("vitte.commandShortcuts")) {
       updateCommandButtons(context);
     }
     if (e.affectsConfiguration("vitte")) {
       reportSettingsIssues(output, "config");
-      await requestClientRestart(context, "config-change");
+      scheduleConfigRestart(context, "config-change");
     }
     if (e.affectsConfiguration("vitte.server.offlinePermanent")) {
       if (isOfflinePermanent()) {
@@ -2236,6 +2237,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 export async function deactivate(): Promise<void> {
   try { await client?.stop(); } catch { /* noop */ }
   client = undefined;
+  if (configRestartTimer) {
+    clearTimeout(configRestartTimer);
+    configRestartTimer = undefined;
+  }
   if (suggestionProfilerRenderTimer) {
     clearInterval(suggestionProfilerRenderTimer);
     suggestionProfilerRenderTimer = undefined;
@@ -2831,6 +2836,14 @@ async function requestClientRestart(
     restartQueueReason = "";
   });
   return restartInFlight;
+}
+
+function scheduleConfigRestart(context: vscode.ExtensionContext | undefined, reason: string): void {
+  if (configRestartTimer) clearTimeout(configRestartTimer);
+  configRestartTimer = setTimeout(() => {
+    configRestartTimer = undefined;
+    void requestClientRestart(context, reason);
+  }, 450);
 }
 
 function startHealthChecks(context: vscode.ExtensionContext): void {
