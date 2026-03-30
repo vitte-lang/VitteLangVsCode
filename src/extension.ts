@@ -161,7 +161,11 @@ let completionFallbackTimeoutCount = 0;
 let completionFallbackNegativeCacheCount = 0;
 let completionFallbackOfflineCount = 0;
 let completionFallbackCancelCount = 0;
-const vitteExplainHelpCache = new Map<string, { help: string; at: number }>();
+interface DiagnosticExplainPayload {
+  help: string;
+  example?: string;
+}
+const vitteExplainHelpCache = new Map<string, { help: string; example?: string; at: number }>();
 const vitteExplainHelpCacheLoadedFiles = new Set<string>();
 const vitteExplainHelpCachePersistTimers = new Map<string, NodeJS.Timeout>();
 const vitteVersionSignatureByBin = new Map<string, string>();
@@ -3295,11 +3299,13 @@ function resolveVitteVersionSignature(resolved: { bin: string; cwd: string }): s
   }
 }
 
-function touchVitteExplainHelpCache(key: string, help: string, at: number): void {
+function touchVitteExplainHelpCache(key: string, help: string, at: number, example?: string): void {
   if (vitteExplainHelpCache.has(key)) {
     vitteExplainHelpCache.delete(key);
   }
-  vitteExplainHelpCache.set(key, { help, at });
+  const next: { help: string; example?: string; at: number } = { help, at };
+  if (example) next.example = example;
+  vitteExplainHelpCache.set(key, next);
 }
 
 function loadVitteExplainHelpCache(cachePath: string, versionSignature: string): void {
@@ -3311,7 +3317,7 @@ function loadVitteExplainHelpCache(cachePath: string, versionSignature: string):
     const parsed = JSON.parse(raw) as {
       schema?: number;
       versionSignature?: string;
-      entries?: Record<string, { help?: string; at?: number }>;
+      entries?: Record<string, { help?: string; example?: string; at?: number }>;
     };
     if (parsed.versionSignature && parsed.versionSignature !== versionSignature) {
       return;
@@ -3319,9 +3325,10 @@ function loadVitteExplainHelpCache(cachePath: string, versionSignature: string):
     const entries = parsed.entries ?? {};
     for (const [key, value] of Object.entries(entries)) {
       const help = typeof value?.help === "string" ? value.help.trim() : "";
+      const example = typeof value?.example === "string" ? value.example.trim() : undefined;
       const at = typeof value?.at === "number" && Number.isFinite(value.at) ? value.at : Date.now();
       if (!help) continue;
-      touchVitteExplainHelpCache(key, help, at);
+      touchVitteExplainHelpCache(key, help, at, example);
     }
   } catch {
     // missing/invalid cache file => ignore
@@ -3335,9 +3342,11 @@ function persistVitteExplainHelpCache(cachePath: string, versionSignature: strin
       .filter(([key]) => key.startsWith(`${versionSignature}|`))
       .sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0))
       .slice(0, 800);
-    const payload: Record<string, { help: string; at: number }> = {};
+    const payload: Record<string, { help: string; example?: string; at: number }> = {};
     for (const [key, value] of entries) {
-      payload[key] = { help: value.help, at: value.at };
+      const row: { help: string; example?: string; at: number } = { help: value.help, at: value.at };
+      if (value.example) row.example = value.example;
+      payload[key] = row;
     }
     fs.writeFileSync(
       cachePath,
@@ -3364,7 +3373,7 @@ function explainHelpFromVitte(
   lang: string,
   resolved: { bin: string; cwd: string },
   explainTimeoutMs: number
-): string | undefined {
+): DiagnosticExplainPayload | undefined {
   if (!/^E\d{4}$/.test(code) && !/^VITTE-[A-Z]\d{4}$/.test(code)) return undefined;
   const versionSignature = resolveVitteVersionSignature(resolved);
   const cachePath = vitteExplainHelpCachePath(resolved.cwd);
@@ -3373,7 +3382,9 @@ function explainHelpFromVitte(
   const now = Date.now();
   const cached = vitteExplainHelpCache.get(key);
   if (cached && (now - cached.at) <= 6 * 60 * 60 * 1000) {
-    return cached.help;
+    const cachedPayload: DiagnosticExplainPayload = { help: cached.help };
+    if (cached.example) cachedPayload.example = cached.example;
+    return cachedPayload;
   }
   try {
     const out = cp.spawnSync(
@@ -3393,9 +3404,27 @@ function explainHelpFromVitte(
     const summary = lines.find((line) => /^Summary:\s*/i.test(line));
     const picked = (fix ?? summary ?? "").replace(/^(Fix|Summary):\s*/i, "").trim();
     if (!picked) return undefined;
-    touchVitteExplainHelpCache(key, picked, now);
+    const exampleIndex = lines.findIndex((line) => /^Example:\s*/i.test(line));
+    let example: string | undefined;
+    if (exampleIndex >= 0) {
+      const current = (lines[exampleIndex] ?? "").replace(/^Example:\s*/i, "").trim();
+      const extra: string[] = [];
+      for (let i = exampleIndex + 1; i < lines.length && extra.length < 3; i++) {
+        const line = lines[i];
+        if (!line) break;
+        if (/^(Fix|Summary|Code|Hint|Notes?):\s*/i.test(line)) break;
+        extra.push(line);
+      }
+      const collected = [current, ...extra].filter(Boolean);
+      if (collected.length > 0) {
+        example = collected.join("\n");
+      }
+    }
+    touchVitteExplainHelpCache(key, picked, now, example);
     schedulePersistVitteExplainHelpCache(cachePath, versionSignature);
-    return picked;
+    const payload: DiagnosticExplainPayload = { help: picked };
+    if (example) payload.example = example;
+    return payload;
   } catch {
     return undefined;
   }
@@ -3422,16 +3451,24 @@ function resolveDiagnosticHelp(
   resolved: { bin: string; cwd: string },
   helpSource: DiagnosticHelpSource,
   explainTimeoutMs: number
-): string | undefined {
-  if (helpSource === "local") return vitteDiagnosticHelpForCode(code);
+): DiagnosticExplainPayload | undefined {
+  if (helpSource === "local") {
+    const local = vitteDiagnosticHelpForCode(code);
+    return local ? { help: local } : undefined;
+  }
   if (helpSource === "vitte") return explainHelpFromVitte(code, lang, resolved, explainTimeoutMs);
-  return explainHelpFromVitte(code, lang, resolved, explainTimeoutMs) ?? vitteDiagnosticHelpForCode(code);
+  const remote = explainHelpFromVitte(code, lang, resolved, explainTimeoutMs);
+  if (remote) return remote;
+  const local = vitteDiagnosticHelpForCode(code);
+  return local ? { help: local } : undefined;
 }
 
-function formatVitteDiagnosticMessage(base: string, code: string, explainHelp?: string): string {
-  const help = explainHelp ?? vitteDiagnosticHelpForCode(code);
+function formatVitteDiagnosticMessage(base: string, code: string, explain?: DiagnosticExplainPayload): string {
+  const help = explain?.help ?? vitteDiagnosticHelpForCode(code);
   if (!help) return base;
-  return `${base}\nhelp: ${help}`;
+  const example = explain?.example?.trim();
+  if (!example) return `${base}\nhelp: ${help}`;
+  return `${base}\nhelp: ${help}\nexample:\n${example}`;
 }
 
 function extractDiagJson(stdout: string, stderr: string): string | undefined {
