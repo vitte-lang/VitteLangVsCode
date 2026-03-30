@@ -161,6 +161,7 @@ let completionFallbackTimeoutCount = 0;
 let completionFallbackNegativeCacheCount = 0;
 let completionFallbackOfflineCount = 0;
 let completionFallbackCancelCount = 0;
+const vitteExplainHelpCache = new Map<string, { help: string; at: number }>();
 type SuggestionTraceRefreshCause = "none" | "incomplete" | "richer";
 type SuggestionTraceFallbackCause = "none" | "timeout" | "negative_cache" | "offline" | "cancel";
 interface SuggestionTraceEntry {
@@ -3250,6 +3251,43 @@ function diagnosticDocUri(code: string): vscode.Uri | undefined {
   return undefined;
 }
 
+function explainHelpFromVitte(
+  code: string,
+  lang: string,
+  resolved: { bin: string; cwd: string }
+): string | undefined {
+  if (!/^E\d{4}$/.test(code) && !/^VITTE-[A-Z]\d{4}$/.test(code)) return undefined;
+  const key = `${lang}|${code}`;
+  const now = Date.now();
+  const cached = vitteExplainHelpCache.get(key);
+  if (cached && (now - cached.at) <= 6 * 60 * 60 * 1000) {
+    return cached.help;
+  }
+  try {
+    const out = cp.spawnSync(
+      resolved.bin,
+      ["--explain", code, `--lang=${lang}`],
+      {
+        cwd: resolved.cwd,
+        shell: false,
+        encoding: "utf8",
+        timeout: 450,
+        maxBuffer: 128 * 1024,
+      }
+    );
+    const text = `${out.stdout ?? ""}\n${out.stderr ?? ""}`;
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    const fix = lines.find((line) => /^Fix:\s*/i.test(line));
+    const summary = lines.find((line) => /^Summary:\s*/i.test(line));
+    const picked = (fix ?? summary ?? "").replace(/^(Fix|Summary):\s*/i, "").trim();
+    if (!picked) return undefined;
+    vitteExplainHelpCache.set(key, { help: picked, at: now });
+    return picked;
+  } catch {
+    return undefined;
+  }
+}
+
 function vitteDiagnosticHelpForCode(code: string): string | undefined {
   if (code === "E0001") return "expected identifier; use letters/digits/_ and avoid leading digits";
   if (code === "E0002") return "expected expression; try a literal, name, call, or block expression";
@@ -3265,8 +3303,8 @@ function vitteDiagnosticHelpForCode(code: string): string | undefined {
   return undefined;
 }
 
-function formatVitteDiagnosticMessage(base: string, code: string): string {
-  const help = vitteDiagnosticHelpForCode(code);
+function formatVitteDiagnosticMessage(base: string, code: string, explainHelp?: string): string {
+  const help = explainHelp ?? vitteDiagnosticHelpForCode(code);
   if (!help) return base;
   return `${base}\nhelp: ${help}`;
 }
@@ -3362,7 +3400,8 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const severity = mapDiagSeverity(d.severity);
         const severityRaw = (d.severity ?? "").toLowerCase();
         const code = normalizeDiagCode(d.code);
-        const message = code ? formatVitteDiagnosticMessage(baseMessage, code) : baseMessage;
+        const explainHelp = code ? explainHelpFromVitte(code, lang, resolved) : undefined;
+        const message = code ? formatVitteDiagnosticMessage(baseMessage, code, explainHelp) : baseMessage;
         const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${severityRaw}|${code}|${baseMessage}`;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
