@@ -947,6 +947,43 @@ interface CommandMenuItem extends vscode.QuickPickItem {
   command: string;
 }
 
+type ObsLevel = "info" | "warn" | "error";
+interface ObsEntry {
+  ts: string;
+  event: string;
+  lvl: ObsLevel;
+  requestId?: string;
+  data?: Record<string, unknown>;
+}
+
+const OBS_HISTORY_MAX = 400;
+const obsHistory: ObsEntry[] = [];
+let obsSeq = 0;
+
+function nextRequestId(prefix = "req"): string {
+  obsSeq += 1;
+  return `${prefix}-${Date.now().toString(36)}-${obsSeq.toString(36)}`;
+}
+
+function obsLog(event: string, lvl: ObsLevel = "info", data?: Record<string, unknown>, requestId?: string): void {
+  const entry: ObsEntry = {
+    ts: new Date().toISOString(),
+    event,
+    lvl,
+  };
+  if (requestId) entry.requestId = requestId;
+  if (data && Object.keys(data).length > 0) entry.data = data;
+  obsHistory.push(entry);
+  if (obsHistory.length > OBS_HISTORY_MAX) {
+    obsHistory.splice(0, obsHistory.length - OBS_HISTORY_MAX);
+  }
+  try {
+    output.appendLine(`[obs] ${JSON.stringify(entry)}`);
+  } catch {
+    // noop: output channel may not be ready during very early activation
+  }
+}
+
 function readNumberSetting(cfg: vscode.WorkspaceConfiguration, key: string, fallback: number): number {
   const raw = cfg.get<unknown>(key);
   if (typeof raw !== "number" || !Number.isFinite(raw)) return fallback;
@@ -1050,6 +1087,7 @@ const COMMAND_MENU_ENTRIES: readonly CommandMenuEntry[] = [
   { label: "Bench workspace", description: "Run vitte.bench", command: "vitte.bench" },
   { label: "Bench extension CI", description: "Activation/memory/completion latency snapshot", command: "vitte.benchExtensionCi" },
   { label: "Export perf session", description: "Export activation/p95/memory session JSON", command: "vitte.exportPerfSession" },
+  { label: "Export observability session", description: "Export structured logs + runtime metrics snapshot", command: "vitte.observability.export" },
   { label: "Open bench report", description: "Latest bench report", command: "vitte.benchReport" },
   { label: "Diagnostics ▸ Refresh", description: "Re-scan diagnostics", command: "vitte.diagnostics.refresh" },
   { label: "Diagnostics ▸ Export snapshot", description: "Export workspace diagnostics JSON snapshot", command: "vitte.diagnostics.exportSnapshot" },
@@ -1450,6 +1488,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   }
   output.appendLine("[activate] begin");
   output.appendLine("[activate] Vitte extension activated");
+  obsLog("extension.activate.begin", "info", { extensionVersion: getExtensionVersion(context.extension) });
   try {
     statusItem = vscode.window.createStatusBarItem("vitte.status", vscode.StatusBarAlignment.Right, 100);
   } catch {
@@ -1582,16 +1621,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       output.show(true);
     }),
     vscode.commands.registerCommand("vitte.showServerMetrics", async () => {
+      const requestId = nextRequestId("metrics");
+      obsLog("command.showServerMetrics.start", "info", undefined, requestId);
       if (isOfflineEffective()) return showOfflineNoop("metrics");
       if (!client) {
         const reason = offlineReason ? ` (${offlineReason})` : "";
         void vscode.window.showWarningMessage(`Vitte server is not running.${reason}`);
+        obsLog("command.showServerMetrics.skipped", "warn", { reason: "client_not_running", offlineReason }, requestId);
         return;
       }
       try {
         const stats = await client.sendRequest<ServerMetricEntry[]>("vitte/metrics");
         if (!stats || stats.length === 0) {
           void vscode.window.showInformationMessage("Vitte: no metrics available yet.");
+          obsLog("command.showServerMetrics.empty", "info", undefined, requestId);
           return;
         }
         const timestamp = new Date().toLocaleTimeString();
@@ -1611,9 +1654,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
           );
         }
         output.show(true);
+        obsLog("command.showServerMetrics.done", "info", { metricsCount: stats.length }, requestId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         void vscode.window.showErrorMessage(`Vitte: unable to fetch server metrics (${message})`);
+        obsLog("command.showServerMetrics.failed", "error", { message }, requestId);
       }
     }),
     vscode.commands.registerCommand("vitte.metrics.reset", async () => {
@@ -1661,17 +1706,58 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
       }
     }),
     vscode.commands.registerCommand("vitte.pingServer", async () => {
+      const requestId = nextRequestId("ping");
+      obsLog("command.pingServer.start", "info", undefined, requestId);
       if (isOfflineEffective()) return showOfflineNoop("ping");
       if (!client) {
         void vscode.window.showWarningMessage("Vitte server is not running.");
+        obsLog("command.pingServer.skipped", "warn", { reason: "client_not_running" }, requestId);
         return;
       }
       try {
         const res = await client.sendRequest<{ ok: boolean; ts: number }>("vitte/ping");
         void vscode.window.showInformationMessage(`Vitte: pong (${res.ok ? "ok" : "fail"}) at ${new Date(res.ts).toLocaleTimeString()}`);
+        obsLog("command.pingServer.done", "info", { ok: res.ok }, requestId);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         void vscode.window.showErrorMessage(`Vitte: ping failed (${message})`);
+        obsLog("command.pingServer.failed", "error", { message }, requestId);
+      }
+    }),
+    vscode.commands.registerCommand("vitte.observability.export", async () => {
+      const requestId = nextRequestId("obs-export");
+      obsLog("command.observability.export.start", "info", undefined, requestId);
+      try {
+        const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!folder) return;
+        const dir = path.join(folder, ".vitte-cache", "diagnostics");
+        await fs.promises.mkdir(dir, { recursive: true });
+        let metrics: ServerMetricEntry[] | undefined;
+        if (client && client.state === ClientState.Running) {
+          try {
+            metrics = await client.sendRequest<ServerMetricEntry[]>("vitte/metrics");
+          } catch {
+            // ignore metrics fetch errors during export
+          }
+        }
+        const payload = {
+          ts: new Date().toISOString(),
+          activationMs: Date.now() - activationStartedAt,
+          clientState: client ? ClientState[client.state] : "none",
+          healthFailures,
+          reliabilityAttempts,
+          recentStopCount: recentStops.length,
+          events: [...obsHistory],
+          metrics: metrics ?? null,
+        };
+        const file = path.join(dir, "observability-session.json");
+        await fs.promises.writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+        void vscode.window.showInformationMessage(`Observability session exported: ${file}`);
+        obsLog("command.observability.export.done", "info", { file }, requestId);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        void vscode.window.showErrorMessage(`Observability export failed: ${message}`);
+        obsLog("command.observability.export.failed", "error", { message }, requestId);
       }
     }),
     vscode.commands.registerCommand("vitte.showCommandMenu", async () => {
@@ -2617,6 +2703,7 @@ async function startClient(context: vscode.ExtensionContext | undefined): Promis
 
   client.onTelemetry((e: unknown) => {
     output.appendLine(`[telemetry] ${JSON.stringify(e)}`);
+    obsLog("lsp.telemetry", "info", { payloadType: typeof e });
   });
 
   wireClientState(client);
@@ -2649,7 +2736,9 @@ function startHealthChecks(context: vscode.ExtensionContext): void {
       if (isOfflineEffective()) return;
       if (!client || client.state !== ClientState.Running) return;
       try {
+        const requestId = nextRequestId("health-ping");
         await client.sendRequest("vitte/ping");
+        obsLog("health.ping.ok", "info", undefined, requestId);
         healthFailures = 0;
         try {
           const metrics = await client.sendRequest<ServerMetricEntry[]>("vitte/metrics");
@@ -2669,6 +2758,7 @@ function startHealthChecks(context: vscode.ExtensionContext): void {
           if (over.length > 0 && Date.now() - lastBudgetAlert > 120000) {
             lastBudgetAlert = Date.now();
             void vscode.window.showWarningMessage(`Vitte semantic budget exceeded: ${over.join(" | ")}`);
+            obsLog("health.semanticBudget.exceeded", "warn", { over: over.join(" | ") });
           }
         } catch {
           // ignore budget telemetry errors
@@ -2676,6 +2766,7 @@ function startHealthChecks(context: vscode.ExtensionContext): void {
       } catch (err) {
         healthFailures += 1;
         output.appendLine(`[health] ping failure #${healthFailures}: ${String(err)}`);
+        obsLog("health.ping.failed", "error", { failures: healthFailures, message: String(err) });
         if (healthFailures < 2) return;
         if (healthRestartInFlight) return;
         const cfg = vscode.workspace.getConfiguration("vitte");
@@ -2695,13 +2786,16 @@ function startHealthChecks(context: vscode.ExtensionContext): void {
         try {
           const jitter = Math.floor(Math.random() * Math.max(1, Math.floor(reliabilityNextDelayMs * 0.25)));
           await sleep(reliabilityNextDelayMs + jitter);
+          obsLog("health.restart.attempt", "warn", { delayMs: reliabilityNextDelayMs + jitter, attempt: reliabilityAttempts + 1 });
           const ok = await restartClient(context);
           if (!ok) {
             setOfflineStatus("Health check restart failed.");
+            obsLog("health.restart.failed", "error");
           } else {
             healthFailures = 0;
             reliabilityAttempts = 0;
             reliabilityNextDelayMs = baseRetry;
+            obsLog("health.restart.ok", "info");
           }
           reliabilityAttempts += 1;
           reliabilityNextDelayMs = Math.min(maxRetry, Math.max(baseRetry, reliabilityNextDelayMs * 2));
@@ -2715,6 +2809,10 @@ function startHealthChecks(context: vscode.ExtensionContext): void {
 
 function wireClientState(c: LanguageClient): void {
   c.onDidChangeState((e: { oldState: ClientState; newState: ClientState }) => {
+    obsLog("lsp.state.changed", "info", {
+      oldState: ClientState[e.oldState],
+      newState: ClientState[e.newState],
+    });
     if (e.newState === ClientState.Starting) {
       setStatusBase("$(gear)", "Vitte LSP: starting");
       void setServerOnlineContext(false);
@@ -2749,6 +2847,14 @@ function wireClientState(c: LanguageClient): void {
 
   c.onNotification("vitte/log", (msg: unknown) => {
     output.appendLine(typeof msg === "string" ? msg : JSON.stringify(msg));
+    if (typeof msg === "string") {
+      obsLog("lsp.log", "info", { message: msg.slice(0, 240) });
+    } else if (msg && typeof msg === "object") {
+      const rec = msg as Record<string, unknown>;
+      const requestId = typeof rec.requestId === "string" ? rec.requestId : undefined;
+      const event = typeof rec.event === "string" ? rec.event : "lsp.log.object";
+      obsLog(event, "info", { keys: Object.keys(rec).slice(0, 12).join(",") }, requestId);
+    }
   });
 }
 

@@ -572,6 +572,11 @@
         "category": "Vitte"
       },
       {
+        "command": "vitte.observability.export",
+        "title": "Vitte: Export Observability Session",
+        "category": "Vitte"
+      },
+      {
         "command": "vitte.commandCenter.refresh",
         "title": "Vitte: Refresh Command Center",
         "category": "Vitte"
@@ -810,6 +815,10 @@
         },
         {
           "command": "vitte.exportPerfSession",
+          "when": "workspaceFolderCount > 0"
+        },
+        {
+          "command": "vitte.observability.export",
           "when": "workspaceFolderCount > 0"
         },
         {
