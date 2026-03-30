@@ -2894,7 +2894,32 @@ function showOfflineNoop(action: string): void {
   const reason = offlineReason ?? (isOfflinePermanent()
     ? "Offline permanent (user-forced)."
     : "Offline mode is enabled (vitte.server.offline).");
-  void vscode.window.showWarningMessage(`Vitte: ${action} unavailable while offline — ${reason}`);
+  const summary = summarizeWorkspaceDiagnostics();
+  output.appendLine(
+    `[offline-fallback:${action}] ${reason} | local diagnostics: ${summary.errors}e/${summary.warnings}w/${summary.info}i/${summary.hints}h`
+  );
+  obsLog("offline.noop", "warn", { action, reason });
+  void vscode.window.showWarningMessage(
+    `Vitte: ${action} unavailable while offline — ${reason}`,
+    "Explain Offline",
+    "Open Offline View",
+    "Copy Offline Report",
+  ).then(async (pick) => {
+    if (pick === "Explain Offline") {
+      await vscode.commands.executeCommand("vitte.offline.explain");
+      return;
+    }
+    if (pick === "Open Offline View") {
+      await vscode.commands.executeCommand("workbench.view.extension.vitte-sidebar");
+      await vscode.commands.executeCommand("vitte.offline.refresh");
+      return;
+    }
+    if (pick === "Copy Offline Report") {
+      const report = await readOfflineReport();
+      await vscode.env.clipboard.writeText(report);
+      void vscode.window.showInformationMessage("Vitte: offline report copied to clipboard.");
+    }
+  });
 }
 
 function formatOfflineSince(): string {
