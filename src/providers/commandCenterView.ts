@@ -36,8 +36,8 @@ class CommandCenterProvider implements vscode.WebviewViewProvider {
 
 function html(
   summary: { errors: number; warnings: number; info: number; hints: number },
-  byDir: Array<{ dir: string; errors: number; warnings: number }>,
-  slow: Array<{ name: string; p95Ms?: number; averageMs: number }>
+  byDir: { dir: string; errors: number; warnings: number }[],
+  slow: { name: string; p95Ms?: number; averageMs: number }[]
 ): string {
   const noisy = byDir.map((d) => `<li>${d.dir}: ${d.errors}e/${d.warnings}w</li>`).join("") || "<li>No noisy modules</li>";
   const slowRows = slow.map((s) => `<li>${s.name}: ${(s.p95Ms ?? s.averageMs).toFixed(1)} ms</li>`).join("") || "<li>No metric yet</li>";

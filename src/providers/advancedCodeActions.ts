@@ -54,6 +54,12 @@ function syntaxCodeOf(d: vscode.Diagnostic): string | undefined {
   return SYNTAX_CODES.has(code) ? code : undefined;
 }
 
+function diagnosticCodeText(d: vscode.Diagnostic): string {
+  const raw = d.code;
+  if (typeof raw === "string" || typeof raw === "number") return String(raw);
+  return "";
+}
+
 function buildSyntaxQuickFixes(document: vscode.TextDocument, d: vscode.Diagnostic): vscode.CodeAction[] {
   const actions: vscode.CodeAction[] = [];
   const code = syntaxCodeOf(d);
@@ -227,7 +233,7 @@ function computeSafeSyntaxText(document: vscode.TextDocument, normalizeIndentati
   if (syntaxDiagnostics.length === 0) return undefined;
 
   const before = document.getText().replace(/\r\n/g, "\n");
-  const hadFinalNewline = /\n$/.test(before);
+  const hadFinalNewline = before.endsWith("\n");
   const lines = before.split("\n");
   const removedLine = new Set<number>();
 
@@ -420,7 +426,7 @@ export function registerAdvancedCodeActions(context: vscode.ExtensionContext): v
       addCategory("contracts", vscode.CodeActionKind.SourceFixAll.append("vitte.contracts"));
 
       for (const d of ctx.diagnostics) {
-        const code = String(d.code ?? "");
+        const code = diagnosticCodeText(d);
         if (!code.startsWith("DOCTOR_")) continue;
         const tool = code.replace(/^DOCTOR_/, "").toLowerCase();
         const action = new vscode.CodeAction(`Vitte Doctor: rerun ${tool}`, vscode.CodeActionKind.QuickFix);

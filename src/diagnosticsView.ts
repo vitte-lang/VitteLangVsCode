@@ -392,16 +392,16 @@ function compareFiles(
   a: readonly AggregatedDiagnostic[] | undefined,
   b: readonly AggregatedDiagnostic[] | undefined,
 ): number {
-  const headA = Array.isArray(a) ? a[0] : undefined;
-  const headB = Array.isArray(b) ? b[0] : undefined;
+  const headA = a?.[0];
+  const headB = b?.[0];
   const sevA = severityOrder(headA?.diagnostic.severity);
   const sevB = severityOrder(headB?.diagnostic.severity);
   if (sevA !== sevB) return sevA - sevB;
-  const countA = Array.isArray(a) ? a.length : 0;
-  const countB = Array.isArray(b) ? b.length : 0;
+  const countA = a?.length ?? 0;
+  const countB = b?.length ?? 0;
   if (countA !== countB) return countB - countA;
-  const uriA = Array.isArray(a) ? a[0]?.uri : undefined;
-  const uriB = Array.isArray(b) ? b[0]?.uri : undefined;
+  const uriA = a?.[0]?.uri;
+  const uriB = b?.[0]?.uri;
   return relativeLabel(uriA).localeCompare(relativeLabel(uriB));
 }
 

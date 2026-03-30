@@ -95,7 +95,7 @@ export function registerPackageProblemsView(context: vscode.ExtensionContext): v
     vscode.commands.registerCommand("vitte.packageProblems.refresh", () => provider.refresh()),
     vscode.commands.registerCommand("vitte.packageProblems.open", async (dir: string) => {
       const all = vscode.languages.getDiagnostics();
-      let candidate: { uri: vscode.Uri; range: vscode.Range; sev: number } | undefined;
+      let candidate: { uri: vscode.Uri; range: vscode.Range; sev: vscode.DiagnosticSeverity } | undefined;
       for (const [uri, list] of all) {
         const rel = vscode.workspace.asRelativePath(uri, false).replace(/\\/g, "/");
         if (!inDir(rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/")) : "", dir ?? "")) continue;
@@ -114,4 +114,3 @@ export function registerPackageProblemsView(context: vscode.ExtensionContext): v
     })
   );
 }
-

@@ -611,7 +611,7 @@ function readNumberField(
   max: number
 ): number {
   if (!input || typeof input !== "object") return fallback;
-  const value = Reflect.get(input, field);
+  const value: unknown = Reflect.get(input, field);
   if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, Math.trunc(value)));
 }
@@ -746,7 +746,7 @@ connection.onDocumentRangeFormatting(async (params: DocumentRangeFormattingParam
   });
 });
 
-connection.onCodeAction(async (params: CodeActionParams): Promise<CodeAction[]> => {
+connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
   const doc = documents.get(params.textDocument.uri);
   if (!doc) return [];
   const text = doc.getText();
@@ -859,86 +859,86 @@ connection.onReferences(async (params: ReferenceParams, token?: CancellationToke
   });
 });
 
-connection.languages.callHierarchy.onPrepare(async (params: CallHierarchyPrepareParams, token?: CancellationToken): Promise<CallHierarchyItem[] | null> => {
-  if (isBreakerActive()) return null;
-  return withBackpressure(async () => {
+connection.languages.callHierarchy.onPrepare((params: CallHierarchyPrepareParams, token?: CancellationToken): Promise<CallHierarchyItem[] | null> => {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
     const doc = documents.get(params.textDocument.uri);
-    if (!doc || cancelled(token)) return null;
+    if (!doc || cancelled(token)) return Promise.resolve(null);
     try {
-      return prepareCallHierarchy(doc, params.position, params.textDocument.uri);
+      return Promise.resolve(prepareCallHierarchy(doc, params.position, params.textDocument.uri));
     } catch (e) {
       logErr("callHierarchy.prepare", e);
-      return null;
+      return Promise.resolve(null);
     }
   });
 });
 
-connection.languages.callHierarchy.onIncomingCalls(async (params: CallHierarchyIncomingCallsParams, token?: CancellationToken): Promise<CallHierarchyIncomingCall[] | null> => {
-  if (isBreakerActive()) return null;
-  return withBackpressure(async () => {
+connection.languages.callHierarchy.onIncomingCalls((params: CallHierarchyIncomingCallsParams, token?: CancellationToken): Promise<CallHierarchyIncomingCall[] | null> => {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
     const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return null;
+    if (!doc || cancelled(token)) return Promise.resolve(null);
     try {
-      return callHierarchyIncoming(doc, params.item);
+      return Promise.resolve(callHierarchyIncoming(doc, params.item));
     } catch (e) {
       logErr("callHierarchy.incoming", e);
-      return null;
+      return Promise.resolve(null);
     }
   });
 });
 
-connection.languages.callHierarchy.onOutgoingCalls(async (params: CallHierarchyOutgoingCallsParams, token?: CancellationToken): Promise<CallHierarchyOutgoingCall[] | null> => {
-  if (isBreakerActive()) return null;
-  return withBackpressure(async () => {
+connection.languages.callHierarchy.onOutgoingCalls((params: CallHierarchyOutgoingCallsParams, token?: CancellationToken): Promise<CallHierarchyOutgoingCall[] | null> => {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
     const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return null;
+    if (!doc || cancelled(token)) return Promise.resolve(null);
     try {
-      return callHierarchyOutgoing(doc, params.item);
+      return Promise.resolve(callHierarchyOutgoing(doc, params.item));
     } catch (e) {
       logErr("callHierarchy.outgoing", e);
-      return null;
+      return Promise.resolve(null);
     }
   });
 });
 
-connection.languages.typeHierarchy.onPrepare(async (params: TypeHierarchyPrepareParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
-  if (isBreakerActive()) return null;
-  return withBackpressure(async () => {
+connection.languages.typeHierarchy.onPrepare((params: TypeHierarchyPrepareParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
     const doc = documents.get(params.textDocument.uri);
-    if (!doc || cancelled(token)) return null;
+    if (!doc || cancelled(token)) return Promise.resolve(null);
     try {
-      return prepareTypeHierarchy(doc, params.position, params.textDocument.uri);
+      return Promise.resolve(prepareTypeHierarchy(doc, params.position, params.textDocument.uri));
     } catch (e) {
       logErr("typeHierarchy.prepare", e);
-      return null;
+      return Promise.resolve(null);
     }
   });
 });
 
-connection.languages.typeHierarchy.onSupertypes(async (params: TypeHierarchySupertypesParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
-  if (isBreakerActive()) return null;
-  return withBackpressure(async () => {
+connection.languages.typeHierarchy.onSupertypes((params: TypeHierarchySupertypesParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
     const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return null;
+    if (!doc || cancelled(token)) return Promise.resolve(null);
     try {
-      return typeHierarchySupertypes(doc, params);
+      return Promise.resolve(typeHierarchySupertypes(doc, params));
     } catch (e) {
       logErr("typeHierarchy.supertypes", e);
-      return null;
+      return Promise.resolve(null);
     }
   });
 });
 
-connection.languages.typeHierarchy.onSubtypes(async (params: TypeHierarchySubtypesParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
-  if (isBreakerActive()) return null;
-  return withBackpressure(async () => {
+connection.languages.typeHierarchy.onSubtypes((params: TypeHierarchySubtypesParams, token?: CancellationToken): Promise<TypeHierarchyItem[] | null> => {
+  if (isBreakerActive()) return Promise.resolve(null);
+  return withBackpressure(() => {
     const doc = documents.get(params.item.uri);
-    if (!doc || cancelled(token)) return null;
+    if (!doc || cancelled(token)) return Promise.resolve(null);
     try {
-      return typeHierarchySubtypes(doc, params);
+      return Promise.resolve(typeHierarchySubtypes(doc, params));
     } catch (e) {
       logErr("typeHierarchy.subtypes", e);
-      return null;
+      return Promise.resolve(null);
     }
   });
 });
@@ -1086,7 +1086,7 @@ function runLint(doc: TextDocument): void {
     const uri = doc.uri;
     const hash = fastHash(text);
     const cached = lintResultCache.get(uri);
-    const diags = cached && cached.hash === hash
+    const diags = cached?.hash === hash
       ? (cached.diagnostics ?? [])
       : (lintToPublishable(text, uri, globalSettings.lint) ?? []);
     lintResultCache.set(uri, { hash, diagnostics: diags });

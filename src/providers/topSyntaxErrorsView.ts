@@ -2,13 +2,18 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 type DisplayMode = "compact" | "detailed";
 
-type SyntaxHit = {
+interface SyntaxHit {
   uri: vscode.Uri;
   diagnostic: vscode.Diagnostic;
-};
+}
 
 type TreeNode = SyntaxCodeNode | SyntaxFileNode;
 const FILTER_STATE_KEY = "vitte.topSyntaxErrors.codeFilter";
+
+function labelAsString(label: vscode.TreeItemLabel | string | undefined): string {
+  if (typeof label === "string") return label;
+  return label?.label ?? "";
+}
 
 function syntaxCodeOf(d: vscode.Diagnostic): string | undefined {
   const raw = d.code;
@@ -146,7 +151,7 @@ class TopSyntaxErrorsProvider implements vscode.TreeDataProvider<TreeNode>, vsco
     }
     return Array.from(byFile.entries())
       .map(([uriKey, entries]) => new SyntaxFileNode(element.code, vscode.Uri.parse(uriKey), entries, this.displayMode))
-      .sort((a, b) => b.entries.length - a.entries.length || a.label!.toString().localeCompare(b.label!.toString()));
+      .sort((a, b) => b.entries.length - a.entries.length || labelAsString(a.label).localeCompare(labelAsString(b.label)));
   }
 
   dispose(): void {

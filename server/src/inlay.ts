@@ -1,9 +1,8 @@
 import {
-  InlayHint,
   InlayHintKind,
   Position,
-  Range,
 } from "vscode-languageserver/node";
+import type { InlayHint, Range } from "vscode-languageserver/node";
 import type { TextDocument } from "vscode-languageserver-textdocument";
 
 export interface InlayHintPrefs {
