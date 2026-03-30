@@ -3029,6 +3029,9 @@ function wireClientState(c: LanguageClient): void {
       void setServerOnlineContext(false);
     } else if (e.newState === ClientState.Running) {
       offlineReason = undefined;
+      offlineSince = undefined;
+      offlineBannerShown = false;
+      cancelOfflineRetry();
       setStatusBase("$(check)", "Vitte LSP: running");
       void setServerOnlineContext(true);
     } else if (e.newState === ClientState.Stopped) {
