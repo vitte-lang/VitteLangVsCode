@@ -103,6 +103,7 @@ let restartInFlight: Promise<boolean> | undefined;
 let restartQueued = false;
 let restartQueueReason = "";
 let configRestartTimer: NodeJS.Timeout | undefined;
+let extensionShuttingDown = false;
 let activationStartedAt = Date.now();
 const completionLatencyWindowMs: number[] = [];
 const completionStreamingCachePrefix = new Map<string, { items: vscode.CompletionItem[]; ts: number }>();
@@ -1358,6 +1359,7 @@ async function setOfflineMode(enabled: boolean, reason?: string): Promise<void> 
 }
 
 function scheduleOfflineRetry(): void {
+  if (extensionShuttingDown) return;
   if (isOfflineEffective()) return;
   const cfg = vscode.workspace.getConfiguration("vitte");
   const enabled = cfg.get<boolean>("server.autoRetry", true);
@@ -1368,8 +1370,10 @@ function scheduleOfflineRetry(): void {
     offlineRetryMs = Math.max(base, offlineRetryMs);
     offlineRetryMs = Math.min(offlineRetryMs, max);
     offlineRetryTimer = setTimeout(() => {
+      if (extensionShuttingDown) return;
       offlineRetryTimer = undefined;
       void (async () => {
+        if (extensionShuttingDown) return;
         try {
           const ok = await requestClientRestart(lastActivationContext ?? undefined, "offline-retry");
           if (ok) {
@@ -1531,6 +1535,7 @@ async function showStartupCommandPrompt(context: vscode.ExtensionContext): Promi
   }
 }
 export async function activate(context: vscode.ExtensionContext): Promise<ExtensionApi | undefined> {
+  extensionShuttingDown = false;
   activationStartedAt = Date.now();
   lastActivationContext = context;
   try {
@@ -2256,6 +2261,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 }
 
 export async function deactivate(): Promise<void> {
+  extensionShuttingDown = true;
   try { await client?.stop(); } catch { /* noop */ }
   client = undefined;
   cancelOfflineRetry();
@@ -2291,6 +2297,9 @@ export async function deactivate(): Promise<void> {
   }
   healthFailures = 0;
   healthRestartInFlight = false;
+  restartInFlight = undefined;
+  restartQueued = false;
+  restartQueueReason = "";
   reliabilityAttempts = 0;
   reliabilityNextDelayMs = 30000;
   recentStops.length = 0;
@@ -2334,6 +2343,7 @@ function resolveServerModule(context: vscode.ExtensionContext): string {
 }
 
 async function startClient(context: vscode.ExtensionContext | undefined): Promise<boolean> {
+  if (extensionShuttingDown) return false;
   if (client) return true; // already running
   if (!context) return false;
 
@@ -2845,6 +2855,7 @@ async function requestClientRestart(
   context: vscode.ExtensionContext | undefined,
   reason: string
 ): Promise<boolean> {
+  if (extensionShuttingDown) return false;
   if (restartInFlight) {
     restartQueued = true;
     restartQueueReason = reason;
@@ -2877,8 +2888,10 @@ async function requestClientRestart(
 }
 
 function scheduleConfigRestart(context: vscode.ExtensionContext | undefined, reason: string): void {
+  if (extensionShuttingDown) return;
   if (configRestartTimer) clearTimeout(configRestartTimer);
   configRestartTimer = setTimeout(() => {
+    if (extensionShuttingDown) return;
     configRestartTimer = undefined;
     void requestClientRestart(context, reason);
   }, 450);
@@ -2889,10 +2902,12 @@ function shouldRestartForConfigChange(e: vscode.ConfigurationChangeEvent): boole
 }
 
 function startHealthChecks(context: vscode.ExtensionContext): void {
+  if (extensionShuttingDown) return;
   if (healthCheckTimer) clearInterval(healthCheckTimer);
   let lastBudgetAlert = 0;
   healthCheckTimer = setInterval(() => {
     void (async () => {
+      if (extensionShuttingDown) return;
       if (isOfflineEffective()) return;
       if (!client || client.state !== ClientState.Running) return;
       try {
