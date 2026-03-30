@@ -38,6 +38,11 @@ function severityWeight(s: vscode.DiagnosticSeverity | undefined): number {
   }
 }
 
+function firstSyntaxHit(entries: readonly SyntaxHit[] | undefined): SyntaxHit | undefined {
+  if (!entries || entries.length === 0) return undefined;
+  return entries[0];
+}
+
 class SyntaxCodeNode extends vscode.TreeItem {
   constructor(
     public readonly code: string,
@@ -50,7 +55,7 @@ class SyntaxCodeNode extends vscode.TreeItem {
       : `${entries.length}`;
     this.contextValue = "vitteTopSyntaxCode";
     this.iconPath = new vscode.ThemeIcon("list-ordered");
-    const sample = entries[0]?.diagnostic.message ?? "";
+    const sample = firstSyntaxHit(entries)?.diagnostic.message ?? "";
     this.tooltip = mode === "detailed"
       ? `${code} - ${entries.length} issue(s)\n${sample}`
       : `${code} (${entries.length})`;
@@ -64,7 +69,7 @@ class SyntaxFileNode extends vscode.TreeItem {
     public readonly entries: SyntaxHit[],
     mode: DisplayMode,
   ) {
-    const first = entries[0];
+    const first = firstSyntaxHit(entries);
     const pos = first?.diagnostic.range.start;
     const baseLabel = relLabel(file);
     const compactLabel = pos ? `${baseLabel} (L${pos.line + 1})` : baseLabel;
@@ -120,8 +125,8 @@ class TopSyntaxErrorsProvider implements vscode.TreeDataProvider<TreeNode>, vsco
     const nodes = Array.from(byCode.entries())
       .map(([code, entries]) => new SyntaxCodeNode(code, entries, this.displayMode))
       .sort((a, b) => {
-        const sa = severityWeight(a.entries[0]?.diagnostic.severity);
-        const sb = severityWeight(b.entries[0]?.diagnostic.severity);
+        const sa = severityWeight(firstSyntaxHit(a.entries)?.diagnostic.severity);
+        const sb = severityWeight(firstSyntaxHit(b.entries)?.diagnostic.severity);
         if (sa !== sb) return sb - sa;
         const c = b.entries.length - a.entries.length;
         if (c !== 0) return c;
