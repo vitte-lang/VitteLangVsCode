@@ -3237,6 +3237,40 @@ function mapDiagSeverity(severity: string | undefined): vscode.DiagnosticSeverit
   }
 }
 
+function normalizeDiagCode(raw: string | number | undefined): string {
+  if (typeof raw === "number") return String(raw);
+  if (typeof raw !== "string") return "";
+  return raw.trim().toUpperCase();
+}
+
+function diagnosticDocUri(code: string): vscode.Uri | undefined {
+  if (/^E\d{4}$/.test(code) || /^VITTE-[A-Z]\d{4}$/.test(code)) {
+    return vscode.Uri.parse(`https://docs.vitte.dev/diagnostics/${code}`);
+  }
+  return undefined;
+}
+
+function vitteDiagnosticHelpForCode(code: string): string | undefined {
+  if (code === "E0001") return "expected identifier; use letters/digits/_ and avoid leading digits";
+  if (code === "E0002") return "expected expression; try a literal, name, call, or block expression";
+  if (code === "E0003") return "expected pattern; use identifier, constructor, or tuple/list pattern";
+  if (code === "E0004") return "expected type; try i32/string/bool or a generic type";
+  if (code === "E0005") return "unterminated block; close with `.end`";
+  if (code === "E0006") return "attribute must be followed by a `proc` declaration";
+  if (code === "E0007") return "unexpected top-level token; remove orphan token or close previous construct";
+  if (code === "E1016") return "internal module import denied; import the public facade instead";
+  if (code === "E1017") return "re-export conflict; replace glob imports with explicit symbol imports";
+  if (code === "E1018") return "ambiguous import path; keep either file-form or directory-form module";
+  if (/^VITTE-P\d{4}$/.test(code)) return "process diagnostic; check timeout/grace/profile/allowlist policy";
+  return undefined;
+}
+
+function formatVitteDiagnosticMessage(base: string, code: string): string {
+  const help = vitteDiagnosticHelpForCode(code);
+  if (!help) return base;
+  return `${base}\nhelp: ${help}`;
+}
+
 function extractDiagJson(stdout: string, stderr: string): string | undefined {
   const blobs = [stdout, stderr, `${stdout}\n${stderr}`];
   for (const text of blobs) {
@@ -3324,10 +3358,12 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         const endRaw = Number.isFinite(d.end) ? Number(d.end) : start + 1;
         const end = Math.max(start + 1, endRaw);
         const range = new vscode.Range(doc.positionAt(start), doc.positionAt(end));
-        const message = typeof d.message === "string" && d.message.length > 0 ? d.message : "Syntax error";
+        const baseMessage = typeof d.message === "string" && d.message.length > 0 ? d.message : "Syntax error";
         const severity = mapDiagSeverity(d.severity);
-        const code = (typeof d.code === "string" || typeof d.code === "number") ? String(d.code) : "";
-        const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${code}|${message}`;
+        const severityRaw = (d.severity ?? "").toLowerCase();
+        const code = normalizeDiagCode(d.code);
+        const message = code ? formatVitteDiagnosticMessage(baseMessage, code) : baseMessage;
+        const dedupeKey = `${range.start.line}:${range.start.character}-${range.end.character}|${severity}|${severityRaw}|${code}|${baseMessage}`;
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
 
@@ -3337,7 +3373,7 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
           firstErrorLine.add(range.start.line);
         }
 
-        if ((d.severity ?? "").toLowerCase() === "note" && lastError) {
+        if ((severityRaw === "note" || severityRaw === "help") && lastError) {
           const related = new vscode.DiagnosticRelatedInformation(
             new vscode.Location(doc.uri, range),
             message,
@@ -3347,8 +3383,11 @@ function runLiveSyntaxDiagnosticsNow(doc: vscode.TextDocument, seq: number): voi
         }
 
         const diag = new vscode.Diagnostic(range, message, severity);
-        if (code) diag.code = code;
-        diag.source = "vitte-parse";
+        if (code) {
+          const target = diagnosticDocUri(code);
+          diag.code = target ? { value: code, target } : code;
+        }
+        diag.source = "vitte";
         diagnostics.push(diag);
         if (severity === vscode.DiagnosticSeverity.Error) {
           lastError = diag;

@@ -189,7 +189,7 @@ function buildSyntaxQuickFixes(document: vscode.TextDocument, d: vscode.Diagnost
     actions.push(b);
   }
 
-  // Broad safe cleanup inspired by rust-analyzer quick fixes.
+  // Broad safe cleanup inspired by common language-server quick fixes.
   const normalize = new vscode.CodeAction(
     "Vitte: Normalize indentation and trailing spaces",
     vscode.CodeActionKind.QuickFix,
