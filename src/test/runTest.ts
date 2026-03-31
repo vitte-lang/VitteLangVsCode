@@ -7,6 +7,7 @@ import { runTests } from "@vscode/test-electron";
 
 interface TestRunFailedError extends Error {
   code?: number;
+  signal?: string;
 }
 
 async function main(): Promise<void> {
@@ -30,14 +31,17 @@ async function main(): Promise<void> {
 
 main().catch((err: TestRunFailedError) => {
   const message = String(err?.message ?? err);
+  const signal = typeof err?.signal === "string" ? err.signal : "";
   const isMacSandboxIssue =
     process.platform === "darwin" &&
     (err?.code === 9 ||
+      signal === "SIGABRT" ||
+      message.includes("signal SIGABRT") ||
       message.includes("bad option: --no-sandbox") ||
       message.includes("SecCodeCheckValidity"));
 
   if (isMacSandboxIssue) {
-    console.warn("[tests] Impossible de lancer VS Code dans cet environnement (restriction macOS).");
+    console.warn("[tests] Impossible de lancer VS Code dans cet environnement (restriction/runtime macOS).");
     console.warn("[tests] Exécutez `xattr -dr com.apple.quarantine <Visual Studio Code.app>` si vous souhaitez lancer les tests localement.");
     return;
   }
