@@ -77,17 +77,21 @@ function inDir(relPath: string, dir: string): boolean {
 
 export function registerPackageProblemsView(context: vscode.ExtensionContext): void {
   const provider = new PackageProblemsProvider();
-  const tree = vscode.window.createTreeView("vittePackageProblems", {
-    treeDataProvider: provider,
-    showCollapseAll: false,
-  });
+  let tree: vscode.TreeView<PackageSummaryNode> | undefined;
+  try {
+    tree = vscode.window.createTreeView("vittePackageProblems", {
+      treeDataProvider: provider,
+      showCollapseAll: false,
+    });
+  } catch {
+    // Keep commands active even when the view contribution is not present.
+  }
 
   const refresh = () => provider.refreshSoon();
   provider.refresh();
 
   context.subscriptions.push(
     provider,
-    tree,
     vscode.languages.onDidChangeDiagnostics(refresh),
     vscode.workspace.onDidSaveTextDocument(refresh),
     vscode.workspace.onDidOpenTextDocument(refresh),
@@ -113,4 +117,7 @@ export function registerPackageProblemsView(context: vscode.ExtensionContext): v
       editor.selection = new vscode.Selection(candidate.range.start, candidate.range.start);
     })
   );
+  if (tree) {
+    context.subscriptions.push(tree);
+  }
 }

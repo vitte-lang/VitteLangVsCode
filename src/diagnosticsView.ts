@@ -152,7 +152,7 @@ const SUPPORTED_EXTS = new Set([".vitte", ".vit"]);
 
 export interface DiagnosticsView {
   readonly provider: DiagnosticsTreeDataProvider;
-  readonly tree: vscode.TreeView<TreeNode>;
+  readonly tree: vscode.TreeView<TreeNode> | undefined;
   refresh(): void;
 }
 
@@ -380,11 +380,17 @@ class DiagnosticsTreeDataProvider implements vscode.TreeDataProvider<TreeNode>, 
 
 export function registerDiagnosticsView(context: vscode.ExtensionContext): DiagnosticsView {
   const provider = new DiagnosticsTreeDataProvider();
-  const tree = vscode.window.createTreeView<TreeNode>("vitteDiagnostics", { treeDataProvider: provider });
+  let tree: vscode.TreeView<TreeNode> | undefined;
+  try {
+    tree = vscode.window.createTreeView<TreeNode>("vitteDiagnostics", { treeDataProvider: provider });
+  } catch {
+    // Keep diagnostics commands available even when the view contribution is not present.
+  }
 
   const refresh = () => {
     const u = uiStrings();
     provider.refresh();
+    if (!tree) return;
     if (provider.hasItems()) {
       tree.message = '';
     } else {
@@ -395,13 +401,13 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
   const refreshDebounced = () => {
     const u = uiStrings();
     provider.refreshDebounced();
+    if (!tree) return;
     if (!provider.hasItems()) tree.message = u.noDiagnostics;
   };
 
   refresh();
 
   context.subscriptions.push(
-    tree,
     provider,
     vscode.languages.onDidChangeDiagnostics(refreshDebounced),
     vscode.workspace.onDidCloseTextDocument(refreshDebounced),
@@ -477,6 +483,9 @@ export function registerDiagnosticsView(context: vscode.ExtensionContext): Diagn
       refresh();
     }),
   );
+  if (tree) {
+    context.subscriptions.push(tree);
+  }
 
   vscode.window.onDidChangeActiveTextEditor(refresh, undefined, context.subscriptions);
 

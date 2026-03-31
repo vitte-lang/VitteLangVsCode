@@ -32,6 +32,12 @@ async function waitUntil(condition: () => boolean | Promise<boolean>, timeout = 
   throw new Error("Timed out waiting for condition");
 }
 
+function writableConfigTarget(): vscode.ConfigurationTarget {
+  return (vscode.workspace.workspaceFolders?.length ?? 0) > 0
+    ? vscode.ConfigurationTarget.Workspace
+    : vscode.ConfigurationTarget.Global;
+}
+
 suite("Vitte extension", () => {
   let extension: vscode.Extension<unknown> | undefined;
   let api: ExtensionTestApi | undefined;
@@ -631,9 +637,10 @@ suite("Vitte extension", () => {
   test("E2E: E0001 diagnostic includes non-empty help", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
+    const target = writableConfigTarget();
 
     try {
-      await cfg.update("diagnostics.helpSource", "local", vscode.ConfigurationTarget.Workspace);
+      await cfg.update("diagnostics.helpSource", "local", target);
       const rendered = await vscode.commands.executeCommand<string>(
         "vitte.test.renderDiagnosticMessage",
         "E0001",
@@ -646,16 +653,20 @@ suite("Vitte extension", () => {
         `Le diagnostic E0001 n'inclut pas de help non vide. Message: ${rendered ?? ""}`,
       );
     } finally {
-      await cfg.update("diagnostics.helpSource", helpSourceInspect?.workspaceValue, vscode.ConfigurationTarget.Workspace);
+      const previous = target === vscode.ConfigurationTarget.Workspace
+        ? helpSourceInspect?.workspaceValue
+        : helpSourceInspect?.globalValue;
+      await cfg.update("diagnostics.helpSource", previous, target);
     }
   });
 
   test("E2E: missing vitte binary falls back to local help", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
+    const target = writableConfigTarget();
 
     try {
-      await cfg.update("diagnostics.helpSource", "auto", vscode.ConfigurationTarget.Workspace);
+      await cfg.update("diagnostics.helpSource", "auto", target);
       const rendered = await vscode.commands.executeCommand<string>(
         "vitte.test.renderDiagnosticMessage",
         "E0001",
@@ -669,13 +680,17 @@ suite("Vitte extension", () => {
         `Fallback local help absent quand le binaire vitte est introuvable. Message: ${rendered ?? ""}`,
       );
     } finally {
-      await cfg.update("diagnostics.helpSource", helpSourceInspect?.workspaceValue, vscode.ConfigurationTarget.Workspace);
+      const previous = target === vscode.ConfigurationTarget.Workspace
+        ? helpSourceInspect?.workspaceValue
+        : helpSourceInspect?.globalValue;
+      await cfg.update("diagnostics.helpSource", previous, target);
     }
   });
 
   test("Observability: tracks explain usage vs local fallback", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
+    const target = writableConfigTarget();
 
     const before = await vscode.commands.executeCommand<{
       requests?: number;
@@ -690,10 +705,10 @@ suite("Vitte extension", () => {
     assert.ok(before, "Snapshot observability initial manquant");
 
     try {
-      await cfg.update("diagnostics.helpSource", "local", vscode.ConfigurationTarget.Workspace);
+      await cfg.update("diagnostics.helpSource", "local", target);
       await vscode.commands.executeCommand<string>("vitte.test.renderDiagnosticMessage", "E0001", "expected identifier");
 
-      await cfg.update("diagnostics.helpSource", "auto", vscode.ConfigurationTarget.Workspace);
+      await cfg.update("diagnostics.helpSource", "auto", target);
       await vscode.commands.executeCommand<string>(
         "vitte.test.renderDiagnosticMessage",
         "E0001",
@@ -723,7 +738,10 @@ suite("Vitte extension", () => {
       assert.equal(typeof after.localFallbackRate, "number");
       assert.equal(typeof after.localOnlyRate, "number");
     } finally {
-      await cfg.update("diagnostics.helpSource", helpSourceInspect?.workspaceValue, vscode.ConfigurationTarget.Workspace);
+      const previous = target === vscode.ConfigurationTarget.Workspace
+        ? helpSourceInspect?.workspaceValue
+        : helpSourceInspect?.globalValue;
+      await cfg.update("diagnostics.helpSource", previous, target);
     }
   });
 

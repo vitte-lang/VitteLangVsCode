@@ -25,6 +25,9 @@ import { registerAdvancedCodeActions } from "./providers/advancedCodeActions";
 import { registerVitteCodeLens } from "./providers/vitteCodeLens";
 import { registerEnterpriseSuite } from "./commands/enterpriseSuite";
 import { registerCommandCenterView } from "./providers/commandCenterView";
+import { registerDiagnosticsView } from "./diagnosticsView";
+import { registerPackageProblemsView } from "./providers/packageProblemsView";
+import { registerTopSyntaxErrorsView } from "./providers/topSyntaxErrorsView";
 import {
   LanguageClient,
   TransportKind,
@@ -2307,15 +2310,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
 
   // Views are registered in best-effort mode so missing contributed view IDs
   // do not interrupt extension activation.
-  // Disabled for now: these three tree views are not contributed in the current UI profile.
-  // Keep commands/diagnostics runtime active, but skip view registration to avoid
-  // "No view is registered with id" errors.
-  // safeRegisterView("vitteDiagnostics", () => registerDiagnosticsView(context));
+  // Register diagnostics/package views in best-effort mode.
+  // View registration may be skipped when the contribution is absent, but command
+  // registration remains available for tests and command palette usage.
+  safeRegisterView("vitteDiagnostics", () => registerDiagnosticsView(context));
   // safeRegisterView("vitteModules", () => registerModuleExplorerView(context));
   // safeRegisterView("vitteMetrics", () => registerMetricsView(context, () => client, getStreamingCompletionStats));
-  // safeRegisterView("vittePackageProblems", () => registerPackageProblemsView(context));
+  safeRegisterView("vittePackageProblems", () => registerPackageProblemsView(context));
   safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
-  // safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
+  safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
   safeRegisterView("vitteCommandCenter", () => registerCommandCenterView(context, () => client));
   // safeRegisterView("vitteOffline", () => registerOfflineView(
   //   context,

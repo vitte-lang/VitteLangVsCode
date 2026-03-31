@@ -180,12 +180,18 @@ class TopSyntaxErrorsProvider implements vscode.TreeDataProvider<TreeNode>, vsco
 
 export function registerTopSyntaxErrorsView(context: vscode.ExtensionContext): void {
   const provider = new TopSyntaxErrorsProvider();
-  const tree = vscode.window.createTreeView<TreeNode>("vitteTopSyntaxErrors", { treeDataProvider: provider });
+  let tree: vscode.TreeView<TreeNode> | undefined;
+  try {
+    tree = vscode.window.createTreeView<TreeNode>("vitteTopSyntaxErrors", { treeDataProvider: provider });
+  } catch {
+    // Keep commands active even when the view contribution is not present.
+  }
   const initialFilter = context.workspaceState.get<string>(FILTER_STATE_KEY);
   provider.setCodeFilter(initialFilter);
 
   const refresh = () => {
     provider.refresh();
+    if (!tree) return;
     const filterLabel = provider.getCodeFilterLabel();
     if (!provider.hasItems()) {
       tree.message = filterLabel
@@ -199,7 +205,6 @@ export function registerTopSyntaxErrorsView(context: vscode.ExtensionContext): v
   refresh();
   context.subscriptions.push(
     provider,
-    tree,
     vscode.languages.onDidChangeDiagnostics(refresh),
     vscode.workspace.onDidOpenTextDocument(refresh),
     vscode.workspace.onDidCloseTextDocument(refresh),
@@ -228,6 +233,9 @@ export function registerTopSyntaxErrorsView(context: vscode.ExtensionContext): v
       refresh();
     }),
   );
+  if (tree) {
+    context.subscriptions.push(tree);
+  }
 }
 
 function parseCodeFilter(raw: string | undefined): Set<string> {
