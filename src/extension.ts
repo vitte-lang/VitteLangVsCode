@@ -1604,6 +1604,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   statusItem.name = "Vitte LSP";
   statusItem.command = "vitte.showServerLog";
   context.subscriptions.push(output, statusItem);
+  if (process.env.VSCODE_TESTING === "1") {
+    ensureTestingWorkspaceFolder(context);
+  }
   setStatusBase("$(rocket)", "Vitte Language Server");
   refreshDiagnosticsStatus();
   statusItem.show();
@@ -2239,6 +2242,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
     vscode.commands.registerCommand("vitte.debug.runFile", async () => { await runDebugCurrentFile(); }),
     vscode.commands.registerCommand("vitte.debug.attachServer", async () => { await attachDebugServer(); }),
   );
+  await ensureBaselineContributedCommands(context);
 
   // Refresh status depending on the active editor
   context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateStatusText));
@@ -2320,7 +2324,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
   safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
   safeRegisterView("vitteCommandCenter", () => registerCommandCenterView(context, () => client));
-  await ensureBaselineContributedCommands(context);
   // safeRegisterView("vitteOffline", () => registerOfflineView(
   //   context,
   //   () => offlineReason,
@@ -3260,6 +3263,17 @@ function safeRegisterView(label: string, register: () => void): void {
     const message = err instanceof Error ? err.message : String(err);
     output.appendLine(`[view.register.skip:${label}] ${message}`);
     obsLog("view.register.skipped", "warn", { view: label, message });
+  }
+}
+
+function ensureTestingWorkspaceFolder(context: vscode.ExtensionContext): void {
+  if ((vscode.workspace.workspaceFolders?.length ?? 0) > 0) return;
+  const uri = vscode.Uri.file(context.extensionPath);
+  try {
+    const ok = vscode.workspace.updateWorkspaceFolders(0, 0, { uri, name: "VitteLangVsCode" });
+    output.appendLine(`[test.workspace] injected=${String(ok)} uri=${uri.fsPath}`);
+  } catch (err) {
+    output.appendLine(`[test.workspace] inject failed: ${String(err)}`);
   }
 }
 
