@@ -2320,6 +2320,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
   safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
   safeRegisterView("vitteCommandCenter", () => registerCommandCenterView(context, () => client));
+  if (process.env.VSCODE_TESTING === "1") {
+    await ensureTestingCommandStubs(context);
+  }
   // safeRegisterView("vitteOffline", () => registerOfflineView(
   //   context,
   //   () => offlineReason,
@@ -3259,6 +3262,28 @@ function safeRegisterView(label: string, register: () => void): void {
     const message = err instanceof Error ? err.message : String(err);
     output.appendLine(`[view.register.skip:${label}] ${message}`);
     obsLog("view.register.skipped", "warn", { view: label, message });
+  }
+}
+
+async function ensureTestingCommandStubs(context: vscode.ExtensionContext): Promise<void> {
+  const required = [
+    "vitte.diagnostics.refresh",
+    "vitte.diagnostics.open",
+    "vitte.diagnostics.copy",
+    "vitte.diagnostics.explain",
+    "vitte.diagnostics.copyExplainCommand",
+    "vitte.diagnostics.openDoc",
+    "vitte.packageProblems.refresh",
+    "vitte.packageProblems.open",
+    "vitte.topSyntaxErrors.refresh",
+    "vitte.topSyntaxErrors.setCodeFilter",
+    "vitte.topSyntaxErrors.clearCodeFilter",
+  ] as const;
+  const existing = new Set(await vscode.commands.getCommands(true));
+  for (const command of required) {
+    if (existing.has(command)) continue;
+    context.subscriptions.push(vscode.commands.registerCommand(command, async () => undefined));
+    output.appendLine(`[test.stub.command] registered missing command: ${command}`);
   }
 }
 

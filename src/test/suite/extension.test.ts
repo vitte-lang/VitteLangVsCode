@@ -32,12 +32,6 @@ async function waitUntil(condition: () => boolean | Promise<boolean>, timeout = 
   throw new Error("Timed out waiting for condition");
 }
 
-function writableConfigTarget(): vscode.ConfigurationTarget {
-  return (vscode.workspace.workspaceFolders?.length ?? 0) > 0
-    ? vscode.ConfigurationTarget.Workspace
-    : vscode.ConfigurationTarget.Global;
-}
-
 suite("Vitte extension", () => {
   let extension: vscode.Extension<unknown> | undefined;
   let api: ExtensionTestApi | undefined;
@@ -637,7 +631,7 @@ suite("Vitte extension", () => {
   test("E2E: E0001 diagnostic includes non-empty help", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
-    const target = writableConfigTarget();
+    const target = vscode.ConfigurationTarget.Global;
 
     try {
       await cfg.update("diagnostics.helpSource", "local", target);
@@ -653,9 +647,7 @@ suite("Vitte extension", () => {
         `Le diagnostic E0001 n'inclut pas de help non vide. Message: ${rendered ?? ""}`,
       );
     } finally {
-      const previous = target === vscode.ConfigurationTarget.Workspace
-        ? helpSourceInspect?.workspaceValue
-        : helpSourceInspect?.globalValue;
+      const previous = helpSourceInspect?.globalValue;
       await cfg.update("diagnostics.helpSource", previous, target);
     }
   });
@@ -663,7 +655,7 @@ suite("Vitte extension", () => {
   test("E2E: missing vitte binary falls back to local help", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
-    const target = writableConfigTarget();
+    const target = vscode.ConfigurationTarget.Global;
 
     try {
       await cfg.update("diagnostics.helpSource", "auto", target);
@@ -680,9 +672,7 @@ suite("Vitte extension", () => {
         `Fallback local help absent quand le binaire vitte est introuvable. Message: ${rendered ?? ""}`,
       );
     } finally {
-      const previous = target === vscode.ConfigurationTarget.Workspace
-        ? helpSourceInspect?.workspaceValue
-        : helpSourceInspect?.globalValue;
+      const previous = helpSourceInspect?.globalValue;
       await cfg.update("diagnostics.helpSource", previous, target);
     }
   });
@@ -690,7 +680,7 @@ suite("Vitte extension", () => {
   test("Observability: tracks explain usage vs local fallback", async () => {
     const cfg = vscode.workspace.getConfiguration("vitte");
     const helpSourceInspect = cfg.inspect<"auto" | "vitte" | "local">("diagnostics.helpSource");
-    const target = writableConfigTarget();
+    const target = vscode.ConfigurationTarget.Global;
 
     const before = await vscode.commands.executeCommand<{
       requests?: number;
@@ -738,9 +728,7 @@ suite("Vitte extension", () => {
       assert.equal(typeof after.localFallbackRate, "number");
       assert.equal(typeof after.localOnlyRate, "number");
     } finally {
-      const previous = target === vscode.ConfigurationTarget.Workspace
-        ? helpSourceInspect?.workspaceValue
-        : helpSourceInspect?.globalValue;
+      const previous = helpSourceInspect?.globalValue;
       await cfg.update("diagnostics.helpSource", previous, target);
     }
   });
