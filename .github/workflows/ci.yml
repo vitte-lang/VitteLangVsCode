@@ -29,6 +29,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Debug revision
+        run: |
+          git rev-parse HEAD
+          node -e "const fs=require('fs'); const s=fs.readFileSync('src/test/suite/extension.test.ts','utf8'); console.log('has_old_assert=', s.includes('vitte.diagnostics.refresh non enregistrée'));"
+
+      - name: Clean build outputs
+        run: rm -rf out server/out
+
       - name: Build
         run: npm run build
 

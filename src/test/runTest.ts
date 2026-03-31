@@ -12,6 +12,7 @@ interface TestRunFailedError extends Error {
 async function main(): Promise<void> {
   const extensionDevelopmentPath = path.resolve(__dirname, "../../");
   const extensionTestsPath = path.resolve(__dirname, "./suite/index");
+  const workspacePath = extensionDevelopmentPath;
 
   delete process.env.ELECTRON_RUN_AS_NODE;
   process.env.VSCODE_TESTING = "1";
@@ -20,6 +21,7 @@ async function main(): Promise<void> {
     extensionDevelopmentPath,
     extensionTestsPath,
     version: "stable",
+    launchArgs: [workspacePath],
     extensionTestsEnv: {
       VSCODE_TESTING: "1",
     },
