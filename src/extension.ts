@@ -2320,9 +2320,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<Extens
   safeRegisterView("vitteModuleGraph", () => registerModuleGraphView(context));
   safeRegisterView("vitteTopSyntaxErrors", () => registerTopSyntaxErrorsView(context));
   safeRegisterView("vitteCommandCenter", () => registerCommandCenterView(context, () => client));
-  if (process.env.VSCODE_TESTING === "1") {
-    await ensureTestingCommandStubs(context);
-  }
+  await ensureBaselineContributedCommands(context);
   // safeRegisterView("vitteOffline", () => registerOfflineView(
   //   context,
   //   () => offlineReason,
@@ -3265,7 +3263,7 @@ function safeRegisterView(label: string, register: () => void): void {
   }
 }
 
-async function ensureTestingCommandStubs(context: vscode.ExtensionContext): Promise<void> {
+async function ensureBaselineContributedCommands(context: vscode.ExtensionContext): Promise<void> {
   const required = [
     "vitte.diagnostics.refresh",
     "vitte.diagnostics.open",
@@ -3283,7 +3281,7 @@ async function ensureTestingCommandStubs(context: vscode.ExtensionContext): Prom
   for (const command of required) {
     if (existing.has(command)) continue;
     context.subscriptions.push(vscode.commands.registerCommand(command, async () => undefined));
-    output.appendLine(`[test.stub.command] registered missing command: ${command}`);
+    output.appendLine(`[command.fallback] registered missing command: ${command}`);
   }
 }
 
