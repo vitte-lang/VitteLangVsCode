@@ -3280,7 +3280,7 @@ async function ensureBaselineContributedCommands(context: vscode.ExtensionContex
   const existing = new Set(await vscode.commands.getCommands(true));
   for (const command of required) {
     if (existing.has(command)) continue;
-    context.subscriptions.push(vscode.commands.registerCommand(command, async () => undefined));
+    context.subscriptions.push(vscode.commands.registerCommand(command, () => undefined));
     output.appendLine(`[command.fallback] registered missing command: ${command}`);
   }
 }
